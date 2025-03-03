@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 import math
-import numpy as np
 import sys
-sys.path.append("/home/parallels/ackerman/src/bridge2ros/bridge2ros")
 from dataclasses import dataclass
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
@@ -11,16 +9,14 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64MultiArray 
 from sensor_msgs.msg import LaserScan
 from PP import PP
-from Visulise_kernals import MyFig
-
-
+import numpy as np
 
 class Controller_Node(Node):
     def __init__(self):
         super().__init__('Controller_Node')
 
-        self.subscription = self.create_subscription(Odometry,'/model/Car/odometry',self.pose_callback,10)
-        # self.subscription = self.create_subscription(LaserScan,'lidar',self.lidar_pose_callback,10)
+        self.subscription = self.create_subscription(Odometry,'/odom',self.pose_callback,10)
+        self.subscription = self.create_subscription(LaserScan,'/scan',self.lidar_pose_callback,10)
         
 
         class params():
@@ -81,11 +77,10 @@ class Controller_Node(Node):
         
         # speed
         v = msg.twist.twist.linear.x
+        print("velocity out")
+        print(v)
         v,theta = self.PP.control(x,y,v,theta)
-        # print('x: y: v: theta:')
-        # print(x,y,v,theta)
-        self.send_vel(v,theta)
-
+        #self.send_vel(v,theta)
 
     def lidar_pose_callback(self, msg):
         r = np.array(msg.ranges)  # DistanceSS
