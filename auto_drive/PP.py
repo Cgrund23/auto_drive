@@ -46,6 +46,7 @@ class PP:
     def get_pdes(self,x,y,lookahead):
         try:
             dist = np.sqrt((self.path_x[0]-x)**2+(self.path_y[0]-y)**2)
+            print("location x,y:")
             print(x,y)
             self.params.x = np.hstack((self.params.x,x))
             self.params.y = np.hstack((self.params.y,y))

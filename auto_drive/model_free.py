@@ -90,6 +90,7 @@ class Controller_Node(Node):
         angle = np.arange(msg.angle_min, msg.angle_max, self.angle)
         
         try:
+            #print(msg)
             pass
         except Exception as e:
             print(f"An error occurred: {e}")
@@ -98,6 +99,7 @@ class Controller_Node(Node):
         my_msg = Twist()
         my_msg.linear.x = float(x)
         my_msg.angular.z = float(z)
+        
         # print(x,z)
         self.my_vel_command.publish(my_msg)
 
