@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'model_free_node = auto_drive.model_free_node:main'
+            'Model_Free_Node = auto_drive.Model_Free_Node:main'
         ],
     },
 )

@@ -12,7 +12,7 @@ from sensor_msgs.msg import LaserScan
 from ackermann_msgs.msg import AckermannDriveStamped
 
 from PP import PP
-from auto_drive.IP_ackermann import IP
+from IP_ackermann import IP
 
 
 class Controller_Node(Node):
