@@ -94,7 +94,7 @@ class Controller_Node(Node):
         self.angle = (msg.angle_max - msg.angle_min)/numpoints
         angle = np.arange(msg.angle_min, msg.angle_max, self.angle)
         print(r.min())
-        if r.min() < .25:
+        if r.min() < .1:
             self.send_vel(0,0)
             return
         try:
@@ -109,7 +109,7 @@ class Controller_Node(Node):
         msg.drive.speed = float(x)  # Set desired velocity in m/s
         msg.drive.steering_angle = float(z)  # Set steering angle in radians
         self.my_vel_command.publish(msg)
-        self.get_logger().info(f'Publishing Velocity STOP :{msg.drive.speed} m/s')
+        self.get_logger().info(f'Publishing Velocity:{msg.drive.speed} m/s')
 
 def main(args=None):
     rclpy.init(args=args)
