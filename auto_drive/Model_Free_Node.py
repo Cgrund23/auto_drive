@@ -78,13 +78,14 @@ class Controller_Node(Node):
         
         # speed
         v = msg.twist.twist.linear.x
-        print("velocity out")
+        print("velocity of car")
         print(v)
-        vdes,thetades = self.PP.control(x,y,v,theta)
-        vdes = 1
+        #vdes,thetades = self.PP.control(x,y,v,theta)
+        vdes = -1
         v = self.IP_vel.control(v,vdes)
-        theta = self.IP_theta.control(theta,x_ref=thetades)
+        #theta = self.IP_theta.control(theta,x_ref=thetades)
         #print(v,theta)
+        theta = 0
         self.send_vel(v,theta)
 
     def lidar_pose_callback(self, msg):
