@@ -4,11 +4,12 @@ from kalman_filter import KalmanFilter as KF
 
 
 class IP:
-    def __init__(self,alpha = 0.25, kp = 100.0,dt = 0.001):
+    def __init__(self,alpha = 0.25, kp = 100.0, dt = 0.001):
 
         # iPD control parameters
         self.alpha = alpha  # Control gain
         self.Kp = kp  # Proportional gainn
+        self.dt = dt
 
         #Ki = .01 # Integral Gain
         # Noise 
