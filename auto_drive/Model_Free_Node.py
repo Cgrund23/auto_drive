@@ -64,7 +64,7 @@ class Controller_Node(Node):
         
 
     def pose_callback(self,msg):
-        print("pose call")
+        #print("pose call")
         x = msg.pose.pose.position.x
         y = msg.pose.pose.position.y
 
@@ -84,11 +84,11 @@ class Controller_Node(Node):
         vdes = 1
         v = self.IP_vel.control(v,x_ref=vdes)
         theta = self.IP_theta.control(theta,x_ref=thetades)
-        print(v,theta)
+        #print(v,theta)
         self.send_vel(v,theta)
 
     def lidar_pose_callback(self, msg):
-        print("lidar call")
+        #print("lidar call")
         r = np.array(msg.ranges)  # DistanceS
         numpoints = len(r)
         self.angle = (msg.angle_max - msg.angle_min)/numpoints

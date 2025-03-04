@@ -31,7 +31,7 @@ class PP:
         self.velocity_actuator_error = 0
         self.theta_actuator_error = 0
         pass
-    
+
     def get_trajectory(self,x_waypoints,y_waypoints):
         index = np.linspace(0,10,len(x_waypoints))
         path_x = CubicSpline(index,x_waypoints)
@@ -46,8 +46,8 @@ class PP:
     def get_pdes(self,x,y,lookahead):
         try:
             dist = np.sqrt((self.path_x[0]-x)**2+(self.path_y[0]-y)**2)
-            print("location x,y:")
-            print(x,y)
+            #print("location x,y:")
+            #print(x,y)
             self.params.x = np.hstack((self.params.x,x))
             self.params.y = np.hstack((self.params.y,y))
             if (dist>lookahead):
