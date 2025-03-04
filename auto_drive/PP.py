@@ -30,10 +30,10 @@ class PP:
         self.thetaistate = 0
         self.velocity_actuator_error = 0
         self.theta_actuator_error = 0
-
         pass
+    
     def get_trajectory(self,x_waypoints,y_waypoints):
-        index = np.linspace(0,10,len(x_waypoints)) 
+        index = np.linspace(0,10,len(x_waypoints))
         path_x = CubicSpline(index,x_waypoints)
         path_y = CubicSpline(index,y_waypoints) 
         index = np.linspace(0,10,20)   
