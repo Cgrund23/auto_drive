@@ -64,6 +64,7 @@ class Controller_Node(Node):
         
 
     def pose_callback(self,msg):
+        print("pose call")
         x = msg.pose.pose.position.x
         y = msg.pose.pose.position.y
 
@@ -86,10 +87,12 @@ class Controller_Node(Node):
         self.send_vel(v,theta)
 
     def lidar_pose_callback(self, msg):
+        print("lidar call")
         r = np.array(msg.ranges)  # DistanceS
         numpoints = len(r)
         self.angle = (msg.angle_max - msg.angle_min)/numpoints
         angle = np.arange(msg.angle_min, msg.angle_max, self.angle)
+        print(r.min())
         if r.min() < .25:
             self.send_vel(0,0)
             return
