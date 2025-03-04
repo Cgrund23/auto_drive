@@ -54,7 +54,7 @@ class Controller_Node(Node):
         self.params = params # store structure
         self.PP = PP(self.params) # pass structure to car
         self.PP.get_trajectory(self.params.wx,self.params.wy)
-        self.IP_vel = IP(alpha = 0.25, kp = 100.0,dt = 0.001)
+        self.IP_vel = IP(alpha = 0.5, kp = 10.0,dt = 0.001)
         self.IP_theta = IP(alpha = 0.25, kp = 100.0,dt = 0.001)
 
         # Publisher
@@ -82,7 +82,7 @@ class Controller_Node(Node):
         print(v)
         vdes,thetades = self.PP.control(x,y,v,theta)
         vdes = 1
-        v = self.IP_vel.control(v,x_ref=vdes)
+        v = self.IP_vel.control(v,vdes)
         theta = self.IP_theta.control(theta,x_ref=thetades)
         #print(v,theta)
         self.send_vel(v,theta)
