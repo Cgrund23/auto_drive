@@ -80,9 +80,9 @@ class Controller_Node(Node):
         print(v)
         vdes,thetades = self.PP.control(x,y,v,theta)
         vdes = 1
-        self.IP_vel.control(v,x_ref=vdes)
-        self.IP_theta.control(theta,x_ref=thetades)
-        #self.send_vel(v,theta)
+        v = self.IP_vel.control(v,x_ref=vdes)
+        theta = self.IP_theta.control(theta,x_ref=thetades)
+        self.send_vel(v,theta)
 
     def lidar_pose_callback(self, msg):
         r = np.array(msg.ranges)  # DistanceS
