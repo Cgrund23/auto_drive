@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
-import math
+import numpy as np
 import sys
 sys.path.append("/home/jetson/f1tenth_ws/src/auto_drive/auto_drive")
 from dataclasses import dataclass
@@ -9,8 +9,11 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64MultiArray 
 from sensor_msgs.msg import LaserScan
+from ackermann_msgs.msg import AckermannDriveStamped
+
 from PP import PP
-import numpy as np
+from IP_ackermann import IP
+
 
 class Controller_Node(Node):
     def __init__(self):
@@ -18,13 +21,8 @@ class Controller_Node(Node):
 
         self.subscription = self.create_subscription(Odometry,'/odom',self.pose_callback,10)
         self.subscription = self.create_subscription(LaserScan,'/scan',self.lidar_pose_callback,10)
-        
 
         class params():
-            # for qp
-            dt: float = 1/100 # 100ms
-
-            # Car info
 
             xdim: float = 4
             udim: float = 2
@@ -42,10 +40,6 @@ class Controller_Node(Node):
             v0: float = 0.0 # initial velocity
             state: float = [x0,y0,theta0,v0] # starting state vector
 
-            beta: float = 0 
-            gamma: float = 0
-            theta: float = 0 
-
             # Gains
             Kvi: float = .01
             Kvp: float = 5
@@ -60,9 +54,13 @@ class Controller_Node(Node):
         self.params = params # store structure
         self.PP = PP(self.params) # pass structure to car
         self.PP.get_trajectory(self.params.wx,self.params.wy)
-        # Publisher and Subscriber
-        self.my_vel_command = self.create_publisher(Twist, "cmd_vel", 10)       # Send velocity and steer angle
+        self.IP_vel = IP(alpha = 0.25, kp = 100.0,dt = 0.001)
+        self.IP_theta = IP(alpha = 0.25, kp = 100.0,dt = 0.001)
+
+        # Publisher
+        self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)       # Send velocity and steer angle
         self.visual = self.create_publisher(Float64MultiArray, "visual", 10)    # send data to visulise will be changing
+
         
 
     def pose_callback(self,msg):
@@ -74,21 +72,26 @@ class Controller_Node(Node):
         w = msg.pose.pose.orientation.w
         t3 = +2.0 * (w * z)
         t4 = +1.0 - 2.0 * (z * z)
-        theta = math.atan2(t3, t4)
+        theta = np.atan2(t3, t4)
         
         # speed
         v = msg.twist.twist.linear.x
         print("velocity out")
         print(v)
-        v,theta = self.PP.control(x,y,v,theta)
+        vdes,thetades = self.PP.control(x,y,v,theta)
+        vdes = 1
+        self.IP_vel.control(v,x_ref=vdes)
+        self.IP_theta.control(theta,x_ref=thetades)
         #self.send_vel(v,theta)
 
     def lidar_pose_callback(self, msg):
-        r = np.array(msg.ranges)  # DistanceSS
+        r = np.array(msg.ranges)  # DistanceS
         numpoints = len(r)
         self.angle = (msg.angle_max - msg.angle_min)/numpoints
         angle = np.arange(msg.angle_min, msg.angle_max, self.angle)
-        
+        if r.min() < .25:
+            self.send_vel(0,0)
+            return
         try:
             #print(msg)
             pass
@@ -96,12 +99,11 @@ class Controller_Node(Node):
             print(f"An error occurred: {e}")
 
     def send_vel(self,x,z):
-        my_msg = Twist()
-        my_msg.linear.x = float(x)
-        my_msg.angular.z = float(z)
-        
-        # print(x,z)
-        self.my_vel_command.publish(my_msg)
+        msg = AckermannDriveStamped()
+        msg.drive.speed = x  # Set desired velocity in m/s
+        msg.drive.steering_angle = z  # Set steering angle in radians
+        self.my_vel_command.publish(msg)
+        self.get_logger().info(f'Publishing Velocity STOP :{msg.drive.speed} m/s')
 
 def main(args=None):
     rclpy.init(args=args)

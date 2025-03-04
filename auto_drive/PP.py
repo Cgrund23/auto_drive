@@ -87,35 +87,4 @@ class PP:
         vdes = self.get_velocity_des(xdes,ydes,x,y)
         thetades = self.get_theta_des(xdes,ydes,x,y)
 
-        # velocity command
-        ev = vdes - v
-
-        integrator_input = self.params.Kvi*ev + 1/self.params.Kvi*(self.velocity_actuator_error)
-        self.vistate += self.params.dt*integrator_input
-
-        commandv = self.params.Kvp*ev #+ self.vistate
-
-        sendv = np.clip(commandv,0,1)
-        
-        #self.velocity_actuator_error = commandv - sendv
-
-        # theta command
-        etheta = thetades - theta
-
-        integrator_input = self.params.Kthetai*etheta + .2*(self.theta_actuator_error)
-        self.thetaistate += self.params.dt*integrator_input
-
-        commandtheta = self.params.Kthetap*etheta + self.thetaistate
-
-        sendtheta = np.clip(commandtheta,-np.pi/2+.1,np.pi/2-.1)
-        
-        self.theta_actuator_error = commandtheta - sendtheta
-
-        return sendv,sendtheta
-
-    def plot(self):
-        fig, ax = ptl.subplots(figsize=(6.5, 4))  
-        ax.plot(self.params.x,self.params.y)
-        ax.plot(self.path_xx,self.path_yy)
-        ptl.legend(['Actual','Path'])
-        ptl.show()
+        return vdes,thetades
