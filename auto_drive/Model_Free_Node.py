@@ -86,7 +86,7 @@ class Controller_Node(Node):
         #theta = self.IP_theta.control(theta,x_ref=thetades)
         #print(v,theta)
         theta = 0
-        self.send_vel(v,theta)
+        #self.send_vel(v,theta)
 
     def lidar_pose_callback(self, msg):
         #print("lidar call")
