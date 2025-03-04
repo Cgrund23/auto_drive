@@ -104,9 +104,10 @@ class Controller_Node(Node):
             print(f"An error occurred: {e}")
 
     def send_vel(self,x,z):
+        z = 0.0
         msg = AckermannDriveStamped()
-        msg.drive.speed = x  # Set desired velocity in m/s
-        msg.drive.steering_angle = z  # Set steering angle in radians
+        msg.drive.speed = float(x)  # Set desired velocity in m/s
+        msg.drive.steering_angle = float(z)  # Set steering angle in radians
         self.my_vel_command.publish(msg)
         self.get_logger().info(f'Publishing Velocity STOP :{msg.drive.speed} m/s')
 
