@@ -82,6 +82,7 @@ class Controller_Node(Node):
         vdes = 1
         v = self.IP_vel.control(v,x_ref=vdes)
         theta = self.IP_theta.control(theta,x_ref=thetades)
+        print(v,theta)
         self.send_vel(v,theta)
 
     def lidar_pose_callback(self, msg):
