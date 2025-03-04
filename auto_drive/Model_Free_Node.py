@@ -82,11 +82,11 @@ class Controller_Node(Node):
         print(v)
         #vdes,thetades = self.PP.control(x,y,v,theta)
         vdes = -1
-        v = -self.IP_vel.control(v,vdes)
+        v = self.IP_vel.control(v,vdes)
         #theta = self.IP_theta.control(theta,x_ref=thetades)
         #print(v,theta)
         theta = 0
-        #self.send_vel(v,theta)
+        self.send_vel(v,theta)
 
     def lidar_pose_callback(self, msg):
         #print("lidar call")
@@ -97,7 +97,7 @@ class Controller_Node(Node):
         print("min distance")
         print(r.min())
         if r.min() < .1:
-            self.send_vel(0,0)
+            #self.send_vel(0,0)
             return
         try:
             #print(msg)
