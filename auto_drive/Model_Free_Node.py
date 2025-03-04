@@ -93,6 +93,7 @@ class Controller_Node(Node):
         numpoints = len(r)
         self.angle = (msg.angle_max - msg.angle_min)/numpoints
         angle = np.arange(msg.angle_min, msg.angle_max, self.angle)
+        print("min distance")
         print(r.min())
         if r.min() < .1:
             self.send_vel(0,0)
