@@ -73,7 +73,8 @@ class Controller_Node(Node):
         w = msg.pose.pose.orientation.w
         t3 = +2.0 * (w * z)
         t4 = +1.0 - 2.0 * (z * z)
-        theta = np.atan2(t3, t4)
+        theta = np.arctan2(t3, t4)
+        
         
         # speed
         v = msg.twist.twist.linear.x
