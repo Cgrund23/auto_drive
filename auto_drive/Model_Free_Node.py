@@ -81,7 +81,11 @@ class Controller_Node(Node):
         print("velocity of car")
         print(v)
         #vdes,thetades = self.PP.control(x,y,v,theta)
+<<<<<<< HEAD
         vdes = -.25
+=======
+        vdes = -0.25
+>>>>>>> a4fe1e5592140571c4401778eb8e84469f205bf2
         v = self.IP_vel.control(v,vdes)
         #theta = self.IP_theta.control(theta,x_ref=thetades)
         #print(v,theta)
