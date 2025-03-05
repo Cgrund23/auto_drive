@@ -82,7 +82,7 @@ class Controller_Node(Node):
         print(v)
         #vdes,thetades = self.PP.control(x,y,v,theta)
         vdes = 1
-        v = self.IP_vel.control(-v,vdes)
+        v = -self.IP_vel.control(-v,vdes)
         #theta = self.IP_theta.control(theta,x_ref=thetades)
         #print(v,theta)
         theta = 0
