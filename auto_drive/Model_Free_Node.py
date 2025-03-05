@@ -22,6 +22,7 @@ class Controller_Node(Node):
         self.last_time = None
         self.subscription = self.create_subscription(Odometry,'/odom',self.pose_callback,10)
         self.subscription = self.create_subscription(LaserScan,'/scan',self.lidar_pose_callback,10)
+        #self.subscription = self.create_subscription(teleop,'/scan',self.lidar_pose_callback,10)
         
         class params():
 
@@ -55,7 +56,7 @@ class Controller_Node(Node):
         self.params = params # store structure
         self.PP = PP(self.params) # pass structure to car
         self.PP.get_trajectory(self.params.wx,self.params.wy)
-        self.IP_vel = IP(alpha = 1.5, kp = 5,ki = 0.00,dt = 0.02)
+        self.IP_vel = IP(alpha = 1.5, kp = 10,ki = 0.00,dt = 0.02)
         self.IP_theta = IP(alpha = 0.25, kp = 100.0,dt = 0.001)
 
         # Publisher
