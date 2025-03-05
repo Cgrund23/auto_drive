@@ -90,7 +90,6 @@ class Controller_Node(Node):
         print(v)
         #vdes,thetades = self.PP.control(x,y,v,theta)
         vdes = 1
-        print(self.pressed)
         if self.pressed == 1:
             v,F = self.IP_vel.control(-v,vdes)
         else:
@@ -130,8 +129,8 @@ class Controller_Node(Node):
     def send_vel(self,x,z):
         z = 0.0
         msg = AckermannDriveStamped()
-        #if x == 0.0:
-        #    msg.drive.acceleration = -5.0 # add brake
+        if x == 0.0:
+            msg.drive.acceleration = -5.0 # add brake
         msg.drive.speed = float(x)  # Set desired velocity in m/s
         msg.drive.steering_angle = float(z)  # Set steering angle in radians
         self.my_vel_command.publish(msg)
