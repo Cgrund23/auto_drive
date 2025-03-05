@@ -59,6 +59,7 @@ class Controller_Node(Node):
         self.IP_vel = IP(alpha = 3, kp = 5, ki = 1,dt = 0.002)
         self.IP_theta = IP(alpha = 0.25, kp = 100.0,dt = 0.001)
         self.pressed = 0
+        self.pressed2 = 0
 
         # Publisher
         self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)       # Send velocity and steer angle
