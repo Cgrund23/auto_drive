@@ -93,7 +93,8 @@ class Controller_Node(Node):
         if self.pressed == 1:
             v,F = self.IP_vel.control(-v,vdes)
         else:
-            v = 0
+            print('paused')
+            v = 0.0
             F = 0
 
         msg = Float64()
