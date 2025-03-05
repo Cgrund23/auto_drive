@@ -70,7 +70,7 @@ class Controller_Node(Node):
         button_pressed = msg.buttons  # List of button states (0 = released, 1 = pressed)
         self.pressed = button_pressed[5]
         self.pressed2 = button_pressed[0]
-        self.get_logger().info(f'buttons:{button_pressed}')
+        self.get_logger().info({button_pressed})
    
 
     def pose_callback(self,msg):
