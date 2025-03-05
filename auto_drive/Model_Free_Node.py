@@ -69,7 +69,7 @@ class Controller_Node(Node):
         """Callback function to process Joy messages."""
         print("button pressed")
         button_pressed = msg.buttons  # List of button states (0 = released, 1 = pressed)
-        self.pressed = button_pressed[0]
+        self.pressed = button_pressed[5]
         
         print(self.pressed)
    
