@@ -65,7 +65,7 @@ class Controller_Node(Node):
         self.visual = self.create_publisher(Float64MultiArray, "visual", 10)    # send data to visulise will be changing
         self.F = self.create_publisher(Float64, "F", 10)    # send data to visulise will be changing
 
-    def joy_callback(self, msg):
+    def run(self, msg):
         """Callback function to process Joy messages."""
         button_pressed = msg.buttons  # List of button states (0 = released, 1 = pressed)
         self.pressed = button_pressed[4]
