@@ -84,7 +84,7 @@ class Controller_Node(Node):
         vdes = 1
         v,F = self.IP_vel.control(-v,vdes)
         msg = Float64MultiArray()
-        msg.data = F
+        msg.data = float(F)
         self.F.publish(msg)
         #theta = self.IP_theta.control(theta,x_ref=thetades)
         #print(v,theta)
