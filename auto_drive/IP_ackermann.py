@@ -72,7 +72,7 @@ class IP:
         self.kalmF.predict(self.u)
         self.kalmF.update(np.array([x_ref,float(x_ref_dot)]).reshape(2,1))
         F_estimated = self.kalmF.x[2,0]
-        self.u =  -(F_estimated - x_ref_dot + self.Kp*error)*(1/self.alpha)
+        self.u =  (-F_estimated + x_ref_dot - self.Kp*error)*(1/self.alpha)
         self.ref_prev = x_ref
         return self.u
 
