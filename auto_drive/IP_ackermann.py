@@ -59,7 +59,7 @@ class IP:
         # Noise covariance 
         Qkalm = np.diag([10,1,0])/100
 
-        Rkalm = np.diag([1,1]) * 1
+        Rkalm = np.diag([.1,10]) * 1
 
         #initialise the filter
 
