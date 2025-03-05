@@ -93,6 +93,7 @@ class Controller_Node(Node):
         #print(v)
         #vdes,thetades = self.PP.control(x,y,v,theta)
         vdes = 1
+        F = 0
         if self.pressed == 1:
             v,F = self.IP_vel.control(-v,vdes)
         if self.pressed2 == 1:
