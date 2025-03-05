@@ -97,7 +97,7 @@ class Controller_Node(Node):
         if self.pressed == 1:
             v,F = self.IP_vel.control(-v,vdes)
         if self.pressed2 == 1:
-            print('brake')
+            print('brake pull')
             self.brake.publish(Float64(data=1000.0))
             v = 0.0
             F = 0
