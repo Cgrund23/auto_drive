@@ -70,7 +70,7 @@ class Controller_Node(Node):
         button_pressed = msg.buttons  # List of button states (0 = released, 1 = pressed)
         self.pressed = button_pressed[5]
         self.pressed2 = button_pressed[0]
-        print(button_pressed)
+        self.get_logger().info(f'buttons:{button_pressed}')
    
 
     def pose_callback(self,msg):
@@ -88,8 +88,8 @@ class Controller_Node(Node):
         
         # speed
         v = msg.twist.twist.linear.x
-        print("velocity of car")
-        print(v)
+        #print("velocity of car")
+        #print(v)
         #vdes,thetades = self.PP.control(x,y,v,theta)
         vdes = 1
         if self.pressed == 1:
@@ -118,8 +118,8 @@ class Controller_Node(Node):
         numpoints = len(r)
         self.angle = (msg.angle_max - msg.angle_min)/numpoints
         angle = np.arange(msg.angle_min, msg.angle_max, self.angle)
-        print("min distance")
-        print(r.min())
+        #print("min distance")
+        #print(r.min())
         if r.min() < .1:
             #self.send_vel(0,0)
             return
@@ -137,7 +137,7 @@ class Controller_Node(Node):
         msg.drive.speed = float(x)  # Set desired velocity in m/s
         msg.drive.steering_angle = float(z)  # Set steering angle in radians
         self.my_vel_command.publish(msg)
-        self.get_logger().info(f'Publishing Velocity:{msg.drive.speed} m/s')
+        #self.get_logger().info(f'Publishing Velocity:{msg.drive.speed} m/s')
 
 def main(args=None):
     rclpy.init(args=args)
