@@ -4,12 +4,14 @@ from kalman_filter import KalmanFilter as KF
 
 
 class IP:
-    def __init__(self,alpha = 0.25, kp = 100.0, dt = 0.001):
+    def __init__(self,alpha = 0.25, kp = 100.0, ki = 0.5, dt = 0.001):
 
         # iPD control parameters
         self.alpha = alpha  # Control gain
         self.Kp = kp  # Proportional gainn
+        self.Ki = ki  # Integral gain
         self.dt = dt
+        self.integral_error = 0
 
         #Ki = .01 # Integral Gain
         # Noise 
@@ -69,10 +71,11 @@ class IP:
         # iPD Control loop
         x_ref_dot = (x_ref - self.ref_prev)/self.dt
         error = x - x_ref 
+        self.integral_error += error * self.dt
         self.kalmF.predict(self.u)
         self.kalmF.update(np.array([x_ref,float(x_ref_dot)]).reshape(2,1))
         F_estimated = self.kalmF.x[2,0]
-        self.u =  (F_estimated - x_ref_dot + self.Kp*error)*(1/self.alpha)
+        self.u =  (F_estimated - x_ref_dot + self.Kp*error + self.Ki * self.integral_error)*(1/self.alpha)
         self.ref_prev = x_ref
         return self.u
 
