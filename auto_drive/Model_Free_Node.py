@@ -67,12 +67,8 @@ class Controller_Node(Node):
 
     def run(self, msg):
         """Callback function to process Joy messages."""
-        print("button pressed")
         button_pressed = msg.buttons  # List of button states (0 = released, 1 = pressed)
         self.pressed = button_pressed[5]
-        
-        print(self.pressed)
-   
 
     def pose_callback(self,msg):
         #print("pose call")
@@ -100,7 +96,6 @@ class Controller_Node(Node):
             v = 0
             F = 0
 
-        #v,F = self.IP_vel.control(-v,vdes)
         msg = Float64()
         msg.data = float(F)
         self.F.publish(msg)
