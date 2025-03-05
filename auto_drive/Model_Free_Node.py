@@ -69,6 +69,7 @@ class Controller_Node(Node):
         """Callback function to process Joy messages."""
         button_pressed = msg.buttons  # List of button states (0 = released, 1 = pressed)
         self.pressed = button_pressed[5]
+        self.pressed2 = button_pressed[0]
    
 
     def pose_callback(self,msg):
@@ -92,8 +93,8 @@ class Controller_Node(Node):
         vdes = 1
         if self.pressed == 1:
             v,F = self.IP_vel.control(-v,vdes)
-        else:
-            print('paused')
+        elif self.pressed2 == 1:
+            print('brake')
             v = 0.0
             F = 0
 
