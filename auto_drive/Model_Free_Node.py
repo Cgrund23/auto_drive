@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Float64
+from std_msgs.msg import Float64, Float64MultiArray
 from sensor_msgs.msg import LaserScan
 from ackermann_msgs.msg import AckermannDriveStamped
 
