@@ -96,6 +96,8 @@ class Controller_Node(Node):
         else:
             v = 0
             F = 0
+
+        v,F = self.IP_vel.control(-v,vdes)
         msg = Float64()
         msg.data = float(F)
         self.F.publish(msg)
