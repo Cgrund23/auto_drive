@@ -65,7 +65,8 @@ class Controller_Node(Node):
         self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)       # Send velocity and steer angle
         self.visual = self.create_publisher(Float64MultiArray, "visual", 10)    # send data to visulise will be changing
         self.F = self.create_publisher(Float64, "F", 10)    # send data to visulise will be changing
-
+        self.brake = self.create_publisher(Float64, "commands/motor/brake", 10)    # send data to visulise will be changing
+    
     def run(self, msg):
         """Callback function to process Joy messages."""
         button_pressed = msg.buttons  # List of button states (0 = released, 1 = pressed)
@@ -97,6 +98,7 @@ class Controller_Node(Node):
             v,F = self.IP_vel.control(-v,vdes)
         if self.pressed2 == 1:
             print('brake')
+            self.brake.publish(Float64(data=5.0))
             v = 0.0
             F = 0
 
