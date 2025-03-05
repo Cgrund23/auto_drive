@@ -8,7 +8,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64, Float64MultiArray
-from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import LaserScan, Joy
 from ackermann_msgs.msg import AckermannDriveStamped
 from rclpy.time import Time
 
@@ -22,7 +22,7 @@ class Controller_Node(Node):
         self.last_time = None
         self.subscription = self.create_subscription(Odometry,'/odom',self.pose_callback,10)
         self.subscription = self.create_subscription(LaserScan,'/scan',self.lidar_pose_callback,10)
-        #self.subscription = self.create_subscription(teleop,'/scan',self.lidar_pose_callback,10)
+        self.subscription = self.create_subscription(Joy,'/joy',self.run,10)
         
         class params():
 
@@ -58,12 +58,18 @@ class Controller_Node(Node):
         self.PP.get_trajectory(self.params.wx,self.params.wy)
         self.IP_vel = IP(alpha = 3, kp = 5, ki = 1,dt = 0.002)
         self.IP_theta = IP(alpha = 0.25, kp = 100.0,dt = 0.001)
+        self.pressed = 0
 
         # Publisher
         self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)       # Send velocity and steer angle
         self.visual = self.create_publisher(Float64MultiArray, "visual", 10)    # send data to visulise will be changing
         self.F = self.create_publisher(Float64, "F", 10)    # send data to visulise will be changing
-        
+
+    def joy_callback(self, msg):
+        """Callback function to process Joy messages."""
+        button_pressed = msg.buttons  # List of button states (0 = released, 1 = pressed)
+        self.pressed = button_pressed[4]
+   
 
     def pose_callback(self,msg):
         #print("pose call")
@@ -84,7 +90,11 @@ class Controller_Node(Node):
         print(v)
         #vdes,thetades = self.PP.control(x,y,v,theta)
         vdes = 1
-        v,F = self.IP_vel.control(-v,vdes)
+        if self.pressed == 1:
+            v,F = self.IP_vel.control(-v,vdes)
+        else:
+            v = 0
+            F = 0
         msg = Float64()
         msg.data = float(F)
         self.F.publish(msg)
