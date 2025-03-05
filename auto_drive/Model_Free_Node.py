@@ -91,11 +91,11 @@ class Controller_Node(Node):
         #theta = self.IP_theta.control(theta,x_ref=thetades)
         #print(v,theta)
         theta = 0
-        current_time = self.get_clock().now()
-        if self.last_time is not None:
-            ts = (current_time - self.last_time).nanoseconds / 1e9  # Convert nanoseconds to seconds
-            self.get_logger().info(f'Sampling Time (Ts): {ts:.6f} s')
-        self.last_time = current_time
+        # current_time = self.get_clock().now()
+        # if self.last_time is not None:
+        #     ts = (current_time - self.last_time).nanoseconds / 1e9  # Convert nanoseconds to seconds
+        #     #self.get_logger().info(f'Sampling Time (Ts): {ts:.6f} s')
+        # self.last_time = current_time
         self.send_vel(v,theta)
 
     def lidar_pose_callback(self, msg):
