@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Float64MultiArray 
+from std_msgs.msg import Float64
 from sensor_msgs.msg import LaserScan
 from ackermann_msgs.msg import AckermannDriveStamped
 
@@ -60,7 +60,7 @@ class Controller_Node(Node):
         # Publisher
         self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)       # Send velocity and steer angle
         self.visual = self.create_publisher(Float64MultiArray, "visual", 10)    # send data to visulise will be changing
-        self.F = self.create_publisher(Float64MultiArray, "F", 10)    # send data to visulise will be changing
+        self.F = self.create_publisher(Float64, "F", 10)    # send data to visulise will be changing
         
 
     def pose_callback(self,msg):
@@ -83,7 +83,7 @@ class Controller_Node(Node):
         #vdes,thetades = self.PP.control(x,y,v,theta)
         vdes = 1
         v,F = self.IP_vel.control(-v,vdes)
-        msg = Float64MultiArray()
+        msg = Float64()
         msg.data = float(F)
         self.F.publish(msg)
         #theta = self.IP_theta.control(theta,x_ref=thetades)
