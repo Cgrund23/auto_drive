@@ -66,6 +66,7 @@ class IP:
         self.kalmF = KF(F = Fkalm, H=Hkalm, Q=Qkalm, R=Rkalm ,B=Bkalm)
         self.u = 0
         self.ref_prev = 0
+        self.x_ref_dot_prev = 0
 
     def control(self,x,x_ref):
         # iPD Control loop
