@@ -10,6 +10,7 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64, Float64MultiArray
 from sensor_msgs.msg import LaserScan
 from ackermann_msgs.msg import AckermannDriveStamped
+from rclpy.time import Time
 
 from PP import PP
 from IP_ackermann import IP
@@ -18,10 +19,10 @@ from IP_ackermann import IP
 class Controller_Node(Node):
     def __init__(self):
         super().__init__('Controller_Node')
-
+        self.last_time = None
         self.subscription = self.create_subscription(Odometry,'/odom',self.pose_callback,10)
         self.subscription = self.create_subscription(LaserScan,'/scan',self.lidar_pose_callback,10)
-
+        
         class params():
 
             xdim: float = 4
@@ -89,6 +90,11 @@ class Controller_Node(Node):
         #theta = self.IP_theta.control(theta,x_ref=thetades)
         #print(v,theta)
         theta = 0
+        current_time = self.get_clock().now()
+        if self.last_time is not None:
+            ts = (current_time - self.last_time).nanoseconds / 1e9  # Convert nanoseconds to seconds
+            self.get_logger().info(f'Sampling Time (Ts): {ts:.6f} s')
+        self.last_time = current_time
         self.send_vel(v,theta)
 
     def lidar_pose_callback(self, msg):
