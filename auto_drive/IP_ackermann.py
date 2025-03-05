@@ -80,5 +80,5 @@ class IP:
         self.u =  -(F_estimated - x_ref_double_dot + self.Kp*error + self.Ki * self.integral_error)*(1/self.alpha)
         self.ref_prev = x_ref
         self.x_ref_dot_prev = x_ref_dot
-        return self.u
+        return self.u, F_estimated
 

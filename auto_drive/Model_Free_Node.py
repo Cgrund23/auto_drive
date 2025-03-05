@@ -54,13 +54,13 @@ class Controller_Node(Node):
         self.params = params # store structure
         self.PP = PP(self.params) # pass structure to car
         self.PP.get_trajectory(self.params.wx,self.params.wy)
-        self.IP_vel = IP(alpha = 0.4, kp = 1,ki = 0.00,dt = 0.001)
+        self.IP_vel = IP(alpha = 0.9, kp = 5,ki = 0.00,dt = 0.001)
         self.IP_theta = IP(alpha = 0.25, kp = 100.0,dt = 0.001)
 
         # Publisher
         self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)       # Send velocity and steer angle
         self.visual = self.create_publisher(Float64MultiArray, "visual", 10)    # send data to visulise will be changing
-
+        self.F = self.create_publisher(Float64MultiArray, "F", 10)    # send data to visulise will be changing
         
 
     def pose_callback(self,msg):
@@ -82,7 +82,10 @@ class Controller_Node(Node):
         print(v)
         #vdes,thetades = self.PP.control(x,y,v,theta)
         vdes = 1
-        v = self.IP_vel.control(-v,vdes)
+        v,F = self.IP_vel.control(-v,vdes)
+        msg = Float64MultiArray()
+        msg.data = F
+        self.F.publish(msg)
         #theta = self.IP_theta.control(theta,x_ref=thetades)
         #print(v,theta)
         theta = 0
@@ -107,7 +110,6 @@ class Controller_Node(Node):
 
     def send_vel(self,x,z):
         z = 0.0
-        
         msg = AckermannDriveStamped()
         msg.drive.speed = float(x)  # Set desired velocity in m/s
         msg.drive.steering_angle = float(z)  # Set steering angle in radians
