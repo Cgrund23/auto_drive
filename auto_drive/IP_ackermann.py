@@ -57,7 +57,7 @@ class IP:
         Hkalm = np.array([[1, 0, 0],[0, 1, 0]]).reshape(2, 3)
 
         # Noise covariance 
-        Qkalm = np.diag([1,1,1]) * 0.1
+        Qkalm = np.diag([1,1,1]) * 0.01
 
         Rkalm = np.diag([1,1]) * 0
 
