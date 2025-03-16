@@ -119,6 +119,15 @@ class Controller_Node(Node):
         angle = np.arange(msg.angle_min, msg.angle_max, msg.angle_increment)  # Angles
         print(msg.angle_min, msg.angle_max, msg.angle_increment) 
         
+        # Extract relevant distances (indexes depend on LiDAR setup)
+        front_idx = len(ranges) // 2  # Directly ahead
+        left_idx = int((msg.angle_max - (3.14 / 2)) / msg.angle_increment)  # 90 degrees left
+        right_idx = int((msg.angle_max + (3.14 / 2)) / msg.angle_increment)  # 90 degrees right
+
+        front_dist = ranges[front_idx] if ranges[front_idx] > 0 else float('inf')
+        left_dist = ranges[left_idx] if ranges[left_idx] > 0 else float('inf')
+        right_dist = ranges[right_idx] if ranges[right_idx] > 0 else float('inf')
+        print(front_dist, left_dist, right_dist)
         #print("min distance")
         #print(r.min())
         if ranges.min() < .1:
