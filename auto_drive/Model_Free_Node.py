@@ -56,8 +56,8 @@ class Controller_Node(Node):
         self.params = params # store structure
         self.PP = PP(self.params) # pass structure to car
         self.PP.get_trajectory(self.params.wx,self.params.wy)
-        self.IP_vel = IP(alpha = 3, kp = 5, ki = 1,dt = 0.002)
-        self.IP_theta = IP(alpha = 0.25, kp = 100.0,dt = 0.001)
+        self.IP_vel = IP(alpha = 3, kp = 3, ki = 1,dt = 0.002)
+        self.IP_theta = IP(alpha = 0.13, kp = 100.0,dt = 0.001)
         self.pressed = 0
         self.pressed2 = 0
 
@@ -105,25 +105,23 @@ class Controller_Node(Node):
         msg = Float64()
         msg.data = float(F)
         self.F.publish(msg)
-        #theta = self.IP_theta.control(theta,x_ref=thetades)
+
+        thetades = 0
+        # steer
+        theta = self.IP_theta.control(theta,x_ref=thetades)
         #print(v,theta)
-        theta = 0
-        # current_time = self.get_clock().now()
-        # if self.last_time is not None:
-        #     ts = (current_time - self.last_time).nanoseconds / 1e9  # Convert nanoseconds to seconds
-        #     #self.get_logger().info(f'Sampling Time (Ts): {ts:.6f} s')
-        # self.last_time = current_time
+        
         self.send_vel(v,theta)
 
     def lidar_pose_callback(self, msg):
         #print("lidar call")
-        r = np.array(msg.ranges)  # DistanceS
-        numpoints = len(r)
-        self.angle = (msg.angle_max - msg.angle_min)/numpoints
-        angle = np.arange(msg.angle_min, msg.angle_max, self.angle)
+        ranges = np.array(msg.ranges)  # DistanceS
+        angle = np.arange(msg.angle_min, msg.angle_max, msg.angle_increment)  # Angles
+        print(msg.angle_min, msg.angle_max, msg.angle_increment) 
+        
         #print("min distance")
         #print(r.min())
-        if r.min() < .1:
+        if ranges.min() < .1:
             #self.send_vel(0,0)
             return
         try:
