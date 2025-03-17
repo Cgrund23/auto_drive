@@ -143,7 +143,7 @@ class Controller_Node(Node):
         #     print(f"An error occurred: {e}")
 
     def send_vel(self,x,z):
-        z = 0.0
+        # z = 0.0
         msg = AckermannDriveStamped()
         if self.pressed2 == 1:
             msg.drive.acceleration = -5.0 # add brake
