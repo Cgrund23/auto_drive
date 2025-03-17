@@ -126,7 +126,7 @@ class Controller_Node(Node):
         
         # Extract relevant distances (indexes depend on LiDAR setup)
         front_idx = len(ranges) // 2  # Directly ahead
-        left_idx = int((msg.angle_max - (3.14 / 2)) / msg.angle_increment) + 30 # 90 degrees left
+        left_idx = int((msg.angle_max - (3.14 / 2)) / msg.angle_increment) + 50 # 90 degrees left
         right_idx = int((msg.angle_max + (3.14 / 2)) / msg.angle_increment)  # 90 degrees right
 
         self.front_dist = ranges[front_idx] if ranges[front_idx] > 0 else float('inf')
