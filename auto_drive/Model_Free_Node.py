@@ -107,7 +107,7 @@ class Controller_Node(Node):
         # self.F.publish(msg)
 
         thetades = 0
-        left_des = 0.4
+        left_des = 0.3
         F = 0
         if self.pressed == 1:
             theta,F = self.IP_theta.control(x=self.left_dist, x_ref=left_des)
