@@ -102,18 +102,19 @@ class Controller_Node(Node):
             v = 0.0
             F = 0
 
-        msg = Float64()
-        msg.data = float(F)
-        self.F.publish(msg)
+        # msg = Float64()
+        # msg.data = float(F)
+        # self.F.publish(msg)
 
         thetades = 0
         left_des = 0.3
         F = 0
         if self.pressed == 1:
-            angle,F = self.IP_vel.control(-self.left_dist,left_des)
-        # steer
-        theta,F = self.IP_theta.control(x=self.left_dist, x_ref=left_des)
+            theta,F = self.IP_theta.control(x=-self.left_dist, x_ref=left_des)
         #print(v,theta)
+        msg = Float64()
+        msg.data = float(F)
+        self.F.publish(msg)
         
         self.send_vel(0.0,theta)
 
@@ -144,7 +145,7 @@ class Controller_Node(Node):
 
     def send_vel(self,x,z):
         # z = 0.0
-        print(x,z)
+        # print(x,z)
         msg = AckermannDriveStamped()
         if self.pressed2 == 1:
             msg.drive.acceleration = -5.0 # add brake
