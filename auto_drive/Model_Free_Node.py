@@ -57,7 +57,7 @@ class Controller_Node(Node):
         self.PP = PP(self.params) # pass structure to car
         self.PP.get_trajectory(self.params.wx,self.params.wy)
         self.IP_vel = IP(alpha = 3, kp = 3, ki = 1,dt = 0.002)
-        self.IP_theta = IP(alpha = 15, kp = 5.0,dt = 0.001)
+        self.IP_theta = IP(alpha = 13, kp = 2.0,dt = 0.001)
         self.pressed = 0
         self.pressed2 = 0
 
@@ -116,7 +116,7 @@ class Controller_Node(Node):
         msg.data = float(F)
         self.F.publish(msg)
         
-        self.send_vel(v,theta)
+        self.send_vel(0.3,theta)
 
     def lidar_pose_callback(self, msg):
         #print("lidar call")
