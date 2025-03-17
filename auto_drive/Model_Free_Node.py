@@ -110,7 +110,7 @@ class Controller_Node(Node):
         left_des = 0.4
         F = 0
         if self.pressed == 1:
-            theta,F = self.IP_theta.control(x=-self.left_dist, x_ref=left_des)
+            theta,F = self.IP_theta.control(x=self.left_dist, x_ref=left_des)
         #print(v,theta)
         msg = Float64()
         msg.data = float(F)
