@@ -144,6 +144,7 @@ class Controller_Node(Node):
 
     def send_vel(self,x,z):
         # z = 0.0
+        print(x,z)
         msg = AckermannDriveStamped()
         if self.pressed2 == 1:
             msg.drive.acceleration = -5.0 # add brake
