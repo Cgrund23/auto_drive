@@ -30,31 +30,3 @@ class KalmanFilter(object):
         I = np.eye(self.n)
         self.P = np.dot(np.dot(I - np.dot(K, self.H), self.P), 
         	(I - np.dot(K, self.H)).T) + np.dot(np.dot(K, self.R), K.T)
-
-def example():
-    dt = 1.0/60
-    F = np.array([[1, dt, 0], [0, 1, dt], [0, 0, 1]])
-    H = np.array([1, 0, 0]).reshape(1, 3)
-    Q = np.array([[0.05, 0.05, 0.0], [0.05, 0.05, 0.0], [0.0, 0.0, 0.0]])
-    R = np.array([0.5]).reshape(1, 1)
-
-    x = np.linspace(0, 10, 1000)
-    measurements = - (x + 2*x - 9)  + np.random.normal(0, 2, 1000)
-
-    kf = KalmanFilter(F = F, H = H, Q = Q, R = R)
-    predictions = []
-
-    for z in measurements:
-        p = np.dot(H,  kf.predict())
-        predictions.append(np.dot(H,  kf.predict())[0])
-        kf.update(z)
-    act = - (x + 2*x - 9)
-    import matplotlib.pyplot as plt
-    plt.plot(range(len(measurements)), measurements, label = 'Measurements')
-    plt.plot(range(len(predictions)), np.array(predictions), label = 'Kalman Filter Prediction')
-    plt.plot(range(len(act)), act, label = 'Actual')
-    plt.legend()
-    plt.show()
-
-if __name__ == '__main__':
-    example()
