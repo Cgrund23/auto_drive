@@ -92,7 +92,7 @@ class Controller_Node(Node):
         #print("velocity of car")
         #print(v)
         #vdes,thetades = self.PP.control(x,y,v,theta)
-        vdes = 0.45
+        vdes = 0.5
         F = 0
         if self.pressed == 1:
             v,F = self.IP_vel.control(-v,vdes)
@@ -107,7 +107,7 @@ class Controller_Node(Node):
         # self.F.publish(msg)
 
         thetades = 0
-        left_des = 0.3
+        left_des = 0.4
         F = 0
         if self.pressed == 1:
             theta,F = self.IP_theta.control(x=-self.left_dist, x_ref=left_des)
@@ -116,7 +116,7 @@ class Controller_Node(Node):
         msg.data = float(F)
         self.F.publish(msg)
         
-        self.send_vel(0.5,theta)
+        self.send_vel(v,theta)
 
     def lidar_pose_callback(self, msg):
         #print("lidar call")
