@@ -66,7 +66,7 @@ class Controller_Node(Node):
         self.visual = self.create_publisher(Float64MultiArray, "visual", 10)    # send data to visulise will be changing
         self.F = self.create_publisher(Float64, "F", 10)    # send data to visulise will be changing
         self.brake = self.create_publisher(Float64, "commands/motor/brake", 10)    # send data to visulise will be changing
-    
+        self.left_dist = 0
     def run(self, msg):
         """Callback function to process Joy messages."""
         button_pressed = msg.buttons  # List of button states (0 = released, 1 = pressed)
@@ -92,7 +92,7 @@ class Controller_Node(Node):
         #print("velocity of car")
         #print(v)
         #vdes,thetades = self.PP.control(x,y,v,theta)
-        vdes = 1
+        vdes = 0
         F = 0
         if self.pressed == 1:
             v,F = self.IP_vel.control(-v,vdes)
@@ -107,11 +107,15 @@ class Controller_Node(Node):
         self.F.publish(msg)
 
         thetades = 0
+        left_des = 0.3
+        F = 0
+        if self.pressed == 1:
+            angle,F = self.IP_vel.control(-self.left_dist,left_des)
         # steer
-        theta = self.IP_theta.control(theta,x_ref=thetades)
+        theta = self.IP_theta.control(x=self.left_dist, x_ref=left_des)
         #print(v,theta)
         
-        self.send_vel(v,theta)
+        self.send_vel(0,theta)
 
     def lidar_pose_callback(self, msg):
         #print("lidar call")
@@ -124,20 +128,19 @@ class Controller_Node(Node):
         left_idx = int((msg.angle_max - (3.14 / 2)) / msg.angle_increment)  # 90 degrees left
         right_idx = int((msg.angle_max + (3.14 / 2)) / msg.angle_increment)  # 90 degrees right
 
-        front_dist = ranges[front_idx] if ranges[front_idx] > 0 else float('inf')
-        left_dist = ranges[left_idx] if ranges[left_idx] > 0 else float('inf')
-        right_dist = ranges[right_idx] if ranges[right_idx] > 0 else float('inf')
-        print(front_dist, left_dist, right_dist)
-        #print("min distance")
-        #print(r.min())
-        if ranges.min() < .1:
-            #self.send_vel(0,0)
-            return
-        try:
-            #print(msg)
-            pass
-        except Exception as e:
-            print(f"An error occurred: {e}")
+        self.front_dist = ranges[front_idx] if ranges[front_idx] > 0 else float('inf')
+        self.left_dist = ranges[left_idx] if ranges[left_idx] > 0 else float('inf')
+        self.right_dist = ranges[right_idx] if ranges[right_idx] > 0 else float('inf')
+        print(self.left_dist, self.front_dist, self.right_dist)
+        
+        # if ranges.min() < .1:
+        #     #self.send_vel(0,0)
+        #     return
+        # try:
+        #     #print(msg)
+        #     pass
+        # except Exception as e:
+        #     print(f"An error occurred: {e}")
 
     def send_vel(self,x,z):
         z = 0.0
