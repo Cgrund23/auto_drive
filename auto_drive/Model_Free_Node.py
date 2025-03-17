@@ -107,7 +107,7 @@ class Controller_Node(Node):
         # self.F.publish(msg)
 
         thetades = 0
-        left_des = 0.3
+        left_des = 0.2
         F = 0
         if self.pressed == 1:
             theta,F = self.IP_theta.control(x=self.left_dist, x_ref=left_des)
@@ -116,7 +116,7 @@ class Controller_Node(Node):
         msg.data = float(F)
         self.F.publish(msg)
         
-        self.send_vel(1,-theta)
+        self.send_vel(1.85,-theta)
 
     def lidar_pose_callback(self, msg):
         #print("lidar call")
