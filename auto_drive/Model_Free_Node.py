@@ -122,7 +122,7 @@ class Controller_Node(Node):
         #print("lidar call")
         ranges = np.array(msg.ranges)  # DistanceS
         angle = np.arange(msg.angle_min, msg.angle_max, msg.angle_increment)  # Angles
-        print(msg.angle_min, msg.angle_max, msg.angle_increment) 
+        #print(msg.angle_min, msg.angle_max, msg.angle_increment) 
         
         # Extract relevant distances (indexes depend on LiDAR setup)
         front_idx = len(ranges) // 2  # Directly ahead
@@ -145,7 +145,7 @@ class Controller_Node(Node):
 
     def send_vel(self,x,z):
         # z = 0.0
-        # print(x,z)
+        print(z)
         msg = AckermannDriveStamped()
         if self.pressed2 == 1:
             msg.drive.acceleration = -5.0 # add brake
