@@ -130,8 +130,8 @@ class Controller_Node(Node):
         right_idx = int((msg.angle_max + (3.14 / 2)) / msg.angle_increment)  # 90 degrees right
 
         self.front_dist = ranges[front_idx] if ranges[front_idx] > 0 else float('inf')
-        self.left_dist = ranges[left_idx] if ranges[left_idx] > 0 else float('inf')
-        self.right_dist = ranges[right_idx] if ranges[right_idx] > 0 else float('inf')
+        self.right_dist = ranges[left_idx] if ranges[left_idx] > 0 else float('inf')
+        self.left_dist = ranges[right_idx] if ranges[right_idx] > 0 else float('inf')
         print(self.left_dist, self.front_dist, self.right_dist)
         
         # if ranges.min() < .1:
