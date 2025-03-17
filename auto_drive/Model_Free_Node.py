@@ -56,7 +56,7 @@ class Controller_Node(Node):
         self.params = params # store structure
         self.PP = PP(self.params) # pass structure to car
         self.PP.get_trajectory(self.params.wx,self.params.wy)
-        self.IP_vel = IP(alpha = 3, kp = 10, ki = 1,dt = 0.002)
+        self.IP_vel = IP(alpha = 3, kp = 100, ki = 1,dt = 0.002)
         self.IP_theta = IP(alpha = 18.0, kp = 17.5, ki = 0,dt = 0.002)
         self.pressed = 0
         self.pressed2 = 0
@@ -110,7 +110,7 @@ class Controller_Node(Node):
         left_des = 0.4
         F = 0
         if self.pressed == 1:
-            theta,F = self.IP_theta.control(x=-self.left_dist, x_ref=left_des)
+            theta,F = self.IP_theta.control(x=self.left_dist, x_ref=left_des)
         #print(v,theta)
         msg = Float64()
         msg.data = float(F)
