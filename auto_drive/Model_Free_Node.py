@@ -116,7 +116,7 @@ class Controller_Node(Node):
         msg.data = float(F)
         self.F.publish(msg)
         
-        self.send_vel(0.6,-theta)
+        self.send_vel(1,-theta)
 
     def lidar_pose_callback(self, msg):
         #print("lidar call")
