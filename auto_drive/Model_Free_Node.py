@@ -112,7 +112,7 @@ class Controller_Node(Node):
         if self.pressed == 1:
             angle,F = self.IP_vel.control(-self.left_dist,left_des)
         # steer
-        theta = self.IP_theta.control(x=self.left_dist, x_ref=left_des)
+        theta,F = self.IP_theta.control(x=self.left_dist, x_ref=left_des)
         #print(v,theta)
         
         self.send_vel(0.0,theta)
