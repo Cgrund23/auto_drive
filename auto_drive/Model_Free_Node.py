@@ -92,7 +92,7 @@ class Controller_Node(Node):
         #print("velocity of car")
         #print(v)
         #vdes,thetades = self.PP.control(x,y,v,theta)
-        vdes = 0.1
+        vdes = 0.2
         F = 0
         if self.pressed == 1:
             v,F = self.IP_vel.control(-v,vdes)
