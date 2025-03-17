@@ -128,13 +128,13 @@ class Controller_Node(Node):
         front_idx = len(ranges) // 2  # Directly ahead
         #left_idx = int((msg.angle_max - (3.14 / 2)) / msg.angle_increment) - 100 # 90 degrees left
         left_idx = 480
-        left_idx_start = int((msg.angle_max - (3.14 / 2)) / msg.angle_increment) - 10 # 90 degrees left
-        left_idx_end = int((msg.angle_max - (3.14 / 2) + 1.57) / msg.angle_increment) + 10  # 180 degrees left
+        left_idx_start = int((msg.angle_max - (3.14 / 2)) / msg.angle_increment) + 10 # 90 degrees left
+        left_idx_end = int((msg.angle_max - (3.14 / 2) + 1.57) / msg.angle_increment) - 10  # 180 degrees left
         right_idx = int((msg.angle_max + (3.14 / 2)) / msg.angle_increment)  # 90 degrees right
 
         self.front_dist = ranges[front_idx] if ranges[front_idx] > 0 else float('inf')
         self.right_dist = ranges[left_idx] if ranges[left_idx] > 0 else float('inf')
-        self.left_dist = ranges[left_idx_start:left_idx_end].min() if ranges[left_idx_start:left_idx_end].min() > 0 else float('inf')
+        self.left_dist = ranges[left_idx_start:left_idx_end].mean() if ranges[left_idx_start:left_idx_end].min() > 0 else float('inf')
         #self.left_dist = ranges[right_idx] if ranges[right_idx] > 0 else float('inf')
         print(self.left_dist, left_idx,front_idx)
         
