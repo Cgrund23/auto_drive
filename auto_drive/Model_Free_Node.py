@@ -136,7 +136,7 @@ class Controller_Node(Node):
         self.right_dist = ranges[left_idx] if ranges[left_idx] > 0 else float('inf')
         self.left_dist = ranges[left_idx_start:left_idx_end].mean() if ranges[left_idx_start:left_idx_end].min() > 0 else float('inf')
         #self.left_dist = ranges[right_idx] if ranges[right_idx] > 0 else float('inf')
-        print(self.left_dist, left_idx,front_idx)
+        print(self.left_dist, left_idx_start, left_idx_end)
         
         # if ranges.min() < .1:
         #     #self.send_vel(0,0)
