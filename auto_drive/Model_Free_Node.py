@@ -57,7 +57,7 @@ class Controller_Node(Node):
         self.PP = PP(self.params) # pass structure to car
         self.PP.get_trajectory(self.params.wx,self.params.wy)
         self.IP_vel = IP(alpha = 3, kp = 2, ki = 1,dt = 0.002)
-        self.IP_theta = IP(alpha = 7.80, kp = 6, ki = 5,dt = 0.002)
+        self.IP_theta = IP(alpha = 7.80, kp = 6, ki = 10,dt = 0.002)
         self.pressed = 0
         self.pressed2 = 0
 
@@ -107,7 +107,7 @@ class Controller_Node(Node):
         # self.F.publish(msg)
 
         thetades = 0
-        left_des = 0.3
+        left_des = 0.5
         F = 0
         if self.pressed == 1:
             theta,F = self.IP_theta.control(x=self.left_dist, x_ref=left_des)
