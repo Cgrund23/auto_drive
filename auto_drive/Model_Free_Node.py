@@ -116,7 +116,7 @@ class Controller_Node(Node):
         msg.data = float(F)
         self.F.publish(msg)
         
-        self.send_vel(2,-theta)
+        self.send_vel(1.25,-theta)
 
     def lidar_pose_callback(self, msg):
         #print("lidar call")
@@ -138,7 +138,7 @@ class Controller_Node(Node):
         self.right_dist = ranges[left_idx] if ranges[left_idx] > 0 else float('inf')
         self.left_dist = ranges[left_idx_start:left_idx_end].min() if ranges[left_idx_start:left_idx_end].min() > 0 else float('inf')
         #self.left_dist = ranges[right_idx] if ranges[right_idx] > 0 else float('inf')
-        print(self.left_dist, left_idx_start, left_idx_end)
+        #print(self.left_dist, left_idx_start, left_idx_end)
         
         # if ranges.min() < .1:
         #     #self.send_vel(0,0)
@@ -151,7 +151,7 @@ class Controller_Node(Node):
 
     def send_vel(self,x,z):
         # z = 0.0
-        print(z)
+        #print(z)
         msg = AckermannDriveStamped()
         if self.pressed2 == 1:
             msg.drive.acceleration = -5.0 # add brake
