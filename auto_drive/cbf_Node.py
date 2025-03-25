@@ -71,7 +71,7 @@ class Controller_Node(Node):
         self.CBFobj = CBF(params)
         # Publisher and Subscriber
 
-        self.my_vel_command = self.create_publisher(Twist, "cmd_vel", 10)
+        self.my_vel_command = self.create_publisher(Twist, "ackermann_cmd", 10)
         self.visual = self.create_publisher(Float64MultiArray, "visual", 10)
 
     def pose_callback(self,msg):
