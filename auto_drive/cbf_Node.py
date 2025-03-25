@@ -20,14 +20,14 @@ class Controller_Node(Node):
         super().__init__('Controller_Node')
         self.subscription = self.create_subscription(
             Odometry,
-            '/model/Car/odometry',
+            'odom',
             self.pose_callback,
             10)
         
         
         self.subscription = self.create_subscription(
             LaserScan,
-            'lidar',
+            'scan',
             self.lidar_pose_callback,
             10)
         
