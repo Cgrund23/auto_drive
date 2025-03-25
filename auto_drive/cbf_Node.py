@@ -116,7 +116,7 @@ class Controller_Node(Node):
 
     def send_vel(self,x,z):
         my_msg = Twist()
-        my_msg.linear.x = float(x)
+        my_msg.linear.x = float(1)
         my_msg.angular.z = float(z)
         # self.get_logger().info('msg =: "%s"' % my_msg)
         self.my_vel_command.publish(my_msg)
