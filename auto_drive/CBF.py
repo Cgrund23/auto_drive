@@ -248,6 +248,7 @@ class CBF:
         #     # Optimal control input
         try:  
             x = solve_qp(H, f_, A, b, solver = "clarabel") 
+            print('x')
             print(x)  
             self.u = x[0]
             #TODO update from imu data
