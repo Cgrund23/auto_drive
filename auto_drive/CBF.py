@@ -65,10 +65,12 @@ class CBF:
         """
         return np.array([self.params.x, self.params.y, self.params.theta],dtype=float).reshape((3,1))
     
-    def updateState(self, V, gamma):
+    def updateState(self,x,y, V, gamma):
         """
         Sets all global variables from "sensor" data
         """
+        self.params.x = x
+        self.params.y = y
         self.params.v = V
         self.params.gamma = gamma
         self.params.beta = np.arctan2((self.params.lf*np.tan(gamma)),(self.params.lf+self.params.lr))

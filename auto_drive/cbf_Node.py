@@ -81,7 +81,7 @@ class Controller_Node(Node):
         angle_rate = msg.twist.twist.angular.z
         print(theta)
         v = msg.twist.twist.linear.x
-        self.CBFobj.update_pose(x,y,theta,v)
+        self.CBFobj.updateState(x,y,theta,v)
 
 
     def lidar_pose_callback(self, msg):
