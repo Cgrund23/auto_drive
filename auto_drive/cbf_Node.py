@@ -79,6 +79,7 @@ class Controller_Node(Node):
         y = msg.pose.pose.position.y
         theta = msg.pose.pose.orientation.x
         angle_rate = msg.twist.twist.angular.z
+        print('theta')
         print(theta)
         v = msg.twist.twist.linear.x
         self.CBFobj.updateState(x,y,theta,v)
