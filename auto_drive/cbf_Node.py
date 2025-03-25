@@ -11,7 +11,7 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64MultiArray 
 from sensor_msgs.msg import LaserScan
 from CBF import CBF
-from Visulise_kernals import MyFig
+#from Visulise_kernals import MyFig
 
 
 
