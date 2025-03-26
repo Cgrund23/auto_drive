@@ -262,6 +262,7 @@ class CBF:
             x = [1,1]
             return x,h_world,dcbf
         except Exception as e:
+            print('failed constraints')
             print(f"An error occurred: {e}")
             return [0,0],h_world,dcbf
         
