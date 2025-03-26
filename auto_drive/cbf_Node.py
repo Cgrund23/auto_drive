@@ -10,6 +10,7 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64MultiArray 
 from sensor_msgs.msg import LaserScan
+from ackermann_msgs.msg import AckermannDriveStamped
 from CBF import CBF
 #from Visulise_kernals import MyFig
 
@@ -76,9 +77,7 @@ class Controller_Node(Node):
         self.u_ref = [1.0,0.0]
 
         # Publisher and Subscriber
-
-        self.my_vel_command = self.create_publisher(Twist, "ackermann_cmd", 10)
-        self.visual = self.create_publisher(Float64MultiArray, "visual", 10)
+        self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10) 
 
     def pose_callback(self,msg):
         print('pose')
@@ -111,11 +110,11 @@ class Controller_Node(Node):
             pass
         
     def send_vel(self,x,z):
-        my_msg = Twist()
-        my_msg.linear.x = float(1)
-        my_msg.angular.z = float(z)
+        msg = AckermannDriveStamped()
+        msg.drive.speed = float(1.0)  # Set desired velocity in m/s
+        msg.drive.steering_angle = float(z)  # Set steering angle in radians
         # self.get_logger().info('msg =: "%s"' % my_msg)
-        self.my_vel_command.publish(my_msg)
+        self.my_vel_command.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)
