@@ -74,7 +74,7 @@ class Controller_Node(Node):
         self.theta = 0.0
         self.v = 0.0
         self.u_ref = [1.0,0.0]
-        
+
         # Publisher and Subscriber
 
         self.my_vel_command = self.create_publisher(Twist, "ackermann_cmd", 10)
@@ -103,7 +103,7 @@ class Controller_Node(Node):
         self.CBFobj.setObjects(r,angle)
         
         try:
-            u,h = (self.CBFobj.constraints_cost(self.u_ref,self.params.x,self.params.y,self.theta,self.v))
+            u,h = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=self.params.x,y=self.params.y,theta=self.theta,v=self.v))
             self.send_vel(1.0,u[1])
         except Exception as e:
             print('failed lidar')
