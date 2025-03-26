@@ -251,7 +251,7 @@ class CBF:
         print('f')
         f_ = (weight_input) @ (-self.u_ref).reshape(2,1)
 
-                  
+        print('start')          
         #     # Optimal control input
         try:  
             x = solve_qp(H, f_, A, b, solver = "clarabel") 
