@@ -1,13 +1,8 @@
 import autograd.numpy as np
-#from sympy import symbols
 from dataclasses import dataclass
-#import numdifftools as nd
-#from autograd import jacobian
-#import cvxpy as cp
 from qpsolvers import solve_qp
 #import time
-#from scipy.integrate import solve_ivp
-#import matplotlib.pyplot as plt
+
 
 class CBF:
     # Initiate Car
@@ -89,8 +84,8 @@ class CBF:
         filtered_angle = []
 
         for k in range(M):
-        # Keep only points within max lidar field
-            if not np.isinf(distance[k]):                               
+        # Keep only points within max lidar field 
+            if distance[k] < self.params.r_max:                                
                 self.N += 1
                 filtered_distance.append(distance[k])
                 filtered_angle.append(angle[k]) 
@@ -100,9 +95,13 @@ class CBF:
         self.NY = np.ones(self.N)
         self.Dist = np.array(filtered_distance).reshape((self.N,1))
         
-        # Convert to x y cordinates
+        # Convert to x y cordinates Global frame
         x_lidar = np.array(np.array(filtered_distance) * np.cos(np.array(filtered_angle) + self.params.theta)+self.params.x).reshape((self.N, 1))
         y_lidar = np.array(np.array(filtered_distance) * np.sin(np.array(filtered_angle) + self.params.theta)+self.params.y).reshape((self.N, 1))
+        
+        # Convert to x y cordinates Local frame
+        x_lidar = np.array(np.array(filtered_distance) * np.cos(np.array(filtered_angle))).reshape((self.N, 1))
+        y_lidar = np.array(np.array(filtered_distance) * np.sin(np.array(filtered_angle))).reshape((self.N, 1))
 
         self.Poe = np.hstack((x_lidar,y_lidar))
 
@@ -168,7 +167,7 @@ class CBF:
         resolution = .5    # resolution of lidar data
         grid_size = int(x_width*1/resolution)    # Grid resolution matches lidar grid
         x_grid, y_grid = np.meshgrid(np.linspace(-x_width, x_width, grid_size), np.linspace(-y_width, y_width, grid_size))
-        safety_matrix = np.column_stack((x_grid.ravel(), y_grid.ravel()))
+        #safety_matrix = np.column_stack((x_grid.ravel(), y_grid.ravel()))
         
         #k_ss = self.rbf_kernel(safety_matrix,safety_matrix,self.length_scale,self.params.sigma_f)
         #print('make math grids')
@@ -199,8 +198,7 @@ class CBF:
          
         A = -self.lf_cbf_function(dcbf) 
         A -= h_control**3
-        
-        
+
         # umax constraints
         
         k = np.hstack(([np.eye(self.params.udim), np.zeros((self.params.udim, 1))]))

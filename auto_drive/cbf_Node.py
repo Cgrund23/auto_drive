@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import rclpy
-import math
 import numpy as np
 import sys
 sys.path.append("/home/jetson/f1tenth_ws/src/auto_drive/auto_drive")
@@ -12,7 +11,6 @@ from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import LaserScan
 from ackermann_msgs.msg import AckermannDriveStamped
 from CBF import CBF
-#from Visulise_kernals import MyFig
 
 
 
@@ -58,7 +56,7 @@ class Controller_Node(Node):
 
             # Obstacle position
             #TODO will be from lidar and continually updated figured out
-
+            r_max: float = 2
             cbf_gamma: float = 1
 
             # Desired target point 
@@ -92,14 +90,10 @@ class Controller_Node(Node):
 
 
     def lidar_pose_callback(self, msg):
-        r = np.array(msg.ranges)  # DistanceSS
-        numpoints = len(r)
-        self.params.ranges = r
-        self.angle = (msg.angle_max - msg.angle_min)/numpoints
-        angle = np.arange(msg.angle_min, msg.angle_max, self.angle)
-        self.params.array = angle
-        self.params.ranges = r
-        self.CBFobj.setObjects(r,angle)
+        #numpoints = len(r) # hard code instead
+        self.params.ranges = np.array(msg.ranges)
+        angle = np.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
+        self.CBFobj.setObjects(self.params.ranges,angle)
         
         try:
             u = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=self.params.x,y=self.params.y,theta=self.theta,v=self.v))
