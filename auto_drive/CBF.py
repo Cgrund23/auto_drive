@@ -255,7 +255,7 @@ class CBF:
         #     # Optimal control input
         try:
             print(H.shape,f.shape,A.shape,b.shape)  
-            x = solve_qp(H, f, A, b, solver = "clarabel") 
+            x = solve_qp(P=H, q=f, G=A, h=b, solver = "clarabel") 
             print('x')
             print(x)  
             self.u = x[0]
