@@ -171,7 +171,7 @@ class CBF:
         safety_matrix = np.column_stack((x_grid.ravel(), y_grid.ravel()))
         
         #k_ss = self.rbf_kernel(safety_matrix,safety_matrix,self.length_scale,self.params.sigma_f)
-        print('make math grids')
+        #print('make math grids')
         # Fill array with barrier locations
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
         k_star = self.rbf_kernel(self.Poe,safety_matrix,self.length_scale,self.params.sigma_f)
@@ -180,13 +180,12 @@ class CBF:
         K_self = self.rbf_kernel(self.PoeA,X_query,self.length_scale,self.params.sigma_f)
         q = X_query[:,:2]
         K_selfish = self.rbf_kernel(X_query[:,:2],self.Poe,self.length_scale,self.params.sigma_f)
-        print('start inverse')
+        #print('start inverse')
         k_inv = np.linalg.pinv(K)
-        print('inverse done')
+        #print('inverse done')
         h_control = 1-2*(K_self.T @ k_inv @ - self.Y)
         h_control[h_control > 1] = 1
         h_control[h_control < -1] = -1
-
         h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
         print('math done')
         # h = h.reshape((int(h.size/2),2))
@@ -225,7 +224,7 @@ class CBF:
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
         b = b @ self.u_ref
-       
+        print('reshape')
         b = b.reshape((b.size,1))
          
         A = -self.lf_cbf_function(dcbf) 
