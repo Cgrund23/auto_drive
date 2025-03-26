@@ -180,6 +180,7 @@ class CBF:
         K_self = self.rbf_kernel(self.PoeA,X_query,self.length_scale,self.params.sigma_f)
         q = X_query[:,:2]
         K_selfish = self.rbf_kernel(X_query[:,:2],self.Poe,self.length_scale,self.params.sigma_f)
+        print('start inverse')
         k_inv = np.linalg.pinv(K)
         h_control = 1-2*(K_self.T @ k_inv @ - self.Y)
         h_control[h_control > 1] = 1
