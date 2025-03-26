@@ -237,14 +237,18 @@ class CBF:
         A = np.vstack((A,k))
         k = np.array((self.params.u_max))
         b = np.vstack((b.reshape((b.shape[0],1)),k.reshape((k.size,1))))
-        print('try stacking')
+        
         # u_min constraints
+        print('A')
         A = np.vstack((A,np.hstack((-np.eye(self.params.udim), np.zeros((self.params.udim, 1))))))
+        print('k')
         k = np.array((self.params.u_min))
+        print('b')
         b = np.vstack((b,-k.reshape((k.size,1))))
         weight_input = np.eye(2)
 
         H = np.array(((1,0),(0,1)))
+        print('f')
         f_ = (weight_input) @ (-self.u_ref).reshape(2,1)
 
                   
