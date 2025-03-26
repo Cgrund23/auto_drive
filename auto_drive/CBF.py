@@ -224,7 +224,7 @@ class CBF:
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
         b = b @ self.u_ref
-        print('reshape')
+        
         b = b.reshape((b.size,1))
          
         A = -self.lf_cbf_function(dcbf) 
@@ -232,6 +232,7 @@ class CBF:
         
         
         # umax constraints
+        print('try stacking')
         k = np.hstack(([np.eye(self.params.udim), np.zeros((self.params.udim, 1))]))
         A = np.vstack((A,k))
         k = np.array((self.params.u_max))
