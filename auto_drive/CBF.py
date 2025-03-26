@@ -174,11 +174,11 @@ class CBF:
         #print('make math grids')
         # Fill array with barrier locations
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
-        k_star = self.rbf_kernel(self.Poe,safety_matrix,self.length_scale,self.params.sigma_f)
+        #k_star = self.rbf_kernel(self.Poe,safety_matrix,self.length_scale,self.params.sigma_f)
         Poe_angles = np.arctan2(self.Poe[:,1],self.Poe[:,0]).reshape((self.Poe.shape[0],1))
         self.PoeA = np.hstack((self.Poe,Poe_angles))
         K_self = self.rbf_kernel(self.PoeA,X_query,self.length_scale,self.params.sigma_f)
-        q = X_query[:,:2]
+        #q = X_query[:,:2]
         K_selfish = self.rbf_kernel(X_query[:,:2],self.Poe,self.length_scale,self.params.sigma_f)
         #print('start inverse')
         k_inv = np.linalg.inv(K)
@@ -186,40 +186,10 @@ class CBF:
         h_control = 1-2*(K_self.T @ k_inv @ - self.Y)
         h_control[h_control > 1] = 1
         h_control[h_control < -1] = -1
-        h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
-        
-        # h = h.reshape((int(h.size/2),2))
-        # Reshape for plotting
-        
-        # h_grid = h.reshape(grid_size, grid_size)
-        # plt.figure()
-        # plt.contourf(x_grid, y_grid, h_grid, 20, cmap='twilight')
-        # plt.colorbar()
-        # plt.title('h')
-        # plt.xlabel('X [m]')
-        # plt.ylabel('Y [m]')
-        # plt.legend()
-        # plt.show()
+        #h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
 
         dkdp = -1/self.length_scale**2*K_selfish
         dcbf = self.Y.T @ k_inv @ dkdp.T
-        # dcbf = dcbf.reshape((int(dcbf.size/2),2))
-        # dcbf = dkdp @ k_inv @ self.Y.T
-        # dcbf[dcbf > 1] = 1
-        # dcbf[dcbf < -1] = -1
-        
-        # dcbf_grid = dcbf.reshape(grid_size, grid_size)
-        # plt.figure()
-        # plt.contourf(x_grid, y_grid, dcbf_grid, 20, cmap='twilight')
-        # plt.colorbar()
-        # plt.title('dh/dx')
-        # plt.xlabel('X [m]')
-        # plt.ylabel('Y [m]')
-        # plt.legend()
-        # plt.show()
-
-        # h = np.hstack((h,np.ones((h.shape[0],1))))
-        # dcbf = np.hstack((dcbf,np.zeros((dcbf.shape[0],1))))
 
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
