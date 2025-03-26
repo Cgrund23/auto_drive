@@ -147,7 +147,7 @@ class CBF:
 
     # Constraints/Cost
     def constraints_cost(self,u_ref,x,y,theta,v):
-        print('cc')
+        
         #self.updateState(v,theta)
         self.params.x,self.params.y = x,y
         # Create variables for optimisation 
@@ -170,7 +170,7 @@ class CBF:
         x_grid, y_grid = np.meshgrid(np.linspace(-x_width, x_width, grid_size), np.linspace(-y_width, y_width, grid_size))
         safety_matrix = np.column_stack((x_grid.ravel(), y_grid.ravel()))
         
-        k_ss = self.rbf_kernel(safety_matrix,safety_matrix,self.length_scale,self.params.sigma_f)
+        #k_ss = self.rbf_kernel(safety_matrix,safety_matrix,self.length_scale,self.params.sigma_f)
  
         # Fill array with barrier locations
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
@@ -186,7 +186,7 @@ class CBF:
         h_control[h_control < -1] = -1
 
         h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
-        
+        print('math done')
         # h = h.reshape((int(h.size/2),2))
         # Reshape for plotting
         
