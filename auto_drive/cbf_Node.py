@@ -20,14 +20,14 @@ class Controller_Node(Node):
         super().__init__('Controller_Node')
         self.subscription = self.create_subscription(
             Odometry,
-            'odom',
+            '/odom',
             self.pose_callback,
             10)
         
         
         self.subscription = self.create_subscription(
             LaserScan,
-            'scan',
+            '/scan',
             self.lidar_pose_callback,
             10)
         
@@ -87,7 +87,7 @@ class Controller_Node(Node):
         self.theta = msg.pose.pose.orientation.x
         angle_rate = msg.twist.twist.angular.z
         print('theta')
-        print(theta)
+        print(self.theta)
         self.v = msg.twist.twist.linear.x
         self.CBFobj.updateState(self.x,self.y,self.theta,self.v)
 
