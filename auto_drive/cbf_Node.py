@@ -87,7 +87,6 @@ class Controller_Node(Node):
 
 
     def lidar_pose_callback(self, msg):
-        print('lidar')
         r = np.array(msg.ranges)  # DistanceSS
         numpoints = len(r)
         self.params.ranges = r
@@ -103,6 +102,7 @@ class Controller_Node(Node):
             self.visulise(h) 
             self.send_vel(0.5,0.5)
         except:
+            print('failed lidar')
             pass
         
     def send_vel(self,x,z):
