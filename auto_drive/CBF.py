@@ -232,12 +232,12 @@ class CBF:
         
         
         # umax constraints
-        print('try stacking')
+        
         k = np.hstack(([np.eye(self.params.udim), np.zeros((self.params.udim, 1))]))
         A = np.vstack((A,k))
         k = np.array((self.params.u_max))
         b = np.vstack((b.reshape((b.shape[0],1)),k.reshape((k.size,1))))
-
+        print('try stacking')
         # u_min constraints
         A = np.vstack((A,np.hstack((-np.eye(self.params.udim), np.zeros((self.params.udim, 1))))))
         k = np.array((self.params.u_min))
