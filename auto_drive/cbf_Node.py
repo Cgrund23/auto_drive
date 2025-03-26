@@ -89,7 +89,7 @@ class Controller_Node(Node):
         print('theta')
         print(theta)
         self.v = msg.twist.twist.linear.x
-        self.CBFobj.updateState(x,y,theta,v)
+        self.CBFobj.updateState(self.x,self.y,self.theta,self.v)
 
 
     def lidar_pose_callback(self, msg):
@@ -103,7 +103,7 @@ class Controller_Node(Node):
         self.CBFobj.setObjects(r,angle)
         
         try:
-            u,h = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=self.params.x,y=self.params.y,theta=self.theta,v=self.v))
+            u = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=self.params.x,y=self.params.y,theta=self.theta,v=self.v))
             self.send_vel(1.0,u[1])
         except Exception as e:
             print('failed lidar')

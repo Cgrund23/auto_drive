@@ -265,8 +265,8 @@ class CBF:
             self.params.gamma = float(x[1])
             self.params.v = float(x[0])
             self.params.weightslack = float(x[2])
-            x = [1,1]
-            return x,h_world,dcbf
+            #x = [1,1]
+            return x
         except Exception as e:
             print('failed constraints')
             print(f"An error occurred: {e}")
