@@ -171,7 +171,7 @@ class CBF:
         safety_matrix = np.column_stack((x_grid.ravel(), y_grid.ravel()))
         
         #k_ss = self.rbf_kernel(safety_matrix,safety_matrix,self.length_scale,self.params.sigma_f)
- 
+        print('make math grids')
         # Fill array with barrier locations
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
         k_star = self.rbf_kernel(self.Poe,safety_matrix,self.length_scale,self.params.sigma_f)
