@@ -69,6 +69,12 @@ class Controller_Node(Node):
 
         self.params = params
         self.CBFobj = CBF(params)
+        self.x = 0.0
+        self.y = 0.0
+        self.theta = 0.0
+        self.v = 0.0
+        self.u_ref = [1.0,0.0]
+        
         # Publisher and Subscriber
 
         self.my_vel_command = self.create_publisher(Twist, "ackermann_cmd", 10)
@@ -76,13 +82,13 @@ class Controller_Node(Node):
 
     def pose_callback(self,msg):
         print('pose')
-        x = msg.pose.pose.position.x
-        y = msg.pose.pose.position.y
-        theta = msg.pose.pose.orientation.x
+        self.x = msg.pose.pose.position.x
+        self.y = msg.pose.pose.position.y
+        self.theta = msg.pose.pose.orientation.x
         angle_rate = msg.twist.twist.angular.z
         print('theta')
         print(theta)
-        v = msg.twist.twist.linear.x
+        self.v = msg.twist.twist.linear.x
         self.CBFobj.updateState(x,y,theta,v)
 
 
@@ -97,10 +103,8 @@ class Controller_Node(Node):
         self.CBFobj.setObjects(r,angle)
         
         try:
-            x,h,dcbf = (self.CBFobj.constraints_cost())
-            h = np.vstack((h,h))
-            self.visulise(h) 
-            self.send_vel(0.5,0.5)
+            u,h = (self.CBFobj.constraints_cost(self.u_ref,self.params.x,self.params.y,self.theta,self.v))
+            self.send_vel(1.0,u[1])
         except Exception as e:
             print('failed lidar')
             print(f"An error occurred: {e}")
