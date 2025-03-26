@@ -148,7 +148,7 @@ class CBF:
     # Constraints/Cost
     def constraints_cost(self,u_ref,x,y,theta,v):
         print('cc')
-        self.updateState(v,theta)
+        #self.updateState(v,theta)
         self.params.x,self.params.y = x,y
         # Create variables for optimisation 
         self.u_ref = u_ref
