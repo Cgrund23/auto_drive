@@ -248,14 +248,15 @@ class CBF:
         weight_input = np.eye(2)
 
         H = np.array(((1,0),(0,1)))
+        H = np.eye(3)
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
-
+        f = np.vstack((f,np.zeros((1,1))))
                  
         #     # Optimal control input
         try:
             print(H.shape,f.shape,A.shape,b.shape)  
-            x = solve_qp(P=H, q=f, G=A[:,0:1], h=b, solver = "clarabel") 
+            x = solve_qp(P=H, q=f, G=A, h=b, solver = "clarabel") 
             print('x')
             print(x)  
             self.u = x[0]
