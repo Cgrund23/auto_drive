@@ -187,7 +187,7 @@ class CBF:
         h_control[h_control > 1] = 1
         h_control[h_control < -1] = -1
         h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
-        print('math done')
+        
         # h = h.reshape((int(h.size/2),2))
         # Reshape for plotting
         
@@ -239,21 +239,22 @@ class CBF:
         b = np.vstack((b.reshape((b.shape[0],1)),k.reshape((k.size,1))))
         
         # u_min constraints
-        print('A')
+        
         A = np.vstack((A,np.hstack((-np.eye(self.params.udim), np.zeros((self.params.udim, 1))))))
-        print('k')
+       
         k = np.array((self.params.u_min))
-        print('b')
+       
         b = np.vstack((b,-k.reshape((k.size,1))))
         weight_input = np.eye(2)
 
         H = np.array(((1,0),(0,1)))
-        print('f')
+        
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
 
-        print('start')          
+                 
         #     # Optimal control input
-        try:  
+        try:
+            print(H.shape,f.shape,A.shape,b.shape)  
             x = solve_qp(H, f, A, b, solver = "clarabel") 
             print('x')
             print(x)  
