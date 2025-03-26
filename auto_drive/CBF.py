@@ -151,7 +151,7 @@ class CBF:
         #self.updateState(v,theta)
         self.params.x,self.params.y = x,y
         # Create variables for optimisation 
-        self.u_ref = u_ref
+        self.u_ref = np.array(u_ref)
         A = np.empty((0,2), float)
         B = {}
         b = np.empty((0,1),float)
@@ -249,12 +249,12 @@ class CBF:
 
         H = np.array(((1,0),(0,1)))
         print('f')
-        f_ = (weight_input) @ (-self.u_ref).reshape(2,1)
+        f = (weight_input) @ (-self.u_ref).reshape(2,1)
 
         print('start')          
         #     # Optimal control input
         try:  
-            x = solve_qp(H, f_, A, b, solver = "clarabel") 
+            x = solve_qp(H, f, A, b, solver = "clarabel") 
             print('x')
             print(x)  
             self.u = x[0]
