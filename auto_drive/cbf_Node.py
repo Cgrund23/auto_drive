@@ -75,6 +75,7 @@ class Controller_Node(Node):
         self.visual = self.create_publisher(Float64MultiArray, "visual", 10)
 
     def pose_callback(self,msg):
+        print('pose')
         x = msg.pose.pose.position.x
         y = msg.pose.pose.position.y
         theta = msg.pose.pose.orientation.x
@@ -86,6 +87,7 @@ class Controller_Node(Node):
 
 
     def lidar_pose_callback(self, msg):
+        print('lidar')
         r = np.array(msg.ranges)  # DistanceSS
         numpoints = len(r)
         self.params.ranges = r
@@ -103,18 +105,6 @@ class Controller_Node(Node):
         except:
             pass
         
-    def visulise(self,B):
-        msg = Float64MultiArray()
-        A = self.params.array
-        A[np.isinf(A)] = 12
-        A = np.append(A,self.params.ranges)
-        B = B.flatten()
-        A = np.append(A,B)
-        A = A.tolist()
-        msg.data = A
-        self.visual.publish(msg)
-
-
     def send_vel(self,x,z):
         my_msg = Twist()
         my_msg.linear.x = float(1)
