@@ -101,8 +101,9 @@ class Controller_Node(Node):
             h = np.vstack((h,h))
             self.visulise(h) 
             self.send_vel(0.5,0.5)
-        except:
+        except Exception as e:
             print('failed lidar')
+            print(f"An error occurred: {e}")
             pass
         
     def send_vel(self,x,z):
