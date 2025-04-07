@@ -36,18 +36,15 @@ class CBF:
         return cp.vstack((x,y,t))
     
     def f_full(self):
-        """AI is creating summary for f_full
-
-        Args:
-            v ([type]): [velovity of the car bike model]
+        """Returns the next state using CuPy arrays.
 
         Returns:
-            [type]: [state]
+            cp.ndarray: State update array of shape (4, 1)
         """
         print('f_full')
-        return cp.array([self.params.v*cp.cos(self.params.theta + self.params.beta)*self.params.dt,
-            self.params.v*cp.sin(self.params.theta + self.params.beta)*self.params.dt,
-            0.0,0.0]).reshape((4,1))
+        dx = self.params.v * cp.cos(self.params.theta + self.params.beta) * self.params.dt
+        dy = self.params.v * cp.sin(self.params.theta + self.params.beta) * self.params.dt
+        return cp.array([dx, dy, cp.float32(0.0), cp.float32(0.0)]).reshape(cp.array([4, 1]))
     
     def g(self):
         """
