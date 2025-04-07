@@ -221,7 +221,8 @@ class CBF:
         #print('start inverse')
         k_inv = cp.linalg.inv(K)
         #print('inverse done')
-        h_control = 1-2*(K_self.T @ k_inv @ - self.Y)
+
+        h_control = 1-2*(self.rbf_kernel_grad_input(K_self,k_inv,self.length_scale,self.params.sigma_f) @ - self.Y)
         h_control[h_control > 1] = 1
         h_control[h_control < -1] = -1
         #h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
