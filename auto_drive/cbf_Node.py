@@ -62,7 +62,7 @@ class Controller_Node(Node):
             # Desired target point 
             #TODO this will still exist need to find a way to relate global to local
 
-            weightslack:float = 10.0
+            weightslack:float = 1.0
 
             cbfrate:float = 1.0
 

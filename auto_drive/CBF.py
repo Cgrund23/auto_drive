@@ -41,7 +41,7 @@ class CBF:
         Returns:
             cp.ndarray: State update array of shape (4, 1)
         """
-        print('f_full')
+        #print('f_full')
         dx = self.params.v * cp.cos(self.params.theta + self.params.beta) * self.params.dt
         dy = self.params.v * cp.sin(self.params.theta + self.params.beta) * self.params.dt
         return cp.array([dx, dy, cp.array(0.0), cp.array(0.0)]).reshape((4, 1))
@@ -139,7 +139,7 @@ class CBF:
         """
         
         sqdist = (cp.sum(X1**2, 1).reshape(-1, 1) + cp.sum(X2**2, 1)) # distance between points in X1 and X2
-        print(X1.shape,X2.shape)
+        #print(X1.shape,X2.shape)
         sqdist = sqdist  - 2 * X1 @ X2.T                                                                              # note the dimentions in the sums!
                                                                                       # all distances between pairs of points
         return sigma_f * cp.exp((-0.5/length_scale**2) * sqdist)                      # Same kernel as in paper
@@ -176,7 +176,7 @@ class CBF:
         diff = x_query - X_train
         grad =  - (1 / (length_scale**2)) * diff * k_star.T
         grad_h = grad.T@k_inv
-        print(cp.vstack((grad_h, cp.zeros((2, grad_h.shape[1])))).shape)
+        #print(cp.vstack((grad_h, cp.zeros((2, grad_h.shape[1])))).shape)
         return cp.vstack((grad_h, cp.zeros((2, grad_h.shape[1]))))
 
     def lf_cbf_function(self,dcbf):
@@ -191,7 +191,7 @@ class CBF:
         Derivitive of the cbf function by the Icput dynamics
         """
         g = self.g_full()
-        print(dcbf.shape,g.shape)
+        #print(dcbf.shape,g.shape)
         return dcbf.T @ g
 
     # Constraints/Cost
@@ -209,12 +209,12 @@ class CBF:
 
         X_query = self.f_full()[:2,:].T
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
-        print(X_query.shape,self.Poe.shape)
+        #print(X_query.shape,self.Poe.shape)
         K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
        
-        start = time.time()
+        #start = time.time()
         k_inv = cp.linalg.inv(K)
-        print(time.time()-start)
+        #print(time.time()-start)
 
         #h_control = self.cbf_function(K_star,K,self.length_scale,self.params.sigma_f)
         #print(h_control.shape)
@@ -223,17 +223,16 @@ class CBF:
 
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
-        b = b @ self.u_ref
-        
-        b = b.reshape((b.size,1))
-         
+        b = b @ self.u_ref 
+        b = b.reshape((b.size,1)) 
+        print(b.shape)
         A = -self.lf_cbf_function(dcbf)
         A = cp.hstack((A , cp.zeros((A.shape[0],2)))) #h_control**3
 
         # umax constraints
         
         k = cp.hstack(([cp.eye(self.params.udim), cp.zeros((self.params.udim, 1))]))
-        print(k.shape,A.shape)
+        #print(k.shape,A.shape)
         A = cp.vstack((A,k))
         k = cp.array((self.params.u_max))
         b = cp.vstack((b.reshape((b.shape[0],1)),k.reshape((k.size,1))))
