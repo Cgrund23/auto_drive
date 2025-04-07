@@ -245,12 +245,12 @@ class CBF:
         k = cp.array((self.params.u_min))
        
         b = cp.vstack((b,-k.reshape((k.size,1))))
-        weight_icput = cp.eye(2)
+        weight_input = cp.eye(2)
 
         H = cp.array(((1,0),(0,1)))
         H = cp.eye(3)
         
-        f = (weight_icput) @ (-self.u_ref).reshape(2,1)
+        f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
                  
         #     # Optimal control icput
