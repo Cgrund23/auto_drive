@@ -37,16 +37,16 @@ class Controller_Node(Node):
             # Car info
 
             v: float = 1.0 # velocity
-            u_max: float = [1,1.54] # max speed,angle
+            u_max: float = [1.0,1.54] # max speed,angle
             u_min: float = [0.25,-1.54] # min speed,angle
 
             # Starting pose
-            beta: float = 0
-            gamma: float = 0
-            theta: float = 0    
+            beta: float = 0.0
+            gamma: float = 0.0
+            theta: float = 0.0    
             
-            x0: float = 0  # Start x
-            y0: float = 0   # Start y
+            x0: float = 0.0  # Start x
+            y0: float = 0.0   # Start y
             
             # TODO get from model
             xdim: float = 4.0
@@ -56,15 +56,15 @@ class Controller_Node(Node):
 
             # Obstacle position
             #TODO will be from lidar and continually updated figured out
-            r_max: float = 2
-            cbf_gamma: float = 1
+            r_max: float = 2.0
+            cbf_gamma: float = 1.0
 
             # Desired target point 
             #TODO this will still exist need to find a way to relate global to local
 
-            weightslack:float = 10
+            weightslack:float = 10.0
 
-            cbfrate:float = 1
+            cbfrate:float = 1.0
 
         self.params = params
         self.CBFobj = CBF(params)

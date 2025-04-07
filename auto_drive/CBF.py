@@ -15,11 +15,11 @@ class CBF:
             pass
         self.params = param
         # Local cordinate system
-        self.params.x = 0
-        self.params.y = 0
+        self.params.x = 0.0
+        self.params.y = 0.0
         self.params.Od = {}
         self.params.Y = {}
-        self.params.sigma_f = 1
+        self.params.sigma_f = 1.0
         
         pass
         self.length_scale = 1.25    # found from  loop demo
