@@ -251,7 +251,7 @@ class CBF:
         H = cp.eye(3)
         
         f = (weight_icput) @ (-self.u_ref).reshape(2,1)
-        f = cp.vstack((f,cp.zeros((1,1))))
+        f = cp.vstack((f,self.params.weightslack))
                  
         #     # Optimal control icput
         #try:
