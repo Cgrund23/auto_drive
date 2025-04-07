@@ -165,7 +165,8 @@ class CBF:
         """
         Computes the CBF
         """
-        return 1-2*(self.rbf_kernel(x_test, X_train, length_scale, sigma_f))
+        return (x_test @ X_train.T)
+        #return 1-2*(self.rbf_kernel(x_test, X_train, length_scale, sigma_f))
         #return  self.rbf_kernel(x_test, X_train, length_scale, sigma_f) @ alpha - safe_dist
       
     def dcbf_function(self, x_test, X_train, length_scale, sigma_f):
@@ -220,17 +221,18 @@ class CBF:
         #print('make math grids')
         # Fill array with barrier locations
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
-        print(K.shape)
+        #print(K.shape)
         #Poe_angles = cp.arctan2(self.Poe[:,1],self.Poe[:,0]).reshape((self.Poe.shape[0],1))
         #self.PoeA = cp.hstack((self.Poe,Poe_angles))
         #K_self = self.rbf_kernel(self.Poe,X_query[:,:3],self.length_scale,self.params.sigma_f)
         K_star = self.rbf_kernel(self.Poe,X_query[:3,:].T,self.length_scale,self.params.sigma_f)
-        print(K_star.shape)
+        #print(K_star.shape)
         start = time.time()
         k_inv = cp.linalg.inv(K)
         print(time.time()-start)
         mean = 1-2*(K_star.T @ k_inv @ - self.Y)
-        h_control = self.cbf_function()
+        h_control = self.cbf_function(K_star,K,self.length_scale,self.params.sigma_f)
+        print(h_control.shape)
         #h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
 
         dkdp = (-1/self.length_scale**2)*K_star
