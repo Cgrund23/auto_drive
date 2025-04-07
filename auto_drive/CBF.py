@@ -123,7 +123,7 @@ class CBF:
         # Convert to x y cordinates Local frame
         x_lidar = cp.array(cp.array(filtered_distance) * cp.cos(cp.array(filtered_angle))).reshape((self.N, 1))
         y_lidar = cp.array(cp.array(filtered_distance) * cp.sin(cp.array(filtered_angle))).reshape((self.N, 1))
-
+        filtered_angle = cp.array(filtered_angle).reshape((self.N,1))
         self.Poe = cp.hstack((x_lidar,y_lidar,filtered_angle)).reshape((self.N,3))
 
 
