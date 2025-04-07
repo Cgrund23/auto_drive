@@ -226,7 +226,7 @@ class CBF:
 
         dkdp = (-1/self.length_scale**2)*K_selfish
         print(self.Y.shape,dkdp.shape,k_inv.shape)
-        dcbf = self.Y.T @ k_inv @ dkdp.T
+        dcbf = self.Y.T @ k_inv @ dkdp
 
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
