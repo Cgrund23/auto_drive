@@ -132,12 +132,12 @@ class CBF:
         Computes the RBF (Radial Basis Function) kernel between X1 and X2.
         """
         
-        sqdist = (cp.sum(X1**2, 1).reshape(-1, 1) + cp.sum(X2**2, 1)) - 2 * X1 @ X2.T # distance between points in X1 and X2
+        sqdist = (cp.sum(X1**2, 1).reshape(-1, 1) + cp.sum(X2**2, 1)).reshape(1, -1) - 2 * X1 @ X2.T # distance between points in X1 and X2
                                                                                     # note the dimentions in the sums!
                                                                                     # all distances between pairs of points
         return sigma_f * cp.exp((-0.5/length_scale**2) * sqdist)                  # Same kernel as in paper
 
-    def rbf_kernel_grad_input(self, X1, X2, length_scale, sigma_f):
+    def rbf_kernel_grad_input(X1, X2, length_scale, sigma_f):
         """
         Gradient of the RBF kernel w.r.t. X1.
         Returns array of shape (N, M, D), where grad[i, j] = ∂k(X1[i], X2[j]) / ∂X1[i]
@@ -221,8 +221,8 @@ class CBF:
         #print('start inverse')
         k_inv = cp.linalg.inv(K)
         #print('inverse done')
-        print(k_inv.shape,K_self.shape)
-        h_control = 1-2*(self.rbf_kernel_grad_input(K_self,k_inv,self.length_scale,self.params.sigma_f))
+        
+        h_control = 1-2*(K_self.T @ k_inv @ - self.Y)
         h_control[h_control > 1] = 1
         h_control[h_control < -1] = -1
         #h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
