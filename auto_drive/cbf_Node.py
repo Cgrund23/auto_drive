@@ -49,8 +49,8 @@ class Controller_Node(Node):
             y0: float = 0.0   # Start y
             
             # TODO get from model
-            xdim: float = 4.0
-            udim: float = 2.0
+            xdim: float = 4
+            udim: float = 2
             lf: float = 1.0
             lr: float = 1.0
 
