@@ -219,7 +219,7 @@ class CBF:
         #h_control = self.cbf_function(K_star,K,self.length_scale,self.params.sigma_f)
         #print(h_control.shape)
         #h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
-        dcbf = self.dcbf_function(X_query,self.Poe,K,k_inv,self.length_scale,self.params.sigma_f)
+        dcbf = self.dcbf_function(X_query,self.Poe,K_star,k_inv,self.length_scale,self.params.sigma_f)
 
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
