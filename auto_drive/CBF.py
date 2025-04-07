@@ -206,7 +206,7 @@ class CBF:
         LfB = {}
         LgB = {}
 
-        X_query = self.f_full()[:3,:]
+        X_query = self.f_full()[:2,:]
         print('X_query')
         m_val = 1
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
