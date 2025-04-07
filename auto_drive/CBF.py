@@ -228,7 +228,7 @@ class CBF:
         b = b.reshape((b.size,1))
          
         A = -self.lf_cbf_function(dcbf) 
-        A -= h_control**3
+        A -= 0.0 #h_control**3
 
         # umax constraints
         
