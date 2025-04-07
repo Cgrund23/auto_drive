@@ -35,6 +35,19 @@ class CBF:
         t = cp.array([0.0, 0.0 , 1.0])
         return cp.vstack((x,y,t))
     
+    def f_full(self):
+        """AI is creating summary for f_full
+
+        Args:
+            v ([type]): [velovity of the car bike model]
+
+        Returns:
+            [type]: [state]
+        """
+        return cp.array([self.params.v*cp.cos(self.params.theta + self.params.beta)*self.params.dt,
+            self.params.v*cp.sin(self.params.theta + self.params.beta)*self.params.dt,
+            0.0,0.0]).reshape((4,1))
+    
     def g(self):
         """
         The natrual dynamics of the ackerman steering car bike
@@ -45,7 +58,15 @@ class CBF:
             [cp.cos(self.params.beta) / (self.params.lf + self.params.lr) * cp.tan(self.params.gamma) * self.params.dt,
             self.params.v * cp.cos(self.params.beta) / ((self.params.lf + self.params.lr) * cp.cos(self.params.gamma)**2) * self.params.dt]
         ])
-
+    def g_full(self):
+        """
+        The natrual dynamics of the ackerman steering car bike
+        """
+        return cp.array([[0.0 , -self.params.v * cp.sin(self.params.theta +self.params.beta) * self.params.dt],
+                        [0.0 , self.params.v * cp.cos(self.params.theta + self.params.beta) * self.params.dt],
+                        [1.0 , 0.0],
+                        [0.0 , self.params.v / self.params.lf]]).reshape((4,2))
+    
     def c(self):
         """
         Path through component
@@ -60,7 +81,7 @@ class CBF:
         """
         return cp.array([self.params.x, self.params.y, self.params.theta],dtype=cp.float32).reshape((3,1))
     
-    def updateState(self,x,y, V, gamma):
+    def updateState(self, x, y, V, gamma):
         """
         Sets all global variables from "sensor" data
         """
@@ -111,11 +132,27 @@ class CBF:
         Computes the RBF (Radial Basis Function) kernel between X1 and X2.
         """
         
-        sqdist = cp.sum(X1**2, 1).reshape(-1, 1) + cp.sum(X2**2, 1) - 2 * X1 @ X2.T # distance between points in X1 and X2
+        sqdist = (cp.sum(X1**2, 1).reshape(-1, 1) + cp.sum(X2**2, 1)).reshape(1, -1) - 2 * X1 @ X2.T # distance between points in X1 and X2
                                                                                     # note the dimentions in the sums!
                                                                                     # all distances between pairs of points
-        return sigma_f * cp.exp(-0.5 * (sqdist / length_scale**2))                  # Same kernel as in paper
+        return sigma_f * cp.exp((-0.5/length_scale**2) * sqdist)                  # Same kernel as in paper
 
+    def rbf_kernel_grad_input(X1, X2, length_scale, sigma_f):
+        """
+        Gradient of the RBF kernel w.r.t. X1.
+        Returns array of shape (N, M, D), where grad[i, j] = ∂k(X1[i], X2[j]) / ∂X1[i]
+        """
+        # Compute squared distances (N, M)
+        sqdist = cp.sum(X1**2, axis=1).reshape(-1, 1) + cp.sum(X2**2, axis=1) - 2 * X1 @ X2.T
+        K = sigma_f * cp.exp(-0.5 * sqdist / length_scale**2)
+
+        # (N, M, D): X2 - X1 for each pair
+        diff = X2[cp.newaxis, :, :] - X1[:, cp.newaxis, :]  # shape (N, M, D)
+
+        # Apply gradient formula
+        grad = (K[:, :, cp.newaxis] / length_scale**2) * diff  # shape (N, M, D)
+        return grad
+    
 
     def cbf_function(self, x_test, X_train, length_scale, sigma_f):
         """
@@ -128,20 +165,21 @@ class CBF:
         """
         Compute the derivitive of the cbf function
         """
-        return  -1 / length_scale**2 * self.rbf_kernel(x_test, X_train, length_scale, sigma_f)*(x_test-X_train)
+        #return  -1 / length_scale**2 * self.rbf_kernel(x_test, X_train, length_scale, sigma_f)*(x_test-X_train)
+        return -self.rbf_kernel_grad_input(x_test, X_train, length_scale, sigma_f)
 
     def lf_cbf_function(self,dcbf):
         """
         Derivitive of the cbf function by the forced dynamics
         """
-        f = self.f()
+        f = self.f_full()
         return dcbf.T @ f
      
     def lg_cbf_function(self,dcbf):
         """
         Derivitive of the cbf function by the Icput dynamics
         """
-        g = self.g()
+        g = self.g_full()
         return dcbf.T @ g
 
     # Constraints/Cost
@@ -162,12 +200,12 @@ class CBF:
                           
         
     # Create grid of safe and unsafe
-        x_width = 12
-        y_width = 12
-        resolution = .5    # resolution of lidar data
-        grid_size = int(x_width*1/resolution)    # Grid resolution matches lidar grid
-        x_grid, y_grid = cp.meshgrid(cp.linspace(-x_width, x_width, grid_size), cp.linspace(-y_width, y_width, grid_size))
-        #safety_matrix = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
+        # x_width = 12
+        # y_width = 12
+        # resolution = .5    # resolution of lidar data
+        # grid_size = int(x_width*1/resolution)    # Grid resolution matches lidar grid
+        # x_grid, y_grid = cp.meshgrid(cp.linspace(-x_width, x_width, grid_size), cp.linspace(-y_width, y_width, grid_size))
+        # #safety_matrix = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
         
         #k_ss = self.rbf_kernel(safety_matrix,safety_matrix,self.length_scale,self.params.sigma_f)
         #print('make math grids')
@@ -240,7 +278,7 @@ class CBF:
         except Exception as e:
             print('failed constraints')
             print(f"An error occurred: {e}")
-            return [0,0],h_world,dcbf
+            return [0,0],dcbf
         
 
         

@@ -24,7 +24,6 @@ class Controller_Node(Node):
             self.pose_callback,
             10)
         
-        
         self.subscription = self.create_subscription(
             LaserScan,
             '/scan',
