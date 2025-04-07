@@ -213,10 +213,10 @@ class CBF:
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
         #Poe_angles = cp.arctan2(self.Poe[:,1],self.Poe[:,0]).reshape((self.Poe.shape[0],1))
         #self.PoeA = cp.hstack((self.Poe,Poe_angles))
-        K_self = self.rbf_kernel(self.Poe,X_query[:,:3],self.length_scale,self.params.sigma_f)
+        #K_self = self.rbf_kernel(self.Poe,X_query[:,:3],self.length_scale,self.params.sigma_f)
         K_selfish = self.rbf_kernel(X_query[:,:3],self.Poe,self.length_scale,self.params.sigma_f)
         k_inv = cp.linalg.inv(K)
-        h_control = 1-2*(K_self.T @ k_inv @ - self.Y)
+        h_control = 1-2*(K_selfish.T @ k_inv @ - self.Y)
         h_control[h_control > 1] = 1
         h_control[h_control < -1] = -1
         #h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
