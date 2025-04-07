@@ -224,7 +224,8 @@ class CBF:
         h_control[h_control < -1] = -1
         #h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
 
-        dkdp = -1/self.length_scale**2*K_selfish
+        dkdp = (-1/self.length_scale**2)*K_selfish
+        print(self.Y.shape,dkdp.shape,k_inv.shape)
         dcbf = self.Y.T @ k_inv @ dkdp.T
 
         ##TODO add theta of all points to dcbf function??? 
