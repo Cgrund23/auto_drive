@@ -207,10 +207,8 @@ class CBF:
         LgB = {}
 
         X_query = self.f_full()[:2,:]
-        print('X_query')
-        m_val = 1
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
-        K_star = self.rbf_kernel(self.Poe,X_query,self.length_scale,self.params.sigma_f)
+        K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
        
         start = time.time()
         k_inv = cp.linalg.inv(K)
