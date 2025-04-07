@@ -44,6 +44,7 @@ class CBF:
         Returns:
             [type]: [state]
         """
+        print('f_full')
         return cp.array([self.params.v*cp.cos(self.params.theta + self.params.beta)*self.params.dt,
             self.params.v*cp.sin(self.params.theta + self.params.beta)*self.params.dt,
             0.0,0.0]).reshape((4,1))
@@ -62,6 +63,7 @@ class CBF:
         """
         The natrual dynamics of the ackerman steering car bike
         """
+        print('g_full')
         return cp.array([[0.0 , -self.params.v * cp.sin(self.params.theta +self.params.beta) * self.params.dt],
                         [0.0 , self.params.v * cp.cos(self.params.theta + self.params.beta) * self.params.dt],
                         [1.0 , 0.0],
