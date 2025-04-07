@@ -165,7 +165,7 @@ class CBF:
         """
         Computes the CBF
         """
-        return (x_test.T @ X_train)
+        return (x_test @ X_train)
         #return 1-2*(self.rbf_kernel(x_test, X_train, length_scale, sigma_f))
         #return  self.rbf_kernel(x_test, X_train, length_scale, sigma_f) @ alpha - safe_dist
       
