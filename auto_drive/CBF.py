@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from qpsolvers import solve_qp
 import cupy as cp
-#import time
+import time
 
 class CBF:
     # Initiate Car
@@ -215,7 +215,9 @@ class CBF:
         #self.PoeA = cp.hstack((self.Poe,Poe_angles))
         #K_self = self.rbf_kernel(self.Poe,X_query[:,:3],self.length_scale,self.params.sigma_f)
         K_selfish = self.rbf_kernel(X_query[:,:3],self.Poe,self.length_scale,self.params.sigma_f)
+        start = time.time()
         k_inv = cp.linalg.inv(K)
+        print(time.time()-start)
         h_control = 1-2*(K_selfish.T @ k_inv @ - self.Y)
         h_control[h_control > 1] = 1
         h_control[h_control < -1] = -1
