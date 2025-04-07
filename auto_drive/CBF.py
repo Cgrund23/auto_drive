@@ -228,6 +228,7 @@ class CBF:
         k_inv = cp.linalg.inv(K)
         print(time.time()-start)
         h_control = 1-2*(K_selfish.T @ k_inv @ - self.Y)
+        print(h_control.shape)
         h_control[h_control > 1] = 1
         h_control[h_control < -1] = -1
         #h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
