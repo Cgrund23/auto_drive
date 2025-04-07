@@ -13,5 +13,7 @@
         "/home/jetson/f1tenth_ws/build/auto_drive",
         "/home/jetson/f1tenth_ws/install/auto_drive/lib/python3.8/site-packages",
         "/opt/ros/foxy/lib/python3.8/site-packages"
-    ]
+    ],
+    "python.pythonPath": "/bin/python3",
+    "ros.distro": "foxy"
 }

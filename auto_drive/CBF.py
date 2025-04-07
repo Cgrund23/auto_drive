@@ -1,8 +1,8 @@
-import autograd.numpy as np
+#import autograd.numpy as np
 from dataclasses import dataclass
 from qpsolvers import solve_qp
+import cupy as cp
 #import time
-
 
 class CBF:
     # Initiate Car
@@ -30,35 +30,35 @@ class CBF:
         """
         The forced dynamics of the car bike model
         """
-        x = np.array([1, 0, -self.params.v * np.sin(self.params.theta + self.params.beta)*self.params.dt])
-        y = np.array([0, 1, self.params.v * np.cos(self.params.theta + self.params.beta)*self.params.dt])
-        t = np.array([0, 0 , 1])
-        return np.vstack((x,y,t))
+        x = cp.array([cp.array(1, dtype=cp.float32),cp.array(0, dtype=cp.float32), -self.params.v * cp.sin(self.params.theta + self.params.beta)*self.params.dt],dtype=cp.float32)
+        y = cp.array([cp.array(0, dtype=cp.float32),cp.array(1, dtype=cp.float32), self.params.v * cp.cos(self.params.theta + self.params.beta)*self.params.dt])
+        t = cp.array([0.0, 0.0 , 1.0])
+        return cp.vstack((x,y,t))
     
     def g(self):
         """
         The natrual dynamics of the ackerman steering car bike
         """
-        return np.array([
-            [np.cos(self.params.theta + self.params.beta) * self.params.dt, 0],
-            [np.cos(self.params.theta + self.params.beta) * self.params.dt, 0],
-            [np.cos(self.params.beta) / (self.params.lf + self.params.lr) * np.tan(self.params.gamma) * self.params.dt,
-            self.params.v * np.cos(self.params.beta) / ((self.params.lf + self.params.lr) * np.cos(self.params.gamma)**2) * self.params.dt]
+        return cp.array([
+            [cp.cos(self.params.theta + self.params.beta) * self.params.dt, cp.array(0, dtype=cp.float32)],
+            [cp.cos(self.params.theta + self.params.beta) * self.params.dt, cp.array(0, dtype=cp.float32)],
+            [cp.cos(self.params.beta) / (self.params.lf + self.params.lr) * cp.tan(self.params.gamma) * self.params.dt,
+            self.params.v * cp.cos(self.params.beta) / ((self.params.lf + self.params.lr) * cp.cos(self.params.gamma)**2) * self.params.dt]
         ])
 
     def c(self):
         """
         Path through component
         """
-        return np.array([self.params.v * self.params.theta * np.sin(self.params.theta + self.params.beta)*self.params.dt,
-            -self.params.v * self.params.theta * np.cos(self.params.theta + self.params.beta)*self.params.dt,
-            -self.params.v * self.params.gamma * np.cos(self.params.beta)/((self.params.lf+self.params.lr)*np.cos(self.params.gamma)**2)*self.params.dt]).reshape((1,3))
+        return cp.array([self.params.v * self.params.theta * cp.sin(self.params.theta + self.params.beta)*self.params.dt,
+            -self.params.v * self.params.theta * cp.cos(self.params.theta + self.params.beta)*self.params.dt,
+            -self.params.v * self.params.gamma * cp.cos(self.params.beta)/((self.params.lf+self.params.lr)*cp.cos(self.params.gamma)**2)*self.params.dt]).reshape((1,3))
     
     def x(self):
         """
         Returns the location of the car and angle of tires / Fornow x,y 0 always
         """
-        return np.array([self.params.x, self.params.y, self.params.theta],dtype=float).reshape((3,1))
+        return cp.array([self.params.x, self.params.y, self.params.theta],dtype=cp.float32).reshape((3,1))
     
     def updateState(self,x,y, V, gamma):
         """
@@ -68,8 +68,8 @@ class CBF:
         self.params.y = y
         self.params.v = V
         self.params.gamma = gamma
-        self.params.beta = np.arctan2((self.params.lf*np.tan(gamma)),(self.params.lf+self.params.lr))
-        self.params.theta = (V*np.cos(self.params.beta)/(self.params.lf+self.params.lr))*np.tan(gamma)
+        self.params.beta = cp.arctan2((self.params.lf*cp.tan(gamma)),(self.params.lf+self.params.lr))
+        self.params.theta = (V*cp.cos(self.params.beta)/(self.params.lf+self.params.lr))*cp.tan(gamma)
         pass
     
     def setObjects(self,distance,angle):                               
@@ -91,19 +91,19 @@ class CBF:
                 filtered_angle.append(angle[k]) 
         
         # Create value and distance to plant of all points
-        self.Y = -1*np.ones(self.N)
-        self.NY = np.ones(self.N)
-        self.Dist = np.array(filtered_distance).reshape((self.N,1))
+        self.Y = -1*cp.ones(self.N)
+        self.NY = cp.ones(self.N)
+        self.Dist = cp.array(filtered_distance).reshape((self.N,1))
         
         # Convert to x y cordinates Global frame
-        x_lidar = np.array(np.array(filtered_distance) * np.cos(np.array(filtered_angle) + self.params.theta)+self.params.x).reshape((self.N, 1))
-        y_lidar = np.array(np.array(filtered_distance) * np.sin(np.array(filtered_angle) + self.params.theta)+self.params.y).reshape((self.N, 1))
+        x_lidar = cp.array(cp.array(filtered_distance) * cp.cos(cp.array(filtered_angle) + self.params.theta)+self.params.x).reshape((self.N, 1))
+        y_lidar = cp.array(cp.array(filtered_distance) * cp.sin(cp.array(filtered_angle) + self.params.theta)+self.params.y).reshape((self.N, 1))
         
         # Convert to x y cordinates Local frame
-        x_lidar = np.array(np.array(filtered_distance) * np.cos(np.array(filtered_angle))).reshape((self.N, 1))
-        y_lidar = np.array(np.array(filtered_distance) * np.sin(np.array(filtered_angle))).reshape((self.N, 1))
+        x_lidar = cp.array(cp.array(filtered_distance) * cp.cos(cp.array(filtered_angle))).reshape((self.N, 1))
+        y_lidar = cp.array(cp.array(filtered_distance) * cp.sin(cp.array(filtered_angle))).reshape((self.N, 1))
 
-        self.Poe = np.hstack((x_lidar,y_lidar))
+        self.Poe = cp.hstack((x_lidar,y_lidar))
 
 
     def rbf_kernel(self, X1, X2, length_scale, sigma_f):
@@ -111,10 +111,10 @@ class CBF:
         Computes the RBF (Radial Basis Function) kernel between X1 and X2.
         """
         
-        sqdist = np.sum(X1**2, 1).reshape(-1, 1) + np.sum(X2**2, 1) - 2 * X1 @ X2.T # distance between points in X1 and X2
+        sqdist = cp.sum(X1**2, 1).reshape(-1, 1) + cp.sum(X2**2, 1) - 2 * X1 @ X2.T # distance between points in X1 and X2
                                                                                     # note the dimentions in the sums!
                                                                                     # all distances between pairs of points
-        return sigma_f * np.exp(-0.5 * (sqdist / length_scale**2))                  # Same kernel as in paper
+        return sigma_f * cp.exp(-0.5 * (sqdist / length_scale**2))                  # Same kernel as in paper
 
 
     def cbf_function(self, x_test, X_train, length_scale, sigma_f):
@@ -139,7 +139,7 @@ class CBF:
      
     def lg_cbf_function(self,dcbf):
         """
-        Derivitive of the cbf function by the Input dynamics
+        Derivitive of the cbf function by the Icput dynamics
         """
         g = self.g()
         return dcbf.T @ g
@@ -150,10 +150,10 @@ class CBF:
         #self.updateState(v,theta)
         self.params.x,self.params.y = x,y
         # Create variables for optimisation 
-        self.u_ref = np.array(u_ref)
-        A = np.empty((0,2), float)
+        self.u_ref = cp.array(u_ref)
+        A = cp.empty((0,2), float)
         B = {}
-        b = np.empty((0,1),float)
+        b = cp.empty((0,1),float)
         LfB = {}
         LgB = {}
 
@@ -166,21 +166,22 @@ class CBF:
         y_width = 12
         resolution = .5    # resolution of lidar data
         grid_size = int(x_width*1/resolution)    # Grid resolution matches lidar grid
-        x_grid, y_grid = np.meshgrid(np.linspace(-x_width, x_width, grid_size), np.linspace(-y_width, y_width, grid_size))
-        #safety_matrix = np.column_stack((x_grid.ravel(), y_grid.ravel()))
+        x_grid, y_grid = cp.meshgrid(cp.linspace(-x_width, x_width, grid_size), cp.linspace(-y_width, y_width, grid_size))
+        #safety_matrix = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
         
         #k_ss = self.rbf_kernel(safety_matrix,safety_matrix,self.length_scale,self.params.sigma_f)
         #print('make math grids')
         # Fill array with barrier locations
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
+        # do eignan decomp and cholesky test time 
         #k_star = self.rbf_kernel(self.Poe,safety_matrix,self.length_scale,self.params.sigma_f)
-        Poe_angles = np.arctan2(self.Poe[:,1],self.Poe[:,0]).reshape((self.Poe.shape[0],1))
-        self.PoeA = np.hstack((self.Poe,Poe_angles))
+        Poe_angles = cp.arctan2(self.Poe[:,1],self.Poe[:,0]).reshape((self.Poe.shape[0],1))
+        self.PoeA = cp.hstack((self.Poe,Poe_angles))
         K_self = self.rbf_kernel(self.PoeA,X_query,self.length_scale,self.params.sigma_f)
         #q = X_query[:,:2]
         K_selfish = self.rbf_kernel(X_query[:,:2],self.Poe,self.length_scale,self.params.sigma_f)
         #print('start inverse')
-        k_inv = np.linalg.inv(K)
+        k_inv = cp.linalg.inv(K)
         #print('inverse done')
         h_control = 1-2*(K_self.T @ k_inv @ - self.Y)
         h_control[h_control > 1] = 1
@@ -201,30 +202,31 @@ class CBF:
 
         # umax constraints
         
-        k = np.hstack(([np.eye(self.params.udim), np.zeros((self.params.udim, 1))]))
-        A = np.vstack((A,k))
-        k = np.array((self.params.u_max))
-        b = np.vstack((b.reshape((b.shape[0],1)),k.reshape((k.size,1))))
+        k = cp.hstack(([cp.eye(self.params.udim), cp.zeros((self.params.udim, 1))]))
+        A = cp.vstack((A,k))
+        k = cp.array((self.params.u_max))
+        b = cp.vstack((b.reshape((b.shape[0],1)),k.reshape((k.size,1))))
         
         # u_min constraints
         
-        A = np.vstack((A,np.hstack((-np.eye(self.params.udim), np.zeros((self.params.udim, 1))))))
+        A = cp.vstack((A,cp.hstack((-cp.eye(self.params.udim), cp.zeros((self.params.udim, 1))))))
        
-        k = np.array((self.params.u_min))
+        k = cp.array((self.params.u_min))
        
-        b = np.vstack((b,-k.reshape((k.size,1))))
-        weight_input = np.eye(2)
+        b = cp.vstack((b,-k.reshape((k.size,1))))
+        weight_icput = cp.eye(2)
 
-        H = np.array(((1,0),(0,1)))
-        H = np.eye(3)
+        H = cp.array(((1,0),(0,1)))
+        H = cp.eye(3)
         
-        f = (weight_input) @ (-self.u_ref).reshape(2,1)
-        f = np.vstack((f,np.zeros((1,1))))
+        f = (weight_icput) @ (-self.u_ref).reshape(2,1)
+        f = cp.vstack((f,cp.zeros((1,1))))
                  
-        #     # Optimal control input
+        #     # Optimal control icput
         try:
             print(H.shape,f.shape,A.shape,b.shape)  
-            x = solve_qp(P=H, q=f, G=A, h=b, solver = "clarabel") 
+            x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel")
+            #x = solve_qp(P=H, q=f, G=A, h=b, solver = "clarabel") 
             print('x')
             print(x)  
             self.u = x[0]

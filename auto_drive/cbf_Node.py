@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import rclpy
-import numpy as np
+#import numpy as cp
+import cupy as cp
 import sys
-sys.path.append("/home/jetson/f1tenth_ws/src/auto_drive/auto_drive")
+#sys.path.append("/home/jetson/f1tenth_ws/src/auto_drive/auto_drive")
 from dataclasses import dataclass
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
@@ -10,7 +11,7 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64MultiArray 
 from sensor_msgs.msg import LaserScan
 from ackermann_msgs.msg import AckermannDriveStamped
-from CBF import CBF
+from auto_drive.CBF import CBF
 
 
 
@@ -91,8 +92,8 @@ class Controller_Node(Node):
 
     def lidar_pose_callback(self, msg):
         #numpoints = len(r) # hard code instead
-        self.params.ranges = np.array(msg.ranges)
-        angle = np.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
+        self.params.ranges = cp.array(msg.ranges)
+        angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
         self.CBFobj.setObjects(self.params.ranges,angle)
         
         try:
