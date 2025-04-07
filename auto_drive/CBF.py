@@ -187,6 +187,7 @@ class CBF:
         Derivitive of the cbf function by the Icput dynamics
         """
         g = self.g_full()
+        print(dcbf.shape,g.shape)
         return dcbf.T @ g
 
     # Constraints/Cost
