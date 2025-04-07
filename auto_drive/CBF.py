@@ -257,7 +257,7 @@ class CBF:
                  
         #     # Optimal control icput
         try:
-            print(H.shape,f.shape,A.shape,b.shape)  
+            #print(H.shape,f.shape,A.shape,b.shape)  
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel")
             #x = solve_qp(P=H, q=f, G=A, h=b, solver = "clarabel") 
             print('x')
