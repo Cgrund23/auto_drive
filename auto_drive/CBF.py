@@ -176,7 +176,7 @@ class CBF:
         diff = x_query - X_train
         grad =  - (1 / (length_scale**2)) * diff * k_star.T
         grad_h = grad.T@k_inv
-        return cp.hstack((grad_h, cp.zeros((grad_h.shape[0], 2)))) 
+        return cp.hstack((grad_h, cp.zeros((grad_h.shape[0], 2))))
 
     def lf_cbf_function(self,dcbf):
         """
