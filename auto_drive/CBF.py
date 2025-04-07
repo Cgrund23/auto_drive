@@ -220,20 +220,20 @@ class CBF:
         #print('make math grids')
         # Fill array with barrier locations
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
+        print(K.shape)
         #Poe_angles = cp.arctan2(self.Poe[:,1],self.Poe[:,0]).reshape((self.Poe.shape[0],1))
         #self.PoeA = cp.hstack((self.Poe,Poe_angles))
         #K_self = self.rbf_kernel(self.Poe,X_query[:,:3],self.length_scale,self.params.sigma_f)
-        K_selfish = self.rbf_kernel(self.Poe,X_query[:3,:].T,self.length_scale,self.params.sigma_f)
+        K_star = self.rbf_kernel(self.Poe,X_query[:3,:].T,self.length_scale,self.params.sigma_f)
+        print(K_star.shape)
         start = time.time()
         k_inv = cp.linalg.inv(K)
         print(time.time()-start)
-        h_control = 1-2*(K_selfish.T @ k_inv @ - self.Y)
-        print(h_control.shape)
-        h_control[h_control > 1] = 1
-        h_control[h_control < -1] = -1
+        mean = 1-2*(K_star.T @ k_inv @ - self.Y)
+        h_control = self.cbf_function()
         #h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
 
-        dkdp = (-1/self.length_scale**2)*K_selfish
+        dkdp = (-1/self.length_scale**2)*K_star
         print(self.Y.shape,dkdp.shape,k_inv.shape)
         dcbf = self.Y.T @ k_inv @ dkdp
 
