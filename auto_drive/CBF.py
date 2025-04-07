@@ -124,7 +124,7 @@ class CBF:
         x_lidar = cp.array(cp.array(filtered_distance) * cp.cos(cp.array(filtered_angle))).reshape((self.N, 1))
         y_lidar = cp.array(cp.array(filtered_distance) * cp.sin(cp.array(filtered_angle))).reshape((self.N, 1))
 
-        self.Poe = cp.hstack((x_lidar,y_lidar))
+        self.Poe = cp.hstack((x_lidar,y_lidar,filtered_angle)).reshape((self.N,3))
 
 
     def rbf_kernel(self, X1, X2, length_scale, sigma_f):
@@ -196,7 +196,7 @@ class CBF:
         LgB = {}
 
         X_query = self.f()
-          # Note desired "saftey" TUNE
+        # Note desired "saftey" TUNE
                           
         
     # Create grid of safe and unsafe
@@ -211,17 +211,11 @@ class CBF:
         #print('make math grids')
         # Fill array with barrier locations
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
-        # do eignan decomp and cholesky test time 
-        #k_star = self.rbf_kernel(self.Poe,safety_matrix,self.length_scale,self.params.sigma_f)
-        Poe_angles = cp.arctan2(self.Poe[:,1],self.Poe[:,0]).reshape((self.Poe.shape[0],1))
-        self.PoeA = cp.hstack((self.Poe,Poe_angles))
-        K_self = self.rbf_kernel(self.PoeA,X_query,self.length_scale,self.params.sigma_f)
-        #q = X_query[:,:2]
+        #Poe_angles = cp.arctan2(self.Poe[:,1],self.Poe[:,0]).reshape((self.Poe.shape[0],1))
+        #self.PoeA = cp.hstack((self.Poe,Poe_angles))
+        K_self = self.rbf_kernel(self.Poe,X_query,self.length_scale,self.params.sigma_f)
         K_selfish = self.rbf_kernel(X_query[:,:2],self.Poe,self.length_scale,self.params.sigma_f)
-        #print('start inverse')
         k_inv = cp.linalg.inv(K)
-        #print('inverse done')
-        
         h_control = 1-2*(K_self.T @ k_inv @ - self.Y)
         h_control[h_control > 1] = 1
         h_control[h_control < -1] = -1
