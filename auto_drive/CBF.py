@@ -195,7 +195,7 @@ class CBF:
         LfB = {}
         LgB = {}
 
-        X_query = self.f()
+        X_query = self.f_full()
         # Note desired "saftey" TUNE
                           
         
