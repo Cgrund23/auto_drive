@@ -143,7 +143,7 @@ class CBF:
         Returns array of shape (N, M, D), where grad[i, j] = ∂k(X1[i], X2[j]) / ∂X1[i]
         """
         # Compute squared distances (N, M)
-        sqdist = cp.sum(X1**2, axis=1).reshape(-1, 1) + cp.sum(X2**2, axis=1) - 2 * X1 @ X2.T
+        sqdist = cp.sum(X1**2, axis=1).reshape(-1, 1) + cp.sum(X2**2, axis=1) - 2 * X1 @ X2
         K = sigma_f * cp.exp(-0.5 * sqdist / length_scale**2)
 
         # (N, M, D): X2 - X1 for each pair
