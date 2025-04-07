@@ -233,6 +233,7 @@ class CBF:
         # umax constraints
         
         k = cp.hstack(([cp.eye(self.params.udim), cp.zeros((self.params.udim, 1))]))
+        print(k.shape,A.shape)
         A = cp.vstack((A,k))
         k = cp.array((self.params.u_max))
         b = cp.vstack((b.reshape((b.shape[0],1)),k.reshape((k.size,1))))
