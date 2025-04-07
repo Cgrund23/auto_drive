@@ -58,13 +58,14 @@ class CBF:
         ])
     def g_full(self):
         """
-        The natrual dynamics of the ackerman steering car bike
+        The natural dynamics of the Ackermann steering bicycle model.
         """
-        print('g_full')
-        return cp.array([[0.0 , -self.params.v * cp.sin(self.params.theta +self.params.beta) * self.params.dt],
-                        [0.0 , self.params.v * cp.cos(self.params.theta + self.params.beta) * self.params.dt],
-                        [1.0 , 0.0],
-                        [0.0 , self.params.v / self.params.lf]]).reshape((4,2))
+        return cp.array([
+            [0.0, -self.params.v * cp.sin(self.params.theta + self.params.beta) * self.params.dt],
+            [0.0,  self.params.v * cp.cos(self.params.theta + self.params.beta) * self.params.dt],
+            [1.0,  0.0],
+            [0.0,  self.params.v / self.params.lf]
+        ]).reshape((4, 2))
     
     def c(self):
         """
