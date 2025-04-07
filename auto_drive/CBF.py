@@ -228,7 +228,7 @@ class CBF:
         b = b.reshape((b.size,1))
          
         A = -self.lf_cbf_function(dcbf)
-        A -= 0.0 #h_control**3
+        A = cp.hstack((A , cp.zeros((A.shape[0],2)))) #h_control**3
 
         # umax constraints
         
