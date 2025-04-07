@@ -132,7 +132,7 @@ class CBF:
         Computes the RBF (Radial Basis Function) kernel between X1 and X2.
         """
         
-        sqdist = (cp.sum(X1**2, 1).reshape(-1, 1) + cp.sum(X2**2, 1)).reshape(1, -1) - 2 * X1 @ X2.T # distance between points in X1 and X2
+        sqdist = (cp.sum(X1**2, 1).reshape(-1, 1) + cp.sum(X2**2, 1)) - 2 * X1 @ X2.T # distance between points in X1 and X2
                                                                                     # note the dimentions in the sums!
                                                                                     # all distances between pairs of points
         return sigma_f * cp.exp((-0.5/length_scale**2) * sqdist)                  # Same kernel as in paper
