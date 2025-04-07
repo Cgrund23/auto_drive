@@ -143,7 +143,7 @@ class CBF:
         Returns array of shape (N, M, D), where grad[i, j] = ∂k(X1[i], X2[j]) / ∂X1[i]
         """
         # Compute squared distances (N, M)
-        sqdist = cp.sum(X1**2, axis=1).reshape(-1, 1) + cp.sum(X2**2, axis=1) - 2 * X1 @ X2
+        sqdist = cp.sum(X1**2, axis=1).reshape(-1, 1) + cp.sum(X2**2, axis=1) - 2 * X1 @ X2.T
         K = sigma_f * cp.exp(-0.5 * sqdist / length_scale**2)
 
         # (N, M, D): X2 - X1 for each pair
@@ -222,7 +222,7 @@ class CBF:
         k_inv = cp.linalg.inv(K)
         #print('inverse done')
         print(k_inv.shape,K_self.shape)
-        h_control = 1-2*(self.rbf_kernel_grad_input(K_self,k_inv,self.length_scale,self.params.sigma_f) @ - self.Y)
+        h_control = 1-2*(self.rbf_kernel_grad_input(K_self,k_inv.T,self.length_scale,self.params.sigma_f) @ - self.Y)
         h_control[h_control > 1] = 1
         h_control[h_control < -1] = -1
         #h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
