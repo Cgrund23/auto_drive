@@ -44,7 +44,7 @@ class CBF:
         print('f_full')
         dx = self.params.v * cp.cos(self.params.theta + self.params.beta) * self.params.dt
         dy = self.params.v * cp.sin(self.params.theta + self.params.beta) * self.params.dt
-        return cp.array([dx, dy, cp.float32(0.0), cp.float32(0.0)]).reshape(cp.array([4, 1]))
+        return cp.array([cp.float32(dx), cp.float32(dy), cp.float32(0.0), cp.float32(0.0)]).reshape(cp.array([4, 1]))
     
     def g(self):
         """
