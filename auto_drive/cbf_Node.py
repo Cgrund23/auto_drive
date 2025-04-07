@@ -49,10 +49,10 @@ class Controller_Node(Node):
             y0: float = 0   # Start y
             
             # TODO get from model
-            xdim: float = 4
-            udim: float = 2
-            lf: float = 1
-            lr: float = 1
+            xdim: float = 4.0
+            udim: float = 2.0
+            lf: float = 1.0
+            lr: float = 1.0
 
             # Obstacle position
             #TODO will be from lidar and continually updated figured out
