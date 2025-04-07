@@ -50,7 +50,7 @@ class Controller_Node(Node):
             
             # TODO get from model
             xdim: float = 4
-            udim: float = 2
+            udim: float = 1
             lf: float = 1.0
             lr: float = 1.0
 
