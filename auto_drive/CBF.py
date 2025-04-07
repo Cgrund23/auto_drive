@@ -199,6 +199,7 @@ class CBF:
         
         #self.updateState(v,theta)
         self.params.x,self.params.y = x,y
+
         # Create variables for optimisation 
         self.u_ref = cp.array(u_ref)
         A = cp.empty((0,2), float)
@@ -209,24 +210,20 @@ class CBF:
 
         X_query = self.f_full()[:2,:].T
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
-        #print(X_query.shape,self.Poe.shape)
-        K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
-       
-        #start = time.time()
-        k_inv = cp.linalg.inv(K)
-        #print(time.time()-start)
 
-        #h_control = self.cbf_function(K_star,K,self.length_scale,self.params.sigma_f)
-        #print(h_control.shape)
-        #h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
+        K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
+
+        k_inv = cp.linalg.inv(K)
+
+        cbf = self.cbf_function(X_query,self.Poe,self.length_scale,self.params.sigma_f)
         dcbf = self.dcbf_function(X_query,self.Poe,K_star,k_inv,self.length_scale,self.params.sigma_f)
 
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
         b = b @ self.u_ref 
-        b = b.reshape((b.size,1)) 
+        b = - b.reshape((b.size,1)) 
         print(b.shape)
-        A = -self.lf_cbf_function(dcbf)
+        A = self.lf_cbf_function(dcbf) + cbf**3
         A = cp.hstack((A , cp.zeros((A.shape[0],2)))) #h_control**3
 
         # umax constraints
