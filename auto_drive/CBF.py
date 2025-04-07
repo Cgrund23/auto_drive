@@ -177,7 +177,7 @@ class CBF:
         grad =  - (1 / (length_scale**2)) * diff * k_star.T
         grad_h = grad.T@k_inv
         #print(cp.hstack((grad_h, cp.zeros((grad_h.shape[0], 2)))).shape)
-        return cp.vstack((grad_h, cp.zeros((2, grad_h.shape[0]))))
+        return cp.vstack((grad_h, cp.zeros((2, grad_h.shape[1]))))
 
     def lf_cbf_function(self,dcbf):
         """
