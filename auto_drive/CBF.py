@@ -137,7 +137,7 @@ class CBF:
                                                                                     # all distances between pairs of points
         return sigma_f * cp.exp((-0.5/length_scale**2) * sqdist)                  # Same kernel as in paper
 
-    def rbf_kernel_grad_input(X1, X2, length_scale, sigma_f):
+    def rbf_kernel_grad_input(self, X1, X2, length_scale, sigma_f):
         """
         Gradient of the RBF kernel w.r.t. X1.
         Returns array of shape (N, M, D), where grad[i, j] = ∂k(X1[i], X2[j]) / ∂X1[i]
