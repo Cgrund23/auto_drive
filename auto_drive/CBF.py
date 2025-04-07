@@ -67,10 +67,10 @@ class CBF:
         lf = cp.asarray(self.params.lf)
 
         return cp.array([
-            [0.0, -v * cp.sin(theta + beta) * dt],
-            [0.0,  v * cp.cos(theta + beta) * dt],
-            [1.0,  0.0],
-            [0.0,  v / lf]
+            [cp.array(0.0), -v * cp.sin(theta + beta) * dt],
+            [cp.array(0.0),  v * cp.cos(theta + beta) * dt],
+            [cp.array(1.0),  cp.array(0.0)],
+            [cp.array(0.0),  v / lf]
         ]).reshape((4, 2))
     
     def c(self):
