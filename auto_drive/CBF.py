@@ -130,7 +130,7 @@ class CBF:
         x_lidar = cp.array(cp.array(filtered_distance) * cp.cos(cp.array(filtered_angle))).reshape((self.N, 1))
         y_lidar = cp.array(cp.array(filtered_distance) * cp.sin(cp.array(filtered_angle))).reshape((self.N, 1))
         filtered_angle = cp.array(filtered_angle).reshape((self.N,1))
-        self.Poe = cp.hstack((x_lidar,y_lidar,filtered_angle)).reshape((self.N,3))
+        self.Poe = cp.hstack((x_lidar,y_lidar)).reshape((self.N,2))
 
 
     def rbf_kernel(self, X1, X2, length_scale, sigma_f):
@@ -169,12 +169,14 @@ class CBF:
         #return 1-2*(self.rbf_kernel(x_test, X_train, length_scale, sigma_f))
         #return  self.rbf_kernel(x_test, X_train, length_scale, sigma_f) @ alpha - safe_dist
       
-    def dcbf_function(self, x_test, X_train, length_scale, sigma_f):
+    def dcbf_function(self, x_query, X_train, k_star, k_inv, length_scale, sigma_f):
         """
         Compute the derivitive of the cbf function
         """
-        #return  -1 / length_scale**2 * self.rbf_kernel(x_test, X_train, length_scale, sigma_f)*(x_test-X_train)
-        return -self.rbf_kernel_grad_input(x_test, X_train, length_scale, sigma_f)
+        diff = x_query - X_train
+        grad =  - (1 / (length_scale**2)) * diff * k_star.T
+        grad_h = grad@k_inv
+        return cp.hstack((grad_h, cp.zeros((grad_h.shape[0], 2)))) 
 
     def lf_cbf_function(self,dcbf):
         """
@@ -204,40 +206,20 @@ class CBF:
         LfB = {}
         LgB = {}
 
-        X_query = self.f_full()
+        X_query = self.f_full()[:3,:]
         print('X_query')
-        # Note desired "saftey" TUNE
-                          
-        
-    # Create grid of safe and unsafe
-        # x_width = 12
-        # y_width = 12
-        # resolution = .5    # resolution of lidar data
-        # grid_size = int(x_width*1/resolution)    # Grid resolution matches lidar grid
-        # x_grid, y_grid = cp.meshgrid(cp.linspace(-x_width, x_width, grid_size), cp.linspace(-y_width, y_width, grid_size))
-        # #safety_matrix = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
-        
-        #k_ss = self.rbf_kernel(safety_matrix,safety_matrix,self.length_scale,self.params.sigma_f)
-        #print('make math grids')
-        # Fill array with barrier locations
+        m_val = 1
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
-        #print(K.shape)
-        #Poe_angles = cp.arctan2(self.Poe[:,1],self.Poe[:,0]).reshape((self.Poe.shape[0],1))
-        #self.PoeA = cp.hstack((self.Poe,Poe_angles))
-        #K_self = self.rbf_kernel(self.Poe,X_query[:,:3],self.length_scale,self.params.sigma_f)
-        K_star = self.rbf_kernel(self.Poe,X_query[:3,:].T,self.length_scale,self.params.sigma_f)
-        #print(K_star.shape)
+        K_star = self.rbf_kernel(self.Poe,X_query,self.length_scale,self.params.sigma_f)
+       
         start = time.time()
         k_inv = cp.linalg.inv(K)
         print(time.time()-start)
-        mean = 1-2*(K_star.T @ k_inv @ - self.Y)
-        h_control = self.cbf_function(K_star,K,self.length_scale,self.params.sigma_f)
-        print(h_control.shape)
-        #h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
 
-        dkdp = (-1/self.length_scale**2)*K_star
-        print(self.Y.shape,dkdp.shape,k_inv.shape)
-        dcbf = self.Y.T @ k_inv @ dkdp
+        #h_control = self.cbf_function(K_star,K,self.length_scale,self.params.sigma_f)
+        #print(h_control.shape)
+        #h_world =  1-2*(k_star.T @ k_inv @ - self.Y)
+        dcbf = self.dcbf_function(X_query,self.Poe,K,k_inv,self.length_scale,self.params.sigma_f)
 
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
