@@ -60,12 +60,17 @@ class CBF:
         """
         The natural dynamics of the Ackermann steering bicycle model.
         """
-        print('g start')
+        v = cp.asarray(self.params.v)
+        theta = cp.asarray(self.params.theta)
+        beta = cp.asarray(self.params.beta)
+        dt = cp.asarray(self.params.dt)
+        lf = cp.asarray(self.params.lf)
+
         return cp.array([
-            [0.0, -self.params.v * cp.sin(self.params.theta + self.params.beta) * self.params.dt],
-            [0.0,  self.params.v * cp.cos(self.params.theta + self.params.beta) * self.params.dt],
+            [0.0, -v * cp.sin(theta + beta) * dt],
+            [0.0,  v * cp.cos(theta + beta) * dt],
             [1.0,  0.0],
-            [0.0,  self.params.v / self.params.lf]
+            [0.0,  v / lf]
         ]).reshape((4, 2))
     
     def c(self):
