@@ -44,8 +44,9 @@ class CBF:
         print('f_full')
         dx = self.params.v * cp.cos(self.params.theta + self.params.beta) * self.params.dt
         dy = self.params.v * cp.sin(self.params.theta + self.params.beta) * self.params.dt
-        return cp.array([dx, dy, cp.array(0.0), cp.array(0.0)]).reshape((4, 1))
-    
+        b = cp.array([dx, dy, cp.array(0.0), cp.array(0.0)]).reshape((4, 1))
+        print('b')
+        return b    
     def g(self):
         """
         The natrual dynamics of the ackerman steering car bike
