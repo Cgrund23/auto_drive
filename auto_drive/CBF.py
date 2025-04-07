@@ -176,7 +176,7 @@ class CBF:
         diff = x_query - X_train
         grad =  - (1 / (length_scale**2)) * diff * k_star.T
         grad_h = grad.T@k_inv
-        #print(cp.hstack((grad_h, cp.zeros((grad_h.shape[0], 2)))).shape)
+        print(cp.vstack((grad_h, cp.zeros((2, grad_h.shape[1])))).shape)
         return cp.vstack((grad_h, cp.zeros((2, grad_h.shape[1]))))
 
     def lf_cbf_function(self,dcbf):
@@ -227,7 +227,7 @@ class CBF:
         
         b = b.reshape((b.size,1))
          
-        A = -self.lf_cbf_function(dcbf).T 
+        A = -self.lf_cbf_function(dcbf)
         A -= 0.0 #h_control**3
 
         # umax constraints
