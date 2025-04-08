@@ -235,12 +235,12 @@ class CBF:
         return grad
     
 
-    def cbf_function(self, x_test, X_train, length_scale, sigma_f):
+    def cbf_function(self, x_test, X_train):
         """
         Computes the CBF
         """
         #print(x_test.shape,X_train.shape)
-        return (x_test.T@X_train)
+        return (1 - 2* x_test.T @ X_train @ self.NY)
         #return 1-2*(self.rbf_kernel(x_test, X_train, length_scale, sigma_f))
         #return  self.rbf_kernel(x_test, X_train, length_scale, sigma_f) @ alpha - safe_dist
       
