@@ -38,7 +38,7 @@ class Controller_Node(Node):
 
             v: float = 1.0 # velocity
             u_max: float = [1.5,1.54] # max speed,angle
-            u_min: float = [0.25,-1.54] # min speed,angle
+            u_min: float = [0.0,-1.54] # min speed,angle
 
             # Starting pose
             beta: float = 0.0
@@ -51,8 +51,8 @@ class Controller_Node(Node):
             # TODO get from model
             xdim: float = 4
             udim: float = 2
-            lf: float = 1.0
-            lr: float = 1.0
+            lf: float = 0.23
+            lr: float = 0.3
 
             # Obstacle position
             #TODO will be from lidar and continually updated figured out
