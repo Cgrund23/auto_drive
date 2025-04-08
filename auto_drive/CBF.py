@@ -24,7 +24,7 @@ class CBF:
         
         pass
         self.length_scale = 0.15    # found from  loop demo
-
+        self.time = 0.0
     # Dynamics #
 
     def f(self):
@@ -275,6 +275,9 @@ class CBF:
     # Constraints/Cost
     def constraints_cost(self,u_ref,x,y,theta,v):
         #self.updateState(v,theta)
+        print(self.time - time.time())
+        self.time = time.time()
+
         self.params.x,self.params.y = x,y
         # Create variables for optimisation 
         self.u_ref = cp.array(u_ref)
