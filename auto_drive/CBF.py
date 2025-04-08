@@ -240,8 +240,9 @@ class CBF:
         b = cp.vstack((b,-k.reshape((k.size,1))))
         weight_input = cp.eye(2)
 
-        H = cp.array(((1,0),(0,1)))
+        #H = cp.array(((1,0),(0,1)))
         H = cp.eye(3)
+        H = cp.diagnal(cp.array([1.0, 10.0, 1.0]))
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
