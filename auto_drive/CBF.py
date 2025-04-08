@@ -244,7 +244,7 @@ class CBF:
         #return 1-2*(self.rbf_kernel(x_test, X_train, length_scale, sigma_f))
         #return  self.rbf_kernel(x_test, X_train, length_scale, sigma_f) @ alpha - safe_dist
       
-    def dcbf_function(self, x_query, X_train, k_star, k_inv, length_scale, sigma_f):
+    def dcbf_function(self, x_query, X_train, k_star, k_inv, length_scale):
         """
         Compute the derivitive of the cbf function
         """
@@ -288,7 +288,7 @@ class CBF:
         k_inv = cp.linalg.inv(K)
 
         cbf = self.cbf_function(K_star.T,k_inv)
-        dcbf = self.dcbf_function(X_query,self.Poe,K_star.T,k_inv,self.length_scale,self.params.sigma_f)
+        dcbf = self.dcbf_function(x_query=X_query,k_star=K_star.T,X_train=self.Poe,k_inv=k_inv,length_scale=self.length_scale)
 
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
