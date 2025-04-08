@@ -96,7 +96,7 @@ class Controller_Node(Node):
         #try:
         u = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=self.params.x,y=self.params.y,theta=self.theta,v=self.v))
         #print("success")
-        print(u)
+        #print(u)
         self.send_vel(u[0],u[1])
         # except Exception as e:
         #     print('failed lidar')
