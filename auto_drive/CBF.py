@@ -254,6 +254,7 @@ class CBF:
         print(grad.shape)
         grad_h = (self.Y.T @ k_inv @ grad.T)
         #print(cp.vstack((grad_h, cp.zeros((2, grad_h.shape[1])))).shape)
+        print(grad_h.shape)
         return cp.hstack((grad_h, cp.zeros((2, grad_h.shape[1]))))
 
     def lf_cbf_function(self,dcbf):
