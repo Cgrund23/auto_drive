@@ -221,12 +221,7 @@ class CBF:
         b = b @ self.u_ref 
         b = - b.reshape((b.size,1)) 
         A = - (self.lf_cbf_function(dcbf) + cbf**3)
-        print(cbf)
-        print('------------')
-        print(A)
-        print("--------")
-        print(b)
-        A = cp.hstack((A , cp.zeros((A.shape[0],2)))) #h_control**3
+        A = cp.hstack((cp.zeros((A.shape[0],1)), A , cp.zeros((A.shape[0],1))))
 
         # umax constraints
         
