@@ -250,20 +250,6 @@ class CBF:
         try:
         #print(H.shape,f.shape,A.shape,b.shape)  
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel")
-            residuals = cp.dot(A, x) - b
-
-            # Define a small numerical tolerance.
-            tolerance = 1e-6
-
-            # Find indices of constraints where the residual exceeds the tolerance (indicating violation).
-            violated_indices = cp.where(residuals > tolerance)[0]
-
-            if violated_indices.size > 0:
-                print("The following constraints are violated (index: residual):")
-                for idx in violated_indices:
-                    print(f"Constraint {idx}: Residual = {residuals[idx]}")
-            else:
-                print("All constraints are satisfied within the tolerance.")
         #x = solve_qp(P=H, q=f, G=A, h=b, solver = "clarabel") 
         #print('x')
         #print(x)  
