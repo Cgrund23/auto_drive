@@ -288,6 +288,7 @@ class CBF:
         K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
 
         k_inv = cp.linalg.inv(K)
+        print(cp.hstack((self.Poe,cp.zeros((self.Poe.shape[0],2)))).shape)
         k_test = self.rbf_kernel(self.f_full(),cp.hstack((self.Poe,cp.zeros((self.Poe.shape[0],2)))),self.length_scale,self.params.sigma_f)
         print(k_test.shape)
         cbf = self.cbf_function(K_star.T,k_inv)
