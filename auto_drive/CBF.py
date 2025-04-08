@@ -222,6 +222,8 @@ class CBF:
         b = b.reshape((b.size,1)) 
         print(b.shape)
         A = - (self.lf_cbf_function(dcbf) + cbf**3)
+        print(A)
+        print(b)
         A = cp.hstack((A , cp.zeros((A.shape[0],2)))) #h_control**3
 
         # umax constraints
