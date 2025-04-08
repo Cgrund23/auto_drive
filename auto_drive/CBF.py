@@ -22,7 +22,7 @@ class CBF:
         self.params.sigma_f = 1.0
         
         pass
-        self.length_scale = 0.020    # found from  loop demo
+        self.length_scale = 0.20    # found from  loop demo
 
     # Dynamics #
 
@@ -223,6 +223,7 @@ class CBF:
         print(b.shape)
         A = - (self.lf_cbf_function(dcbf) + cbf**3)
         print(A)
+        print("--------")
         print(b)
         A = cp.hstack((A , cp.zeros((A.shape[0],2)))) #h_control**3
 
