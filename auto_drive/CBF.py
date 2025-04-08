@@ -126,8 +126,8 @@ class CBF:
         m, n = A.shape
 
         # Define CVXPY variables
-        x = cp.Variable(n)
-        xi = cp.Variable(nonneg=True)  # nonnegative slack scalar
+        x = cp.variable(n)
+        xi = cp.variable(nonneg=True)  # nonnegative slack scalar
 
         # Formulate the LP: we “relax” the constraints with the same slack xi added to all
         constraints = [A @ x <= b + xi]
