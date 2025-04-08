@@ -20,10 +20,10 @@ class CBF:
         self.params.y = 0.0
         self.params.Od = {}
         self.params.Y = {}
-        self.params.sigma_f = 1.0
+        self.params.sigma_f = 1.0*10**-2
         
         pass
-        self.length_scale = 0.15    # found from  loop demo
+        self.length_scale = 0.05    # found from  loop demo
 
     # Dynamics #
 
@@ -240,7 +240,7 @@ class CBF:
         Computes the CBF
         """
         print(x_test.shape,X_train.shape)
-        return (1 - 2* x_test.T @ X_train @ self.NY)
+        return (1 - 2 * x_test.T @ X_train @ self.NY)
         #return 1-2*(self.rbf_kernel(x_test, X_train, length_scale, sigma_f))
         #return  self.rbf_kernel(x_test, X_train, length_scale, sigma_f) @ alpha - safe_dist
       
