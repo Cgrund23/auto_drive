@@ -99,6 +99,7 @@ class CBF:
         self.params.beta = cp.arctan2((self.params.lf*cp.tan(gamma)),(self.params.lf+self.params.lr))
         self.params.theta = (V*cp.cos(self.params.beta)/(self.params.lf+self.params.lr))*cp.tan(gamma)
         pass
+    
     def check_constraints_feasibility(self, A, b, num_iters=1000, lr=1e-3, penalty=1e4, tol=1e-6):
         """
         Check the feasibility of inequality constraints A x <= b using a penalty method entirely in CuPy.
@@ -127,7 +128,7 @@ class CBF:
         m, n = A.shape
 
         # Initialize our decision variable x and slack xi
-        x = cp.zeros((n, 1))
+        x = cp.ones((n, 1))
         xi = cp.array([[1.0]])  # slack variable, shape (1, 1)
 
         # Perform subgradient descent
