@@ -58,12 +58,9 @@ class Controller_Node(Node):
             #TODO will be from lidar and continually updated figured out
             r_max: float = 2.0
             cbf_gamma: float = 1.0
-
             # Desired target point 
             #TODO this will still exist need to find a way to relate global to local
-
-            weightslack:float = 1.0
-
+            weightslack:float = 10.0
             cbfrate:float = 1.0
 
         self.params = params
@@ -72,7 +69,7 @@ class Controller_Node(Node):
         self.y = 0.0
         self.theta = 0.0
         self.v = 0.0
-        self.u_ref = [1.0,0.2]
+        self.u_ref = [1.0,0.0]
 
         # Publisher and Subscriber
         self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10) 

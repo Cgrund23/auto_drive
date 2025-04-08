@@ -239,8 +239,8 @@ class CBF:
         """
         Computes the CBF
         """
-        print(x_test.shape,X_train.shape)
-        return (X_train@x_test.T)
+        #print(x_test.shape,X_train.shape)
+        return (x_test.T@X_train)
         #return 1-2*(self.rbf_kernel(x_test, X_train, length_scale, sigma_f))
         #return  self.rbf_kernel(x_test, X_train, length_scale, sigma_f) @ alpha - safe_dist
       
@@ -287,7 +287,7 @@ class CBF:
 
         k_inv = cp.linalg.inv(K)
 
-        cbf = self.cbf_function(X_query,self.Poe,self.length_scale,self.params.sigma_f)
+        cbf = self.cbf_function(X_query,k_inv,self.length_scale,self.params.sigma_f)
         dcbf = self.dcbf_function(X_query,self.Poe,K_star,k_inv,self.length_scale,self.params.sigma_f)
 
         ##TODO add theta of all points to dcbf function??? 
@@ -316,7 +316,7 @@ class CBF:
 
         #H = cp.array(((1,0),(0,1)))
         H = cp.eye(3)
-        H = cp.diag(cp.array([1.0, 10.0, 1.0]))
+        H = cp.diag(cp.array([10.0, 1.0, 10.0]))
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
