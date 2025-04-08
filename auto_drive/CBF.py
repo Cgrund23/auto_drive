@@ -128,7 +128,7 @@ class CBF:
         m, n = A.shape
 
         # Initialize our decision variable x and slack xi
-        x = cp.ones((n, 1))
+        x = cp.zeros((n, 1))
         xi = cp.array([[1.0]])  # slack variable, shape (1, 1)
 
         # Perform subgradient descent
