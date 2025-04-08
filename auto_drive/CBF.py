@@ -239,7 +239,7 @@ class CBF:
         """
         Computes the CBF
         """
-        print(x_test.shape,X_train.shape)
+        #print(x_test.shape,X_train.shape)
         return (1 - 2 * x_test.T @ X_train @ self.NY)
         #return 1-2*(self.rbf_kernel(x_test, X_train, length_scale, sigma_f))
         #return  self.rbf_kernel(x_test, X_train, length_scale, sigma_f) @ alpha - safe_dist
@@ -249,12 +249,12 @@ class CBF:
         Compute the derivitive of the cbf function
         """
         diff = x_query - X_train
-        print(k_star.shape,diff.shape)
+        #print(k_star.shape,diff.shape)
         grad =  - (1 / (length_scale**2)) * k_star.T * diff.T
-        print(grad.shape)
+        #print(grad.shape)
         grad_h = (self.Y.T @ k_inv @ grad.T)
         #print(cp.vstack((grad_h, cp.zeros((2, grad_h.shape[1])))).shape)
-        print(grad_h.shape)
+        #print(grad_h.shape)
         return cp.vstack((grad_h.reshape((2,1)), cp.zeros((2, 1))))
 
     def lf_cbf_function(self,dcbf):
@@ -269,7 +269,7 @@ class CBF:
         Derivitive of the cbf function by the Icput dynamics
         """
         g = self.g_full()
-        print(dcbf.shape,g.shape)
+        #print(dcbf.shape,g.shape)
         return dcbf.T @ g
 
     # Constraints/Cost
@@ -292,7 +292,7 @@ class CBF:
         K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
 
         k_inv = cp.linalg.inv(K)
-        print(X_query.shape)
+        #print(X_query.shape)
         #k_test = self.rbf_kernel(self.f_full().T,cp.hstack((self.Poe,cp.zeros((self.Poe.shape[0],2)))).T,self.length_scale,self.params.sigma_f)
         #print(k_test.shape)
         cbf = self.cbf_function(K_star.T,k_inv)
