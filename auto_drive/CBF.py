@@ -197,10 +197,8 @@ class CBF:
 
     # Constraints/Cost
     def constraints_cost(self,u_ref,x,y,theta,v):
-        
         #self.updateState(v,theta)
         self.params.x,self.params.y = x,y
-
         # Create variables for optimisation 
         self.u_ref = cp.array(u_ref)
         A = cp.empty((0,2), float)
@@ -208,7 +206,6 @@ class CBF:
         b = cp.empty((0,1),float)
         LfB = {}
         LgB = {}
-
         X_query = self.f_full()[:2,:].T
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
 
@@ -222,9 +219,9 @@ class CBF:
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
         b = b @ self.u_ref 
-        b = - b.reshape((b.size,1)) 
+        b = b.reshape((b.size,1)) 
         print(b.shape)
-        A = self.lf_cbf_function(dcbf) + cbf**3
+        A = - (self.lf_cbf_function(dcbf) + cbf**3)
         A = cp.hstack((A , cp.zeros((A.shape[0],2)))) #h_control**3
 
         # umax constraints
