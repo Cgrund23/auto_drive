@@ -321,7 +321,7 @@ class CBF:
 
         #H = cp.array(((1,0),(0,1)))
         H = cp.eye(3)
-        H = cp.diag(cp.array([10.0, 1.0, 10.0]))
+        #H = cp.diag(cp.array([10.0, 1.0, 10.0]))
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
@@ -330,7 +330,7 @@ class CBF:
         try:
 
         #print(H.shape,f.shape,A.shape,b.shape)  
-            self.check_constraints_feasibility((A), (b))
+            #self.check_constraints_feasibility((A), (b))
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
             print(x)
             self.u = x[0]
