@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from qpsolvers import solve_qp
 import cupy as cp
-import numpy as np
+#import numpy as np
 import time
 
 class CBF:
@@ -99,57 +99,78 @@ class CBF:
         self.params.beta = cp.arctan2((self.params.lf*cp.tan(gamma)),(self.params.lf+self.params.lr))
         self.params.theta = (V*cp.cos(self.params.beta)/(self.params.lf+self.params.lr))*cp.tan(gamma)
         pass
-    def check_constraints_feasibility(self,A, b, tol=1e-6):
+    def check_constraints_feasibility_cp(self, A, b, num_iters=1000, lr=1e-3, penalty=1e4, tol=1e-6):
         """
-        Check the feasibility of a set of inequality constraints A x <= b.
+        Check the feasibility of inequality constraints A x <= b using a penalty method entirely in CuPy.
         
-        This function solves an auxiliary linear program (LP)
-            minimize   xi 
-            subject to A x <= b + xi,
-                        xi >= 0,
-        and reports whether the optimal slack xi is close to zero.
-        
-        Additionally, if constraints appear infeasible, it prints the index
-        and residual of each constraint violation.
+        We approximately solve:
+            minimize    f(x, xi) = xi + penalty * sum(max(0, A x - b - xi))
+            subject to  xi >= 0
+        via a simple subgradient descent approach.
         
         Parameters:
-            A: np.ndarray, shape (m, n) - constraint matrix.
-            b: np.ndarray, shape (m,) or (m, 1) - constraint vector.
-            tol: float - tolerance level for feasibility.
+        A: cp.array of shape (m, n) -- constraint matrix.
+        b: cp.array of shape (m,) or (m, 1) -- constraint vector.
+        num_iters: number of gradient descent iterations.
+        lr: learning rate.
+        penalty: penalty parameter to strongly enforce the constraints.
+        tol: tolerance for determining if a constraint is violated.
         
         Returns:
-            x_opt: The candidate x obtained from the feasibility LP.
-            xi_opt: The optimal slack value.
+        x: cp.array, approximate solution for x.
+        xi: cp.array scalar, approximate optimal slack.
+        violated_idx: cp.array, indices of constraints whose residual exceeds tol.
+        residuals: cp.array of computed residuals, r = A x - b.
         """
-        # Ensure b is a flat array
-        b = np.ravel(b)
+        # Ensure b is a column vector (m, 1)
+        b = cp.atleast_2d(b).reshape(-1, 1)
         m, n = A.shape
 
-        # Define CVXPY variables
-        x = cp.variable(n)
-        xi = cp.variable(nonneg=True)  # nonnegative slack scalar
+        # Initialize our decision variable x and slack xi
+        x = cp.zeros((n, 1))
+        xi = cp.array([[1.0]])  # slack variable, shape (1, 1)
 
-        # Formulate the LP: we “relax” the constraints with the same slack xi added to all
-        constraints = [A @ x <= b + xi]
-        objective = cp.Minimize(xi)
+        # Perform subgradient descent
+        for it in range(num_iters):
+            # Compute constraint residuals (including slack): v = A x - b - xi
+            v = cp.dot(A, x) - b - xi  # shape: (m, 1)
+            
+            # Only positive violations contribute to the penalty term.
+            violation = cp.maximum(v, 0)  # shape: (m, 1)
+            
+            # (Optional) Compute the current objective value:
+            f_val = xi + penalty * cp.sum(violation)
+            # You could print f_val every so often for diagnostics.
+            
+            # Compute subgradients.
+            # For x: subgrad_x = penalty * A^T * indicator(v > 0)
+            indicator = (v > 0).astype(cp.float32)  # shape: (m, 1)
+            subgrad_x = penalty * cp.dot(A.T, indicator)  # shape: (n, 1)
+            
+            # For xi: subgrad_xi = 1 - penalty * sum(indicator)
+            subgrad_xi = 1 - penalty * cp.sum(indicator)
+            
+            # Update x and xi using the subgradients.
+            x = x - lr * subgrad_x
+            xi = xi - lr * subgrad_xi
+            # Enforce xi >= 0
+            xi = cp.maximum(xi, 0)
+
+        # Compute final residuals for the original constraints.
+        residuals = cp.dot(A, x) - b  # shape: (m, 1)
+        violated_idx = cp.where(residuals > tol)[0]
         
-        prob = cp.Problem(objective, constraints)
-        prob.solve()
-
-        xi_opt = xi.value
-        x_opt = x.value
-
-        if xi_opt > tol:
-            print(f"Constraints may be infeasible (optimal slack = {xi_opt:.2e}).")
-            # Compute residuals for each constraint
-            residuals = A @ x_opt - b
-            violated_indices = np.where(residuals > tol)[0]
-            for i in violated_indices:
-                print(f"Constraint {i}: residual = {residuals[i]:.2e}")
+        if xi.item() > tol:
+            print("Constraints may be infeasible. Final slack xi =", xi.item())
+            if violated_idx.size > 0:
+                print("Violated constraints and their residuals:")
+                for idx in violated_idx.get():
+                    print(f"Constraint {idx}: residual = {residuals[idx].item():.2e}")
         else:
-            print("All constraints are feasible within the given tolerance.")
+            print("All constraints appear feasible within tolerance.")
+        
+        return x, xi, violated_idx, residuals
 
-        return x_opt, xi_opt
 
     def setObjects(self,distance,angle):                               
         """
@@ -303,7 +324,7 @@ class CBF:
         try:
 
         #print(H.shape,f.shape,A.shape,b.shape)  
-            x_feas, slack = self.check_constraints_feasibility(cp.asnumpy(A), cp.asnumpy(b))
+            x_feas, slack = self.check_constraints_feasibility((A), (b))
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel")
         #x = solve_qp(P=H, q=f, G=A, h=b, solver = "clarabel") 
         #print('x')
