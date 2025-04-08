@@ -249,8 +249,8 @@ class CBF:
         Compute the derivitive of the cbf function
         """
         diff = x_query - X_train
-        print(k_star.shape,diff.shape)
         grad =  - (1 / (length_scale**2)) * k_star.T @ diff
+        print(self.Y.shape,k_inv.shape,grad.shape)
         grad_h = (self.Y.T @ k_inv @ grad).T
         #print(cp.vstack((grad_h, cp.zeros((2, grad_h.shape[1])))).shape)
         return cp.hstack((grad_h, cp.zeros((2, grad_h.shape[1]))))
