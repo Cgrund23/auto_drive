@@ -83,9 +83,10 @@ class Controller_Node(Node):
         self.y = msg.pose.pose.position.y
         self.theta = msg.pose.pose.orientation.x
         angle_rate = msg.twist.twist.angular.z
-        print('theta')
-        print(self.theta)
-        self.v = msg.twist.twist.linear.x
+        print('V')
+        print(self.v)
+        #self.v = msg.twist.twist.linear.x
+        self.v = 1.0
         self.CBFobj.updateState(self.x,self.y,self.theta,self.v)
 
 
@@ -98,6 +99,7 @@ class Controller_Node(Node):
         #try:
         u = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=self.params.x,y=self.params.y,theta=self.theta,v=self.v))
         print("success")
+        print(u)
         self.send_vel(1.0,u[1])
         # except Exception as e:
         #     print('failed lidar')

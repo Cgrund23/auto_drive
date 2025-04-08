@@ -247,7 +247,7 @@ class CBF:
         H = cp.array(((1,0),(0,1)))
         H = cp.eye(3)
         
-        f = (weight_input) @ (-self.u_ref).reshape(2,1)
+        f = (weight_input) @ (self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
                  
         #     # Optimal control icput
@@ -255,8 +255,8 @@ class CBF:
         #print(H.shape,f.shape,A.shape,b.shape)  
         x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel")
         #x = solve_qp(P=H, q=f, G=A, h=b, solver = "clarabel") 
-        print('x')
-        print(x)  
+        #print('x')
+        #print(x)  
         self.u = x[0]
         #TODO update from imu data
         ##self.updateState(x[1],x[0])
