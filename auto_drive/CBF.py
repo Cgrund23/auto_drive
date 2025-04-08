@@ -219,7 +219,7 @@ class CBF:
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
         b = b @ self.u_ref 
-        b = b.reshape((b.size,1)) 
+        b = - b.reshape((b.size,1)) 
         A = - (self.lf_cbf_function(dcbf) + cbf**3)
         print(cbf)
         print('------------')
