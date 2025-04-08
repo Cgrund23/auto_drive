@@ -282,7 +282,7 @@ class CBF:
         b = cp.empty((0,1),float)
         LfB = {}
         LgB = {}
-        X_query = self.f_full()[:2,:].T
+        X_query = self.f_full()[:2,:]
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
 
         K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
