@@ -22,7 +22,7 @@ class CBF:
         self.params.sigma_f = 1.0
         
         pass
-        self.length_scale = 0.20    # found from  loop demo
+        self.length_scale = 0.10    # found from  loop demo
 
     # Dynamics #
 
