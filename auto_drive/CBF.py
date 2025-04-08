@@ -252,7 +252,7 @@ class CBF:
         print(k_star.shape,diff.shape)
         grad =  - (1 / (length_scale**2)) * k_star.T * diff.T
         print(grad.shape)
-        grad_h = (self.Y.T @ k_inv @ grad).T
+        grad_h = (self.Y.T @ k_inv @ grad.T).T
         #print(cp.vstack((grad_h, cp.zeros((2, grad_h.shape[1])))).shape)
         return cp.hstack((grad_h, cp.zeros((2, grad_h.shape[1]))))
 
