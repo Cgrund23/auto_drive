@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from qpsolvers import solve_qp
 import cupy as cp
+import numpy as np
 import time
 
 class CBF:
@@ -98,7 +99,63 @@ class CBF:
         self.params.beta = cp.arctan2((self.params.lf*cp.tan(gamma)),(self.params.lf+self.params.lr))
         self.params.theta = (V*cp.cos(self.params.beta)/(self.params.lf+self.params.lr))*cp.tan(gamma)
         pass
-    
+    def check_constraints_feasibility(self,A, b, tol=1e-6):
+        """
+        Check the feasibility of a set of inequality constraints A x <= b.
+        
+        This function solves an auxiliary linear program (LP)
+            minimize   xi 
+            subject to A x <= b + xi,
+                        xi >= 0,
+        and reports whether the optimal slack xi is close to zero.
+        
+        Additionally, if constraints appear infeasible, it prints the index
+        and residual of each constraint violation.
+        
+        Parameters:
+            A: np.ndarray, shape (m, n) - constraint matrix.
+            b: np.ndarray, shape (m,) or (m, 1) - constraint vector.
+            tol: float - tolerance level for feasibility.
+        
+        Returns:
+            x_opt: The candidate x obtained from the feasibility LP.
+            xi_opt: The optimal slack value.
+        """
+        # Ensure b is a flat array
+        b = np.ravel(b)
+        m, n = A.shape
+
+        # Define CVXPY variables
+        x = cp.Variable(n)
+        xi = cp.Variable(nonneg=True)  # nonnegative slack scalar
+
+        # Formulate the LP: we “relax” the constraints with the same slack xi added to all
+        constraints = [A @ x <= b + xi]
+        objective = cp.Minimize(xi)
+        
+        prob = cp.Problem(objective, constraints)
+        prob.solve()
+
+        xi_opt = xi.value
+        x_opt = x.value
+
+        if xi_opt > tol:
+            print(f"Constraints may be infeasible (optimal slack = {xi_opt:.2e}).")
+            # Compute residuals for each constraint
+            residuals = A @ x_opt - b
+            violated_indices = np.where(residuals > tol)[0]
+            for i in violated_indices:
+                print(f"Constraint {i}: residual = {residuals[i]:.2e}")
+        else:
+            print("All constraints are feasible within the given tolerance.")
+
+        return x_opt, xi_opt
+
+    # Example usage:
+    # Convert your CuPy arrays back to NumPy if needed for cvxpy
+    A_np = cp.asnumpy(A)  # A is your constraint matrix (e.g., from clarabel, A = G in your code)
+    b_np = cp.asnumpy(b)  # b is your constraint vector (e.g., b = h in your code)
+
     def setObjects(self,distance,angle):                               
         """
         Take all lidar points and turn them into data
@@ -249,7 +306,9 @@ class CBF:
                  
         #     # Optimal control icput
         try:
+
         #print(H.shape,f.shape,A.shape,b.shape)  
+            x_feas, slack = check_constraints_feasibility(A_np, b_np)
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel")
         #x = solve_qp(P=H, q=f, G=A, h=b, solver = "clarabel") 
         #print('x')
