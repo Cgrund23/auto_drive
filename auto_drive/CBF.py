@@ -331,10 +331,8 @@ class CBF:
 
         #print(H.shape,f.shape,A.shape,b.shape)  
             x_feas, slack = self.check_constraints_feasibility((A), (b))
-            x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel")
-        #x = solve_qp(P=H, q=f, G=A, h=b, solver = "clarabel") 
-        #print('x')
-        #print(x)  
+            x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
+            print(x)
             self.u = x[0]
             #TODO update from imu data
             ##self.updateState(x[1],x[0])
@@ -344,7 +342,7 @@ class CBF:
             #x = [1,1]
             return x
         except Exception as e:
-            print('failed constraints')
+            #print('failed constraints')
             print(f"An error occurred: {e}")
             return [0,0]
         
