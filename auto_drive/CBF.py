@@ -288,7 +288,7 @@ class CBF:
         k_inv = cp.linalg.inv(K)
 
         cbf = self.cbf_function(K_star.T,k_inv)
-        dcbf = self.dcbf_function(X_query,self.Poe,K_star,k_inv,self.length_scale,self.params.sigma_f)
+        dcbf = self.dcbf_function(X_query,self.Poe,K_star.T,k_inv,self.length_scale,self.params.sigma_f)
 
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
