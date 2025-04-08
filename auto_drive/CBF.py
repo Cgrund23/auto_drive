@@ -151,11 +151,6 @@ class CBF:
 
         return x_opt, xi_opt
 
-    # Example usage:
-    # Convert your CuPy arrays back to NumPy if needed for cvxpy
-    A_np = cp.asnumpy(A)  # A is your constraint matrix (e.g., from clarabel, A = G in your code)
-    b_np = cp.asnumpy(b)  # b is your constraint vector (e.g., b = h in your code)
-
     def setObjects(self,distance,angle):                               
         """
         Take all lidar points and turn them into data
@@ -308,7 +303,7 @@ class CBF:
         try:
 
         #print(H.shape,f.shape,A.shape,b.shape)  
-            x_feas, slack = check_constraints_feasibility(A_np, b_np)
+            x_feas, slack = self.check_constraints_feasibility(cp.asnumpy(A), cp.asnumpy(b))
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel")
         #x = solve_qp(P=H, q=f, G=A, h=b, solver = "clarabel") 
         #print('x')
