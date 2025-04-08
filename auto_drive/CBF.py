@@ -22,7 +22,7 @@ class CBF:
         self.params.sigma_f = 1.0
         
         pass
-        self.length_scale = 0.10    # found from  loop demo
+        self.length_scale = 0.15    # found from  loop demo
 
     # Dynamics #
 
@@ -220,8 +220,9 @@ class CBF:
         b = self.lg_cbf_function(dcbf) 
         b = b @ self.u_ref 
         b = b.reshape((b.size,1)) 
-        print(b.shape)
         A = - (self.lf_cbf_function(dcbf) + cbf**3)
+        print(cbf)
+        print('------------')
         print(A)
         print("--------")
         print(b)
