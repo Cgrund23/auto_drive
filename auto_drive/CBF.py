@@ -349,7 +349,7 @@ class CBF:
         except Exception as e:
             #print('failed constraints')
             print(f"An error occurred: {e}")
-            return [0,0]
+            return [0,0],self.f_full()
         
 
         
