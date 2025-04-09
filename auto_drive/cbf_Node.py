@@ -96,24 +96,25 @@ class Controller_Node(Node):
 
     def lidar_pose_callback(self, msg):
         #numpoints = len(r) # hard code instead
-        
+        start = time.time()
         self.params.ranges = cp.array(msg.ranges)
         angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
-        start = time.time()
+        
         self.CBFobj.setObjects(self.params.ranges,angle)
         # here
         
         #try:
         
         u, state = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=self.params.x,y=self.params.y,theta=self.theta,v=self.v))
-        total_time = time.time() - start
-        self.get_logger().info(f"Constrain Cost time: {total_time:.3f}")
+        
         #print("success")
         #print(u)
         msg = Float32MultiArray()
         msg.data = set(state.ravel().get())
         self.state_publisher.publish(msg)
         self.send_vel(u[0],u[1]*10**2)
+        total_time = time.time() - start
+        self.get_logger().info(f"Constrain Cost time: {total_time:.3f}")
         
         
         # except Exception as e:
