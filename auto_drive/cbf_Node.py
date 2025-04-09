@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Float64MultiArray 
+from std_msgs.msg import Float32MultiArray 
 from sensor_msgs.msg import LaserScan
 from ackermann_msgs.msg import AckermannDriveStamped
 from auto_drive.CBF import CBF
@@ -32,7 +32,7 @@ class Controller_Node(Node):
         
 
         class params():
-            dt: float = 1/10 # 10ms
+            dt: float = 0.5#1/10 # 10ms
 
             # Car info
 
@@ -52,7 +52,7 @@ class Controller_Node(Node):
             xdim: float = 4
             udim: float = 2
             lf: float = 0.23
-            lr: float = 0.3
+            lr: float = 0.2
 
             # Obstacle position
             #TODO will be from lidar and continually updated figured out
@@ -60,7 +60,7 @@ class Controller_Node(Node):
             cbf_gamma: float = 1.0
             # Desired target point 
             #TODO this will still exist need to find a way to relate global to local
-            weightslack:float = 1.0
+            weightslack:float = 5.0
             cbfrate:float = 1.0
 
         self.params = params
@@ -72,7 +72,8 @@ class Controller_Node(Node):
         self.u_ref = [1.0,0.0]
 
         # Publisher and Subscriber
-        self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10) 
+        self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)
+        self.state_publisher = self.create_publisher(Float32MultiArray, "/state", 10) 
 
     def pose_callback(self,msg):
         print('pose')
@@ -94,9 +95,12 @@ class Controller_Node(Node):
         self.CBFobj.setObjects(self.params.ranges,angle)
         
         #try:
-        u = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=self.params.x,y=self.params.y,theta=self.theta,v=self.v))
+        u, state = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=self.params.x,y=self.params.y,theta=self.theta,v=self.v))
         #print("success")
         #print(u)
+        msg = Float32MultiArray()
+        msg.data = state
+        self.state_publisher.publish(msg)
         self.send_vel(u[0],u[1])
         # except Exception as e:
         #     print('failed lidar')
