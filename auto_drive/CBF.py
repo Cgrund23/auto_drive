@@ -275,7 +275,7 @@ class CBF:
     # Constraints/Cost
     def constraints_cost(self,u_ref,x,y,theta,v):
         #self.updateState(v,theta)
-        print(self.time - time.time())
+        #print(self.time - time.time())
         self.time = time.time()
 
         self.params.x,self.params.y = x,y
@@ -292,8 +292,8 @@ class CBF:
         K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
         tim = time.time()
         k_inv = cp.linalg.inv(K)
-        print('inverse time')
-        print(tim - time.time())
+        #print('inverse time')
+        #print(tim - time.time())
         #print(X_query.shape)
         #k_test = self.rbf_kernel(self.f_full().T,cp.hstack((self.Poe,cp.zeros((self.Poe.shape[0],2)))).T,self.length_scale,self.params.sigma_f)
         #print(k_test.shape)
@@ -345,7 +345,7 @@ class CBF:
             self.params.v = float(x[0])
             self.params.weightslack = float(x[2])
             #x = [1,1]
-            print(self.g_full())
+            #print(self.g_full())
             return x,self.f_full()
         except Exception as e:
             #print('failed constraints')
