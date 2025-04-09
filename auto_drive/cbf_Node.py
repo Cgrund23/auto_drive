@@ -97,12 +97,12 @@ class Controller_Node(Node):
 
     def lidar_pose_callback(self, msg):
         #numpoints = len(r) # hard code instead
-        start = time.time()
+        #start = time.time()
         self.params.ranges = cp.array(msg.ranges)
         angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
         self.CBFobj.setObjects(self.params.ranges,angle)
         #total_time = time.time() - start
-        self.get_logger().info(f"Set time: {total_time:.3f}")
+        #self.get_logger().info(f"Set time: {total_time:.3f}")
         # here
         
         #try:
