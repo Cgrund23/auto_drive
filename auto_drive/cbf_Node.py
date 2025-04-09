@@ -14,6 +14,7 @@ from std_msgs.msg import Float32MultiArray
 from sensor_msgs.msg import LaserScan
 from ackermann_msgs.msg import AckermannDriveStamped
 from auto_drive.CBF import CBF
+import time
 
 
 
@@ -79,6 +80,7 @@ class Controller_Node(Node):
 
     def pose_callback(self,msg):
         #print('pose')
+        start = time.time()
         self.x = msg.pose.pose.position.x
         self.y = msg.pose.pose.position.y
         self.theta = msg.pose.pose.orientation.x
@@ -88,10 +90,13 @@ class Controller_Node(Node):
         #self.v = msg.twist.twist.linear.x
         self.v = 1.0
         self.CBFobj.updateState(self.x,self.y,self.theta,self.v)
+        total_time = time.time() - start
+        self.get_logger().info(f"pose callback time: {total_time:.3f}")
 
 
     def lidar_pose_callback(self, msg):
         #numpoints = len(r) # hard code instead
+        start = time.time()
         self.params.ranges = cp.array(msg.ranges)
         angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
         self.CBFobj.setObjects(self.params.ranges,angle)
@@ -104,6 +109,8 @@ class Controller_Node(Node):
         msg.data = set(state.ravel().get())
         self.state_publisher.publish(msg)
         self.send_vel(u[0],u[1]*10**2)
+        total_time = time.time() - start
+        self.get_logger().info(f"Lidar callback time: {total_time:.3f}")
         # except Exception as e:
         #     print('failed lidar')
         #     print(f"An error occurred: {e}")
