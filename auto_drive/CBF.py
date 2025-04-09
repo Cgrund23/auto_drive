@@ -319,8 +319,6 @@ class CBF:
         #self.updateState(v,theta)
         tim = time.time()
         #print(self.time - time.time())
-        self.time = time.time()
-
         self.params.x,self.params.y = x,y
         # Create variables for optimisation 
         self.u_ref = cp.array(u_ref)
@@ -336,7 +334,7 @@ class CBF:
         #tim = time.time()
         k_inv = cp.linalg.inv(K)
         #print('inverse time')
-        #print(tim - time.time())
+        
         #print(X_query.shape)
         #k_test = self.rbf_kernel(self.f_full().T,cp.hstack((self.Poe,cp.zeros((self.Poe.shape[0],2)))).T,self.length_scale,self.params.sigma_f)
         #print(k_test.shape)
@@ -377,6 +375,7 @@ class CBF:
         f = cp.vstack((f,self.params.weightslack))
                  
         #     # Optimal control icput
+        print(tim - time.time())
         try:
 
         #print(H.shape,f.shape,A.shape,b.shape)  
