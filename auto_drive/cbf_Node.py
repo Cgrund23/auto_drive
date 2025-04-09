@@ -7,7 +7,7 @@ import sys
 #sys.path.append("/home/jetson/f1tenth_ws/src/auto_drive/auto_drive")
 from dataclasses import dataclass
 from rclpy.node import Node
-from rclpy.executors import MultithreadedExecutor
+from rclpy.executors import MultiThreadedExecutor
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float32MultiArray 
