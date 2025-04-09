@@ -2,6 +2,8 @@
 from dataclasses import dataclass
 from qpsolvers import solve_qp
 import cupy as cp
+import torch
+from qpth.qp import QPFunction
 #import numpy as np
 import time
 
@@ -376,29 +378,65 @@ class CBF:
                  
         #     # Optimal control icput
         tim = time.time()
-        try:
-
-        #print(H.shape,f.shape,A.shape,b.shape)  
-            #self.check_constraints_feasibility((A), (b))
-            #tim = time.time()
-            x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
-            #print(time.time()-tim)
-            #print(x)
-            self.u = x[0]
-            #TODO update from imu data
-            ##self.updateState(x[1],x[0])
-            self.params.gamma = float(x[1])
-            self.params.v = float(x[0])
-            self.params.weightslack = float(x[2])
-            #x = [1,1]
-            #print(self.g_full())
-            #print(time.time()-tim)
-            print(tim - time.time())
-            return x,self.f_full()
-        except Exception as e:
-            #print('failed constraints')
-            print(f"An error occurred: {e}")
-            return [0,0],self.f_full()
         
+        # ... inside constraints_cost, after you've computed your cupy arrays H, f, A, and b ...
+        try:
+            # Convert CuPy arrays to PyTorch tensors via DLPack.
+            # This avoids a full round-trip conversion to/from CPU.
+            P_torch = torch.from_dlpack(cp.toDlpack(H)).unsqueeze(0)   # Shape: (1, n, n)
+            q_torch = torch.from_dlpack(cp.toDlpack(f)).unsqueeze(0)   # Shape: (1, n)
+            G_torch = torch.from_dlpack(cp.toDlpack(A)).unsqueeze(0)   # Shape: (1, n_constraints, n)
+            h_torch = torch.from_dlpack(cp.toDlpack(b)).unsqueeze(0)   # Shape: (1, n_constraints)
+            
+            # Optionally, send tensors to GPU if available.
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            P_torch = P_torch.to(device)
+            q_torch = q_torch.to(device)
+            G_torch = G_torch.to(device)
+            h_torch = h_torch.to(device)
+            
+            # Create and run the QP solver.
+            qp_solver = QPFunction(verbose=False)
+            # The QP solver returns a batched solution; squeeze the batch dimension.
+            sol = qp_solver(P_torch, q_torch, G_torch, h_torch, None, None).squeeze(0)
+            
+            # Update your variables. The original code sets:
+            #   - x[0] (first element) as self.u and self.params.v
+            #   - x[1] as self.params.gamma
+            #   - x[2] as self.params.weightslack
+            self.u = sol[0].item()
+            self.params.gamma = sol[1].item()
+            self.params.v = sol[0].item()  # Note: both self.u and self.params.v use the first element.
+            self.params.weightslack = sol[2].item()
+            print(tim - time.time())
+            return sol, self.f_full()
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            return [0,0], self.f_full()
+        # try:
+        # #print(H.shape,f.shape,A.shape,b.shape)  
+        #     #self.check_constraints_feasibility((A), (b))
+        #     #tim = time.time()
+        #     x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
+        #     #print(time.time()-tim)
+        #     #print(x)
+        #     self.u = x[0]
+        #     #TODO update from imu data
+        #     ##self.updateState(x[1],x[0])
+        #     self.params.gamma = float(x[1])
+        #     self.params.v = float(x[0])
+        #     self.params.weightslack = float(x[2])
+        #     #x = [1,1]
+        #     #print(self.g_full())
+        #     #print(time.time()-tim)
+        #     print(tim - time.time())
+        #     return x,self.f_full()
+        # except Exception as e:
+        #     #print('failed constraints')
+        #     print(f"An error occurred: {e}")
+        #     return [0,0],self.f_full()
+        
+
+
 
         
