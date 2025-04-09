@@ -343,7 +343,7 @@ class CBF:
             #tim = time.time()
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
             #print(time.time()-tim)
-            print(x)
+            #print(x)
             self.u = x[0]
             #TODO update from imu data
             ##self.updateState(x[1],x[0])
@@ -352,7 +352,7 @@ class CBF:
             self.params.weightslack = float(x[2])
             #x = [1,1]
             #print(self.g_full())
-            print(time.time()-tim)
+            #print(time.time()-tim)
             return x,self.f_full()
         except Exception as e:
             #print('failed constraints')
