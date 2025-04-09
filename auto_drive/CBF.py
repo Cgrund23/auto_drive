@@ -345,7 +345,7 @@ class CBF:
             self.params.v = float(x[0])
             self.params.weightslack = float(x[2])
             #x = [1,1]
-            print(self.f_full())
+            print(self.g_full())
             return x,self.f_full()
         except Exception as e:
             #print('failed constraints')

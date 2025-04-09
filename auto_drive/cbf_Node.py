@@ -99,7 +99,7 @@ class Controller_Node(Node):
         #print("success")
         #print(u)
         msg = Float32MultiArray()
-        msg.data = set(state.flatten().get())
+        msg.data = set(state.ravel().get())
         self.state_publisher.publish(msg)
         self.send_vel(u[0],u[1])
         # except Exception as e:
