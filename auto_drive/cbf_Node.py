@@ -116,7 +116,7 @@ class Controller_Node(Node):
         msg = Float32MultiArray()
         msg.data = set(state.ravel().get())
         self.state_publisher.publish(msg)
-        self.send_vel(u[0],-u[1]*10**2)
+        self.send_vel(u[0],-u[1])#*10**2)
         total_time = time.time() - start
         self.get_logger().info(f"Constrain Cost time: {total_time:.3f}")
         
