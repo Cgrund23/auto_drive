@@ -101,6 +101,7 @@ class Controller_Node(Node):
         angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
         start = time.time()
         self.CBFobj.setObjects(self.params.ranges,angle)
+        # here
         
         #try:
         

@@ -182,15 +182,17 @@ class CBF:
         angle:    Iterable or array of angles (in radians)
         """
         # Convert inputs to CuPy arrays (if they're not already)
-        distances = cp.asarray(distance)
-        angles = cp.asarray(angle)
+        if not isinstance(distance, cp.ndarray):
+            distance = cp.asarray(distance)
+        if not isinstance(angle, cp.ndarray):
+            angle = cp.asarray(angle)
 
         # Create a boolean mask for points within the max range
-        mask = distances < self.params.r_max
+        mask = distance < self.params.r_max
 
         # Apply the mask to filter distances and angles
-        filtered_distance = distances[mask]
-        filtered_angle = angles[mask]
+        filtered_distance = distance[mask]
+        filtered_angle = angle[mask]
 
         # Update the number of points
         self.N = filtered_distance.size
