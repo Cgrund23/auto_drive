@@ -172,39 +172,78 @@ class CBF:
         
         return x, xi, violated_idx, residuals
 
-
-    def setObjects(self,distance,angle):                               
+    def setObjects(self,distance,angle):
         """
-        Take all lidar points and turn them into data
+        Process all lidar points using vectorized operations.
+        Filters out points beyond the maximum range and computes the x-y coordinates.
+
+        Parameters:
+        distance: Iterable or array of distances
+        angle:    Iterable or array of angles (in radians)
         """
-        M = len(distance)   # Total Number of possible lidar data points
-        self.N = 0          # Total number of points in range
+        # Convert inputs to CuPy arrays (if they're not already)
+        distances = cp.asarray(distance)
+        angles = cp.asarray(angle)
 
-        # Instantiate matrix
-        filtered_distance = []
-        filtered_angle = []
+        # Create a boolean mask for points within the max range
+        mask = distances < self.params.r_max
 
-        for k in range(M):
-        # Keep only points within max lidar field 
-            if distance[k] < self.params.r_max:                                
-                self.N += 1
-                filtered_distance.append(distance[k])
-                filtered_angle.append(angle[k]) 
-        
-        # Create value and distance to plant of all points
-        self.Y = -1*cp.ones(self.N)
+        # Apply the mask to filter distances and angles
+        filtered_distance = distances[mask]
+        filtered_angle = angles[mask]
+
+        # Update the number of points
+        self.N = filtered_distance.size
+
+        # Create associated arrays directly on the GPU
+        self.Y = -1 * cp.ones(self.N)
         self.NY = cp.ones(self.N)
-        self.Dist = cp.array(filtered_distance).reshape((self.N,1))
+        self.Dist = filtered_distance.reshape((-1, 1))
+
+        # Compute local coordinates (you can also compute global if needed)
+        # Local coordinates:
+        x_lidar = filtered_distance * cp.cos(filtered_angle)
+        y_lidar = filtered_distance * cp.sin(filtered_angle)
+
+        # If you need global coordinates, add the vehicle's pose offsets:
+        # x_global = filtered_distance * cp.cos(filtered_angle + self.params.theta) + self.params.x
+        # y_global = filtered_distance * cp.sin(filtered_angle + self.params.theta) + self.params.y
+
+        # Stack the computed coordinates into a 2-column matrix
+        self.Poe = cp.hstack((x_lidar.reshape((-1, 1)), y_lidar.reshape((-1, 1))))
+
+    # def setObjects(self,distance,angle):                               
+    #     """
+    #     Take all lidar points and turn them into data
+    #     """
+    #     M = len(distance)   # Total Number of possible lidar data points
+    #     self.N = 0          # Total number of points in range
+
+    #     # Instantiate matrix
+    #     filtered_distance = []
+    #     filtered_angle = []
+
+    #     for k in range(M):
+    #     # Keep only points within max lidar field 
+    #         if distance[k] < self.params.r_max:                                
+    #             self.N += 1
+    #             filtered_distance.append(distance[k])
+    #             filtered_angle.append(angle[k]) 
         
-        # Convert to x y cordinates Global frame
-        x_lidar = cp.array(cp.array(filtered_distance) * cp.cos(cp.array(filtered_angle) + self.params.theta)+self.params.x).reshape((self.N, 1))
-        y_lidar = cp.array(cp.array(filtered_distance) * cp.sin(cp.array(filtered_angle) + self.params.theta)+self.params.y).reshape((self.N, 1))
+    #     # Create value and distance to plant of all points
+    #     self.Y = -1*cp.ones(self.N)
+    #     self.NY = cp.ones(self.N)
+    #     #self.Dist = cp.array(filtered_distance).reshape((self.N,1))
         
-        # Convert to x y cordinates Local frame
-        x_lidar = cp.array(cp.array(filtered_distance) * cp.cos(cp.array(filtered_angle))).reshape((self.N, 1))
-        y_lidar = cp.array(cp.array(filtered_distance) * cp.sin(cp.array(filtered_angle))).reshape((self.N, 1))
-        filtered_angle = cp.array(filtered_angle).reshape((self.N,1))
-        self.Poe = cp.hstack((x_lidar,y_lidar)).reshape((self.N,2))
+    #     # Convert to x y cordinates Global frame
+    #     #x_lidar = cp.array(cp.array(filtered_distance) * cp.cos(cp.array(filtered_angle) + self.params.theta)+self.params.x).reshape((self.N, 1))
+    #     #y_lidar = cp.array(cp.array(filtered_distance) * cp.sin(cp.array(filtered_angle) + self.params.theta)+self.params.y).reshape((self.N, 1))
+        
+    #     # Convert to x y cordinates Local frame
+    #     x_lidar = cp.array(cp.array(filtered_distance) * cp.cos(cp.array(filtered_angle))).reshape((self.N, 1))
+    #     y_lidar = cp.array(cp.array(filtered_distance) * cp.sin(cp.array(filtered_angle))).reshape((self.N, 1))
+    #     #filtered_angle = cp.array(filtered_angle).reshape((self.N,1))
+    #     self.Poe = cp.hstack((x_lidar,y_lidar)).reshape((self.N,2))
 
 
     def rbf_kernel(self, X1, X2, length_scale, sigma_f):
