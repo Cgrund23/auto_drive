@@ -101,7 +101,7 @@ class Controller_Node(Node):
         msg = Float32MultiArray()
         msg.data = set(state.ravel().get())
         self.state_publisher.publish(msg)
-        self.send_vel(u[0],-u[1]*10**2)
+        self.send_vel(u[0],-u[1]*10**3)
         # except Exception as e:
         #     print('failed lidar')
         #     print(f"An error occurred: {e}")
