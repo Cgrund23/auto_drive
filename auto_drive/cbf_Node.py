@@ -80,7 +80,7 @@ class Controller_Node(Node):
 
     def pose_callback(self,msg):
         #print('pose')
-        start = time.time()
+        #start = time.time()
         self.x = msg.pose.pose.position.x
         self.y = msg.pose.pose.position.y
         self.theta = msg.pose.pose.orientation.x
@@ -91,18 +91,20 @@ class Controller_Node(Node):
         self.v = 1.0
         self.CBFobj.updateState(self.x,self.y,self.theta,self.v)
         total_time = time.time() - start
-        self.get_logger().info(f"pose callback time: {total_time:.3f}")
+        #self.get_logger().info(f"pose callback time: {total_time:.3f}")
 
 
     def lidar_pose_callback(self, msg):
         #numpoints = len(r) # hard code instead
-        start = time.time()
+        
         self.params.ranges = cp.array(msg.ranges)
         angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
         self.CBFobj.setObjects(self.params.ranges,angle)
         
         #try:
+        start = time.time()
         u, state = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=self.params.x,y=self.params.y,theta=self.theta,v=self.v))
+        self.get_logger().info(f"Constrain Cost time: {total_time:.3f}")
         #print("success")
         #print(u)
         msg = Float32MultiArray()
@@ -110,7 +112,7 @@ class Controller_Node(Node):
         self.state_publisher.publish(msg)
         self.send_vel(u[0],u[1]*10**2)
         total_time = time.time() - start
-        self.get_logger().info(f"Lidar callback time: {total_time:.3f}")
+        
         # except Exception as e:
         #     print('failed lidar')
         #     print(f"An error occurred: {e}")
