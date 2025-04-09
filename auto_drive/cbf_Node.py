@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
+import os
 #import numpy as cp
 import cupy as cp
 import sys
@@ -119,6 +120,7 @@ def main(args=None):
     rclpy.init(args=args)
     controller = Controller_Node()
     controller.get_logger().info("Hello friend!")
+    print(os.cpu_count())
     # Use a multi-threaded executor (for example, with 4 threads)
     executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(controller)
