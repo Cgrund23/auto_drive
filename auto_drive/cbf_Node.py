@@ -99,10 +99,11 @@ class Controller_Node(Node):
         
         self.params.ranges = cp.array(msg.ranges)
         angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
+        start = time.time()
         self.CBFobj.setObjects(self.params.ranges,angle)
         
         #try:
-        start = time.time()
+        
         u, state = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=self.params.x,y=self.params.y,theta=self.theta,v=self.v))
         total_time = time.time() - start
         self.get_logger().info(f"Constrain Cost time: {total_time:.3f}")
