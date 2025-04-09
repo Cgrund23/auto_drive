@@ -290,8 +290,10 @@ class CBF:
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
 
         K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
-
+        tim = time.time()
         k_inv = cp.linalg.inv(K)
+        print('inverse time')
+        print(tim - time.time())
         #print(X_query.shape)
         #k_test = self.rbf_kernel(self.f_full().T,cp.hstack((self.Poe,cp.zeros((self.Poe.shape[0],2)))).T,self.length_scale,self.params.sigma_f)
         #print(k_test.shape)
