@@ -275,6 +275,7 @@ class CBF:
     # Constraints/Cost
     def constraints_cost(self,u_ref,x,y,theta,v):
         #self.updateState(v,theta)
+        tim = time.time()
         #print(self.time - time.time())
         self.time = time.time()
 
@@ -336,9 +337,9 @@ class CBF:
 
         #print(H.shape,f.shape,A.shape,b.shape)  
             #self.check_constraints_feasibility((A), (b))
-            tim = time.time()
+            #tim = time.time()
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
-            print(time.time()-tim)
+            #print(time.time()-tim)
             #print(x)
             self.u = x[0]
             #TODO update from imu data
@@ -348,6 +349,7 @@ class CBF:
             self.params.weightslack = float(x[2])
             #x = [1,1]
             #print(self.g_full())
+            print(time.time()-tim)
             return x,self.f_full()
         except Exception as e:
             #print('failed constraints')
