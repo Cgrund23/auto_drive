@@ -6,6 +6,7 @@ import sys
 #sys.path.append("/home/jetson/f1tenth_ws/src/auto_drive/auto_drive")
 from dataclasses import dataclass
 from rclpy.node import Node
+from rclpy.executors import MultithreadedExecutor
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float32MultiArray 
@@ -118,9 +119,19 @@ def main(args=None):
     rclpy.init(args=args)
     controller = Controller_Node()
     controller.get_logger().info("Hello friend!")
-    rclpy.spin(controller)
-    controller.destroy_node()
-    rclpy.shutdown()
+    # Use a multi-threaded executor (for example, with 4 threads)
+    executor = MultiThreadedExecutor(num_threads=4)
+    executor.add_node(controller)
+    try:
+        executor.spin()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        controller.destroy_node()
+        rclpy.shutdown()
+    # rclpy.spin(controller)
+    # controller.destroy_node()
+    # rclpy.shutdown()
 
 
 if __name__ == '__main__':
