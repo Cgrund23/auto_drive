@@ -90,7 +90,7 @@ class Controller_Node(Node):
         #self.v = msg.twist.twist.linear.x
         self.v = 1.0
         self.CBFobj.updateState(self.x,self.y,self.theta,self.v)
-        total_time = time.time() - start
+        #total_time = time.time() - start
         #self.get_logger().info(f"pose callback time: {total_time:.3f}")
 
 
