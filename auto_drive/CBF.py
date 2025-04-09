@@ -336,8 +336,10 @@ class CBF:
 
         #print(H.shape,f.shape,A.shape,b.shape)  
             #self.check_constraints_feasibility((A), (b))
+            tim = time.time()
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
-            print(x)
+            print(time.time()-tim)
+            #print(x)
             self.u = x[0]
             #TODO update from imu data
             ##self.updateState(x[1],x[0])
