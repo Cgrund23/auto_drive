@@ -100,7 +100,6 @@ class Controller_Node(Node):
         start = time.time()
         self.params.ranges = cp.array(msg.ranges)
         angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
-        
         self.CBFobj.setObjects(self.params.ranges,angle)
         total_time = time.time() - start
         self.get_logger().info(f"Set time: {total_time:.3f}")
