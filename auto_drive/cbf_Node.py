@@ -101,7 +101,7 @@ class Controller_Node(Node):
         self.params.ranges = cp.array(msg.ranges)
         angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
         self.CBFobj.setObjects(self.params.ranges,angle)
-        total_time = time.time() - start
+        #total_time = time.time() - start
         self.get_logger().info(f"Set time: {total_time:.3f}")
         # here
         
@@ -111,15 +111,13 @@ class Controller_Node(Node):
         
         #print("success")
         #print(u)
-        
+        start = time.time()
         msg = Float32MultiArray()
         msg.data = set(state.ravel().get())
         self.state_publisher.publish(msg)
         self.send_vel(u[0],-u[1])#*10**2)
         total_time = time.time() - start
-        self.get_logger().info(f"Total Cost time: {total_time:.3f}")
-        
-        
+        self.get_logger().info(f"send time: {total_time:.3f}")
         # except Exception as e:
         #     print('failed lidar')
         #     print(f"An error occurred: {e}")
