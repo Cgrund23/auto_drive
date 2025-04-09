@@ -317,7 +317,7 @@ class CBF:
     # Constraints/Cost
     def constraints_cost(self,u_ref,x,y,theta,v):
         #self.updateState(v,theta)
-        tim = time.time()
+        
         #print(self.time - time.time())
         self.params.x,self.params.y = x,y
         # Create variables for optimisation 
@@ -375,7 +375,7 @@ class CBF:
         f = cp.vstack((f,self.params.weightslack))
                  
         #     # Optimal control icput
-        
+        tim = time.time()
         try:
 
         #print(H.shape,f.shape,A.shape,b.shape)  
