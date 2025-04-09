@@ -375,7 +375,7 @@ class CBF:
         f = cp.vstack((f,self.params.weightslack))
                  
         #     # Optimal control icput
-        print(tim - time.time())
+        
         try:
 
         #print(H.shape,f.shape,A.shape,b.shape)  
@@ -393,6 +393,7 @@ class CBF:
             #x = [1,1]
             #print(self.g_full())
             #print(time.time()-tim)
+            print(tim - time.time())
             return x,self.f_full()
         except Exception as e:
             #print('failed constraints')
