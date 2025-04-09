@@ -65,6 +65,7 @@ class Controller_Node(Node):
             #TODO this will still exist need to find a way to relate global to local
             weightslack:float =10.0
             cbfrate:float = 1.0
+            #self.length_scale = 0.08    # found from  loop demo
 
         self.params = params
         self.CBFobj = CBF(params)
