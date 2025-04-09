@@ -35,7 +35,7 @@ class Controller_Node(Node):
         
 
         class params():
-            dt: float = 0.5#1/10 # 10ms
+            dt: float = 0.12#1/10 # 10ms
 
             # Car info
 
@@ -96,7 +96,7 @@ class Controller_Node(Node):
 
     def lidar_pose_callback(self, msg):
         #numpoints = len(r) # hard code instead
-        start = time.time()
+        #start = time.time()
         self.params.ranges = cp.array(msg.ranges)
         angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
         
@@ -113,8 +113,8 @@ class Controller_Node(Node):
         msg.data = set(state.ravel().get())
         self.state_publisher.publish(msg)
         self.send_vel(u[0],u[1]*10**2)
-        total_time = time.time() - start
-        self.get_logger().info(f"Constrain Cost time: {total_time:.3f}")
+        #total_time = time.time() - start
+        #self.get_logger().info(f"Constrain Cost time: {total_time:.3f}")
         
         
         # except Exception as e:
