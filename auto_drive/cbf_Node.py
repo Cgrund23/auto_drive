@@ -39,7 +39,7 @@ class Controller_Node(Node):
 
             # Car info
 
-            v: float = 1.0 # velocity
+            v: float = 0.75 # velocity
             u_max: float = [1.5,1.54] # max speed,angle
             u_min: float = [0.0,-1.54] # min speed,angle
 
@@ -73,7 +73,7 @@ class Controller_Node(Node):
         self.y = 0.0
         self.theta = 0.0
         self.v = 0.0
-        self.u_ref = [0.70,0.0]
+        self.u_ref = [self.params.v,0.0]
 
         # Publisher and Subscriber
         self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)
@@ -97,11 +97,13 @@ class Controller_Node(Node):
 
     def lidar_pose_callback(self, msg):
         #numpoints = len(r) # hard code instead
-        #start = time.time()
+        start = time.time()
         self.params.ranges = cp.array(msg.ranges)
         angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
         
         self.CBFobj.setObjects(self.params.ranges,angle)
+        total_time = time.time() - start
+        self.get_logger().info(f"Set time: {total_time:.3f}")
         # here
         
         #try:
@@ -110,12 +112,13 @@ class Controller_Node(Node):
         
         #print("success")
         #print(u)
+        start = time.time()
         msg = Float32MultiArray()
         msg.data = set(state.ravel().get())
         self.state_publisher.publish(msg)
         self.send_vel(u[0],-u[1]*10**2)
-        #total_time = time.time() - start
-        #self.get_logger().info(f"Constrain Cost time: {total_time:.3f}")
+        total_time = time.time() - start
+        self.get_logger().info(f"Constrain Cost time: {total_time:.3f}")
         
         
         # except Exception as e:
