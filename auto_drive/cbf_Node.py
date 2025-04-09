@@ -104,6 +104,7 @@ class Controller_Node(Node):
         #try:
         start = time.time()
         u, state = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=self.params.x,y=self.params.y,theta=self.theta,v=self.v))
+        total_time = time.time() - start
         self.get_logger().info(f"Constrain Cost time: {total_time:.3f}")
         #print("success")
         #print(u)
@@ -111,7 +112,7 @@ class Controller_Node(Node):
         msg.data = set(state.ravel().get())
         self.state_publisher.publish(msg)
         self.send_vel(u[0],u[1]*10**2)
-        total_time = time.time() - start
+        
         
         # except Exception as e:
         #     print('failed lidar')
