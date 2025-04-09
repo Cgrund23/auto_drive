@@ -235,12 +235,13 @@ class CBF:
         return grad
     
 
-    def cbf_function(self, x_test, X_train):
+    def cbf_function(self, K_star, k_inv):
         """
         Computes the CBF
         """
         #print(x_test.shape,X_train.shape)
-        return (1 - 2 * x_test.T @ X_train @ self.NY)
+        return  1 + (K_star @ k_inv @ (self.Y - 1))
+        #return (1 - 2 * x_test.T @ X_train @ self.NY)
         #return 1-2*(self.rbf_kernel(x_test, X_train, length_scale, sigma_f))
         #return  self.rbf_kernel(x_test, X_train, length_scale, sigma_f) @ alpha - safe_dist
       
@@ -291,7 +292,7 @@ class CBF:
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
 
         K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
-        tim = time.time()
+        #tim = time.time()
         k_inv = cp.linalg.inv(K)
         #print('inverse time')
         #print(tim - time.time())
