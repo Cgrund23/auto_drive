@@ -76,7 +76,7 @@ class Controller_Node(Node):
         self.state_publisher = self.create_publisher(Float32MultiArray, "/state", 10) 
 
     def pose_callback(self,msg):
-        print('pose')
+        #print('pose')
         self.x = msg.pose.pose.position.x
         self.y = msg.pose.pose.position.y
         self.theta = msg.pose.pose.orientation.x
