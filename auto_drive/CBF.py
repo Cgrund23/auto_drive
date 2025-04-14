@@ -378,7 +378,7 @@ class CBF:
                  
         #     # Optimal control icput
         tim = time.time()
-        
+        n = P_torch.shape[1]  # Number of decision variables
         q_torch = torch.from_dlpack(f.toDlpack()).unsqueeze(0).squeeze(-1)  
         P_torch = torch.from_dlpack(H.toDlpack()).unsqueeze(0)
         G_torch = torch.from_dlpack(A.toDlpack()).unsqueeze(0)
@@ -397,7 +397,7 @@ class CBF:
         # Create and run the QP solver.
         qp_solver = QPFunction(verbose=True)
         # The QP solver returns a batched solution; squeeze the batch dimension.
-        n = P_torch.shape[1]  # Number of decision variables
+        
 
         # Create empty equality constraint tensors:
         # Example: Creating "empty" equality constraints if none are needed.
