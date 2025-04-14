@@ -395,7 +395,7 @@ class CBF:
         h_torch = h_torch.to(device)
 
 
-        print(P_torch.shape,q_torch.shape,G_torch.shape,h_torch.shape)
+        
         # Create and run the QP solver.
         qp_solver = QPFunction(verbose=True)
         # The QP solver returns a batched solution; squeeze the batch dimension.
@@ -404,7 +404,7 @@ class CBF:
         # Create empty equality constraint tensors:
         A_torch = torch.empty((0, n), dtype=P_torch.dtype, device=P_torch.device)
         b_torch = torch.empty((0,0), dtype=P_torch.dtype, device=P_torch.device)
-
+        print(P_torch.shape,q_torch.shape,G_torch.shape,h_torch.shape, A_torch.shape, b_torch.shape)
         sol = qp_solver(P_torch, q_torch, G_torch, h_torch, A_torch, b_torch)
         print(sol)
         
