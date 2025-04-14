@@ -393,15 +393,13 @@ class CBF:
         q_torch = q_torch.to(device)
         G_torch = G_torch.to(device)
         h_torch = h_torch.to(device)
-        A_torch = torch.zeros(0, P_torch.shape[0], dtype=P_torch.dtype, device=P_torch.device)
-        b_torch = torch.zeros(0, P_torch.shape[0],dtype=P_torch.dtype, device=P_torch.device)
 
 
         print(P_torch.shape,q_torch.shape,G_torch.shape,h_torch.shape)
         # Create and run the QP solver.
         qp_solver = QPFunction(verbose=False)
         # The QP solver returns a batched solution; squeeze the batch dimension.
-        sol = qp_solver(P_torch, q_torch, G_torch, h_torch, torch.tensor(0.0, device=P_torch.device), torch.tensor(0.0, device=P_torch.device))
+        sol = qp_solver(P_torch, q_torch, G_torch, h_torch, torch.zeros(0.0, device=P_torch.device), torch.zeros(0.0, device=P_torch.device))
         
         print(sol)
         
