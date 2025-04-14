@@ -366,7 +366,7 @@ class CBF:
        
         b = cp.vstack((b,-k.reshape((k.size,1))))
         weight_input = cp.eye(2)
-        weight_input = cp.diag(cp.array([1.0, 10]))
+        weight_input = cp.diag(cp.array([1.0, 1.0]))
         
         # H = cp.eye(3)
         H = cp.diag(cp.array([1.0, 0.10, 1.0]))
