@@ -394,7 +394,7 @@ class CBF:
         G_torch = G_torch.to(device)
         h_torch = h_torch.to(device)
         A_torch = torch.zeros(0, P_torch.shape[0], dtype=P_torch.dtype, device=P_torch.device)
-        b_torch = torch.zeros(P_torch.shape[0],0, dtype=P_torch.dtype, device=P_torch.device)
+        b_torch = torch.zeros(0, P_torch.shape[0],dtype=P_torch.dtype, device=P_torch.device)
 
 
         print(P_torch.shape,q_torch.shape,G_torch.shape,h_torch.shape)
