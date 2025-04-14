@@ -397,7 +397,7 @@ class CBF:
 
         print(P_torch.shape,q_torch.shape,G_torch.shape,h_torch.shape)
         # Create and run the QP solver.
-        qp_solver = QPFunction(verbose=False)
+        qp_solver = QPFunction(verbose=True)
         # The QP solver returns a batched solution; squeeze the batch dimension.
         n = P_torch.shape[0]  # Number of decision variables
 
