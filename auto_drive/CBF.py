@@ -413,7 +413,7 @@ class CBF:
         #   - x[0] (first element) as self.u and self.params.v
         #   - x[1] as self.params.gamma
         #   - x[2] as self.params.weightslack
-        self.u = sol[0].item()
+        self.u = sol[1].item()
         self.params.gamma = sol[1].item()
         self.params.v = sol[0].item()  # Note: both self.u and self.params.v use the first element.
         self.params.weightslack = sol[2].item()
