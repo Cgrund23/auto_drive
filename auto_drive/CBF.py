@@ -376,9 +376,7 @@ class CBF:
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
                  
-        #     # Optimal control icput
-        tim = time.time()
-        
+        # Optimal control icput
         # q_torch = torch.from_dlpack(f.toDlpack()).unsqueeze(0).squeeze(-1)  
         # P_torch = torch.from_dlpack(H.toDlpack()).unsqueeze(0)
         # G_torch = torch.from_dlpack(A.toDlpack()).unsqueeze(0)
@@ -412,27 +410,15 @@ class CBF:
         #     print(f"An error occurred: {e}")
         #     return [0,0], self.f_full()
         try:
-        #print(H.shape,f.shape,A.shape,b.shape)  
-            #self.check_constraints_feasibility((A), (b))
-            tim = time.time()
-            cp.asnumpy(H)
-            cp.asnumpy(f) 
-            cp.asnumpy(A) 
-            cp.asnumpy(b)
-            print(time.time()-tim)
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
             
-            #print(x)
-            self.u = x[1]
+            print(x)
+            self.u = x[0]
             #TODO update from imu data
             ##self.updateState(x[1],x[0])
             self.params.gamma = float(x[1])
             self.params.v = float(x[0])
             self.params.weightslack = float(x[2])
-            #x = [1,1]
-            #print(self.g_full())
-            #print(time.time()-tim)
-            print(tim - time.time())
             return x,self.f_full()
         except Exception as e:
             #print('failed constraints')
