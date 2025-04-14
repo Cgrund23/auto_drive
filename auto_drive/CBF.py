@@ -393,32 +393,21 @@ class CBF:
         G_torch = G_torch.to(device)
         h_torch = h_torch.to(device)
 
-
-        
         # Create and run the QP solver.
         qp_solver = QPFunction(verbose=False)
-        # The QP solver returns a batched solution; squeeze the batch dimension.
-        
-
-        # Create empty equality constraint tensors:
-        # Example: Creating "empty" equality constraints if none are needed.
-       
-
-        print(P_torch.shape,q_torch.shape,G_torch.shape,h_torch.shape, A_torch.shape, b_torch.shape)
         sol = qp_solver(P_torch, q_torch, G_torch, h_torch, A_torch, b_torch)
+        
         print(sol)
-        
-        
-        # Update your variables. The original code sets:
-        #   - x[0] (first element) as self.u and self.params.v
-        #   - x[1] as self.params.gamma
-        #   - x[2] as self.params.weightslack
-        self.u = sol[1].item()
+        # Convert the solution back to CuPy
+        self.u = sol[0,0].item()
         self.params.gamma = sol[1].item()
         self.params.v = sol[0].item()  # Note: both self.u and self.params.v use the first element.
         self.params.weightslack = sol[2].item()
         print(tim - time.time())
         return sol, self.f_full()
+    
+
+
         # except Exception as e:
         #     print(f"An error occurred: {e}")
         #     return [0,0], self.f_full()
@@ -444,8 +433,3 @@ class CBF:
         #     #print('failed constraints')
         #     print(f"An error occurred: {e}")
         #     return [0,0],self.f_full()
-        
-
-
-
-        
