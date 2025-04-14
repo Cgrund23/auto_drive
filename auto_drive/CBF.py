@@ -379,15 +379,12 @@ class CBF:
         #     # Optimal control icput
         tim = time.time()
         
-        # ... inside constraints_cost, after you've computed your cupy arrays H, f, A, and b ...
-        # try:
-            # Convert CuPy arrays to PyTorch tensors via DLPack.
-            # This avoids a full round-trip conversion to/from CPU.
-        P_torch = torch.from_dlpack((cp.ndarray.toDlpack(H))).unsqueeze(0)   # Shape: (1, n, n)
-        #q_torch = torch.from_dlpack((cp.ndarray.toDlpack(f))).unsqueeze(0)    # Shape: (1, n)
-        q_torch = torch.from_dlpack(f.toDlpack()).unsqueeze(0).squeeze(-1)  # Final shape: (1, 3)
-        G_torch = torch.from_dlpack((cp.ndarray.toDlpack(A))).unsqueeze(0)    # Shape: (1, n_constraints, n)
-        h_torch = torch.from_dlpack((cp.ndarray.toDlpack(b))).unsqueeze(0).squeeze(-1)    # Shape: (1, n_constraints)
+        q_torch = torch.from_dlpack(f.toDlpack()).unsqueeze(0).squeeze(-1)  
+        P_torch = torch.from_dlpack(H.toDlpack()).unsqueeze(0)
+        G_torch = torch.from_dlpack(A.toDlpack()).unsqueeze(0)
+        h_torch = torch.from_dlpack(b.toDlpack()).unsqueeze(0).squeeze(-1)  
+        A_torch = torch.empty((1, 0, n), dtype=P_torch.dtype, device=P_torch.device)
+        b_torch = torch.empty((1, 0), dtype=P_torch.dtype, device=P_torch.device)
         # Optionally, send tensors to GPU if available.
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         P_torch = P_torch.to(device)
@@ -404,8 +401,7 @@ class CBF:
 
         # Create empty equality constraint tensors:
         # Example: Creating "empty" equality constraints if none are needed.
-        A_torch = torch.empty((1, 0, n), dtype=P_torch.dtype, device=P_torch.device)
-        b_torch = torch.empty((1, 0), dtype=P_torch.dtype, device=P_torch.device)
+       
 
         print(P_torch.shape,q_torch.shape,G_torch.shape,h_torch.shape, A_torch.shape, b_torch.shape)
         sol = qp_solver(P_torch, q_torch, G_torch, h_torch, A_torch, b_torch)
