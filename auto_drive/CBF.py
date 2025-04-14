@@ -1,6 +1,6 @@
 #import autograd.numpy as np
 from dataclasses import dataclass
-from qpsolvers import solve_qp
+#from qpsolvers import solve_qp
 import cupy as cp
 import torch
 from qpth.qp import QPFunction
