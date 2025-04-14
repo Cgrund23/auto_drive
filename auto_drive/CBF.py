@@ -398,7 +398,7 @@ class CBF:
             # Create and run the QP solver.
             qp_solver = QPFunction(verbose=False)
             # The QP solver returns a batched solution; squeeze the batch dimension.
-            sol = qp_solver(P_torch, q_torch, G_torch, h_torch, A_ = None, b_ = None)
+            sol = qp_solver(P_torch, q_torch, G_torch, h_torch, A_ = 0.0, b_ = 0.0)
             print(sol)
             
             
