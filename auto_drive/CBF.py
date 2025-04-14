@@ -415,7 +415,10 @@ class CBF:
         #print(H.shape,f.shape,A.shape,b.shape)  
             #self.check_constraints_feasibility((A), (b))
             tim = time.time()
-            P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b)
+            cp.asnumpy(H)
+            cp.asnumpy(f) 
+            cp.asnumpy(A) 
+            cp.asnumpy(b)
             print(time.time()-tim)
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
             
