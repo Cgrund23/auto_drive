@@ -387,16 +387,18 @@ class CBF:
             q_torch = torch.from_dlpack((cp.ndarray.toDlpack(f))).unsqueeze(0)   # Shape: (1, n)
             G_torch = torch.from_dlpack((cp.ndarray.toDlpack(A))).unsqueeze(0)   # Shape: (1, n_constraints, n)
             h_torch = torch.from_dlpack((cp.ndarray.toDlpack(b))).unsqueeze(0)   # Shape: (1, n_constraints)
-            
+            print('converted')
             # Optionally, send tensors to GPU if available.
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             P_torch = P_torch.to(device)
             q_torch = q_torch.to(device)
             G_torch = G_torch.to(device)
             h_torch = h_torch.to(device)
+            print('to device')
             
             # Create and run the QP solver.
             qp_solver = QPFunction(verbose=False)
+            print('qp started')
             # The QP solver returns a batched solution; squeeze the batch dimension.
             sol = qp_solver(P_torch, q_torch, G_torch, h_torch, None, None).squeeze(0)
             
