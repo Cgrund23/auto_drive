@@ -402,8 +402,9 @@ class CBF:
         n = P_torch.shape[0]  # Number of decision variables
 
         # Create empty equality constraint tensors:
-        A_torch = torch.empty((0, n), dtype=P_torch.dtype, device=P_torch.device)
-        b_torch = torch.empty((0,0), dtype=P_torch.dtype, device=P_torch.device)
+        A_torch = torch.empty((n, n), dtype=P_torch.dtype, device=P_torch.device)
+        b_torch = torch.empty((n,1), dtype=P_torch.dtype, device=P_torch.device)
+
         print(P_torch.shape,q_torch.shape,G_torch.shape,h_torch.shape, A_torch.shape, b_torch.shape)
         sol = qp_solver(P_torch, q_torch, G_torch, h_torch, A_torch, b_torch)
         print(sol)
