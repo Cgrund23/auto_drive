@@ -396,9 +396,10 @@ class CBF:
             
             # Create and run the QP solver.
             qp_solver = QPFunction(verbose=False)
+            print(qp_solver)
             # The QP solver returns a batched solution; squeeze the batch dimension.
             sol = qp_solver(P_torch, q_torch, G_torch, h_torch, None, None).squeeze(0)
-            print(sol)
+            
             
             # Update your variables. The original code sets:
             #   - x[0] (first element) as self.u and self.params.v
