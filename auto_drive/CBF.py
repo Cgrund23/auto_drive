@@ -403,7 +403,7 @@ class CBF:
 
         # Create empty equality constraint tensors:
         A_torch = torch.empty((0, n), dtype=P_torch.dtype, device=P_torch.device)
-        b_torch = torch.empty((0,), dtype=P_torch.dtype, device=P_torch.device)
+        b_torch = torch.empty((0,0), dtype=P_torch.dtype, device=P_torch.device)
 
         sol = qp_solver(P_torch, q_torch, G_torch, h_torch, A_torch, b_torch)
         print(sol)
