@@ -411,7 +411,6 @@ class CBF:
         #     return [0,0], self.f_full()
         try:
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
-            
             print(x)
             self.u = x[0]
             #TODO update from imu data
