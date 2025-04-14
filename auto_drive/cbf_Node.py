@@ -40,8 +40,8 @@ class Controller_Node(Node):
             # Car info
 
             v: float = 0.9 # velocity
-            u_max: float = [1.5,1.54] # max speed,angle
-            u_min: float = [0.0,-1.54] # min speed,angle
+            u_max: float = [1.5,0.85] # max speed,angle
+            u_min: float = [-1.0,-0.85] # min speed,angle
 
             # Starting pose
             beta: float = 0.0
@@ -108,15 +108,16 @@ class Controller_Node(Node):
         
         #try:
         start = time.time()
-        u, state = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=self.params.x,y=self.params.y,theta=self.theta,v=self.v))
-        total_time = time.time() - start
-        self.get_logger().info(f"Constraint Cost time: {total_time:.3f}")
+        u, state = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=0,y=0,theta=self.theta,v=self.v))
+        
         #print("success")
         #print(u)
         msg = Float32MultiArray()
         msg.data = set(state.ravel().get())
         self.state_publisher.publish(msg)
         self.send_vel(u[0],u[1]*10**4)
+        total_time = time.time() - start
+        self.get_logger().info(f"Constraint Cost time: {total_time:.3f}")
         
         # except Exception as e:
         #     print('failed lidar')
