@@ -396,7 +396,7 @@ class CBF:
 
         
         # Create and run the QP solver.
-        qp_solver = QPFunction(verbose=True)
+        qp_solver = QPFunction(verbose=False)
         # The QP solver returns a batched solution; squeeze the batch dimension.
         
 
