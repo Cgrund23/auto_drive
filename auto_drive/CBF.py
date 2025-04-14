@@ -386,7 +386,7 @@ class CBF:
             P_torch = torch.from_dlpack((cp.ndarray.toDlpack(H))).unsqueeze(0)   # Shape: (1, n, n)
             q_torch = torch.from_dlpack((cp.ndarray.toDlpack(f))).unsqueeze(0)   # Shape: (1, n)
             G_torch = torch.from_dlpack((cp.ndarray.toDlpack(A))).unsqueeze(0)   # Shape: (1, n_constraints, n)
-            h_torch = torch.from_dlpack((cp.ndarray.toDLpack(b))).unsqueeze(0)   # Shape: (1, n_constraints)
+            h_torch = torch.from_dlpack((cp.ndarray.toDlpack(b))).unsqueeze(0)   # Shape: (1, n_constraints)
             
             # Optionally, send tensors to GPU if available.
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
