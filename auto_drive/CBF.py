@@ -368,53 +368,16 @@ class CBF:
         weight_input = cp.eye(2)
         weight_input = cp.diag(cp.array([1.0, 10]))
         
-
-        #H = cp.array(((1,0),(0,1)))
-        H = cp.eye(3)
-        H = cp.diag(cp.array([1.0, 0.0010, 1.0]))
+        # H = cp.eye(3)
+        H = cp.diag(cp.array([1.0, 0.000010, 1.0]))
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
-                 
-        # Optimal control icput
-        # q_torch = torch.from_dlpack(f.toDlpack()).unsqueeze(0).squeeze(-1)  
-        # P_torch = torch.from_dlpack(H.toDlpack()).unsqueeze(0)
-        # G_torch = torch.from_dlpack(A.toDlpack()).unsqueeze(0)
-        # h_torch = torch.from_dlpack(b.toDlpack()).unsqueeze(0).squeeze(-1)  
-        # n = P_torch.shape[1]  # Number of decision variables
-        # A_torch = torch.empty((1, 0, n), dtype=P_torch.dtype, device=P_torch.device)
-        # b_torch = torch.empty((1, 0), dtype=P_torch.dtype, device=P_torch.device)
-        # # Optionally, send tensors to GPU if available.
-        # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        # P_torch = P_torch.to(device)
-        # q_torch = q_torch.to(device)
-        # G_torch = G_torch.to(device)
-        # h_torch = h_torch.to(device)
 
-        # # Create and run the QP solver.
-        # qp_solver = QPFunction(verbose=False)
-        # sol = qp_solver(P_torch, q_torch, G_torch, h_torch, A_torch, b_torch)
-        
-        # print(sol)
-        # # Convert the solution back to CuPy
-        # self.u = sol[0,0].item()
-        # self.params.gamma = sol[0,1].item()
-        # self.params.v = sol[0,0].item()  # Note: both self.u and self.params.v use the first element.
-        # self.params.weightslack = sol[0,2].item()
-        # print(tim - time.time())
-        # return sol, self.f_full()
-    
-
-
-        # except Exception as e:
-        #     print(f"An error occurred: {e}")
-        #     return [0,0], self.f_full()
         try:
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
             print(x)
             self.u = x[0]
-            #TODO update from imu data
-            ##self.updateState(x[1],x[0])
             self.params.gamma = float(x[1])
             self.params.v = float(x[0])
             self.params.weightslack = float(x[2])
