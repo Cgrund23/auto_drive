@@ -369,7 +369,7 @@ class CBF:
         weight_input = cp.diag(cp.array([1.0, 100.0]))
         
         # H = cp.eye(3)
-        H = cp.diag(cp.array([1.0, 0.0010, 1.0]))
+        H = cp.diag(cp.array([1.0, 0.0000000000000010, 1.0]))
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
