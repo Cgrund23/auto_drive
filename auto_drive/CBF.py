@@ -394,9 +394,9 @@ class CBF:
             G_torch = G_torch.to(device)
             h_torch = h_torch.to(device)
             
+            print(P_torch.shape,q_torch.shape,G_torch.shape,h_torch.shape)
             # Create and run the QP solver.
             qp_solver = QPFunction(verbose=False)
-            print(qp_solver)
             # The QP solver returns a batched solution; squeeze the batch dimension.
             sol = qp_solver(P_torch, q_torch, G_torch, h_torch, None, None).squeeze(0)
             
