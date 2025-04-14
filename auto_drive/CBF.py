@@ -418,7 +418,7 @@ class CBF:
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
             #print(time.time()-tim)
             #print(x)
-            self.u = x[0]
+            self.u = x[1]
             #TODO update from imu data
             ##self.updateState(x[1],x[0])
             self.params.gamma = float(x[1])
