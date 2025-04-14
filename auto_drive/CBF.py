@@ -399,7 +399,7 @@ class CBF:
         # Create and run the QP solver.
         qp_solver = QPFunction(verbose=True)
         # The QP solver returns a batched solution; squeeze the batch dimension.
-        n = P_torch.shape[0]  # Number of decision variables
+        n = P_torch.shape[1]  # Number of decision variables
 
         # Create empty equality constraint tensors:
         A_torch = torch.empty((1, n, n), dtype=P_torch.dtype, device=P_torch.device)
