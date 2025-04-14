@@ -383,10 +383,10 @@ class CBF:
         try:
             # Convert CuPy arrays to PyTorch tensors via DLPack.
             # This avoids a full round-trip conversion to/from CPU.
-            P_torch = torch.from_dlpack((cp.toDlpack(H))).unsqueeze(0)   # Shape: (1, n, n)
-            q_torch = torch.from_dlpack((cp.toDlpack(f))).unsqueeze(0)   # Shape: (1, n)
-            G_torch = torch.from_dlpack((cp.toDlpack(A))).unsqueeze(0)   # Shape: (1, n_constraints, n)
-            h_torch = torch.from_dlpack((cp.toDLpack(b))).unsqueeze(0)   # Shape: (1, n_constraints)
+            P_torch = torch.from_dlpack((cp.ndarray.toDlpack(H))).unsqueeze(0)   # Shape: (1, n, n)
+            q_torch = torch.from_dlpack((cp.ndarray.toDlpack(f))).unsqueeze(0)   # Shape: (1, n)
+            G_torch = torch.from_dlpack((cp.ndarray.toDlpack(A))).unsqueeze(0)   # Shape: (1, n_constraints, n)
+            h_torch = torch.from_dlpack((cp.ndarray.toDLpack(b))).unsqueeze(0)   # Shape: (1, n_constraints)
             
             # Optionally, send tensors to GPU if available.
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
