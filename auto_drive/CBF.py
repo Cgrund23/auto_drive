@@ -400,9 +400,9 @@ class CBF:
         print(sol)
         # Convert the solution back to CuPy
         self.u = sol[0,0].item()
-        self.params.gamma = sol[1].item()
-        self.params.v = sol[0].item()  # Note: both self.u and self.params.v use the first element.
-        self.params.weightslack = sol[2].item()
+        self.params.gamma = sol[0,1].item()
+        self.params.v = sol[0,0].item()  # Note: both self.u and self.params.v use the first element.
+        self.params.weightslack = sol[0,2].item()
         print(tim - time.time())
         return sol, self.f_full()
     
