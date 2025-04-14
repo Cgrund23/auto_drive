@@ -90,7 +90,8 @@ class Controller_Node(Node):
         #print(self.v)
         #self.v = msg.twist.twist.linear.x
         self.v = 1.0
-        self.CBFobj.updateState(self.x,self.y,self.theta,self.v)
+        #self.CBFobj.updateState(self.x,self.y,self.theta,self.v)
+        self.CBFobj.updateState(0.0,0.0,self.theta,self.v)
         #total_time = time.time() - start
         #self.get_logger().info(f"pose callback time: {total_time:.3f}")
 
@@ -115,7 +116,7 @@ class Controller_Node(Node):
         msg = Float32MultiArray()
         msg.data = set(state.ravel().get())
         self.state_publisher.publish(msg)
-        self.send_vel(u[0],-u[1]*10**2)
+        self.send_vel(u[0],u[1]*10**4)
         
         # except Exception as e:
         #     print('failed lidar')
@@ -135,7 +136,7 @@ def main(args=None):
     controller.get_logger().info("Hello friend!")
     print(os.cpu_count())
     # Use a multi-threaded executor (for example, with 4 threads)
-    executor = MultiThreadedExecutor(num_threads=4)
+    executor = MultiThreadedExecutor(num_threads=6)
     executor.add_node(controller)
     try:
         executor.spin()
