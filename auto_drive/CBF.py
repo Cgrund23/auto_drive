@@ -378,11 +378,12 @@ class CBF:
                  
         #     # Optimal control icput
         tim = time.time()
-        n = P_torch.shape[1]  # Number of decision variables
+        
         q_torch = torch.from_dlpack(f.toDlpack()).unsqueeze(0).squeeze(-1)  
         P_torch = torch.from_dlpack(H.toDlpack()).unsqueeze(0)
         G_torch = torch.from_dlpack(A.toDlpack()).unsqueeze(0)
         h_torch = torch.from_dlpack(b.toDlpack()).unsqueeze(0).squeeze(-1)  
+        n = P_torch.shape[1]  # Number of decision variables
         A_torch = torch.empty((1, 0, n), dtype=P_torch.dtype, device=P_torch.device)
         b_torch = torch.empty((1, 0), dtype=P_torch.dtype, device=P_torch.device)
         # Optionally, send tensors to GPU if available.
