@@ -257,15 +257,15 @@ class CBF:
         y_width = 2.0
         x_lidar = self.Poe[:, 0]
         y_lidar = self.Poe[:, 1]
-        x_grid, y_grid = np.meshgrid(np.linspace(-x_width, x_width, grid_size), np.linspace(-y_width, y_width, grid_size))
-        X_test = np.column_stack((x_grid.ravel(), y_grid.ravel()))
+        x_grid, y_grid = cp.meshgrid(cp.linspace(-x_width, x_width, grid_size), cp.linspace(-y_width, y_width, grid_size))
+        X_test = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
         
         # Predict GP mean and variance
         K_star = self.rbf_kernel(X_test, X_train, self.length_scale, self.params.sigma_f)
         K_ss = self.rbf_kernel(X_test, X_test, self.length_scale, self.params.sigma_f)
         
         mu_test = K_star @ k_inv @ self.Y
-        var_test = np.diag(K_ss - K_star @ np.linalg.pinv(K) @ K_star.T)
+        var_test = cp.diag(K_ss - K_star @ cp.linalg.pinv(K) @ K_star.T)
         
         # Reshape for plotting
         mu_grid = mu_test.reshape(grid_size, grid_size)
