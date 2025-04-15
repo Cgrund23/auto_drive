@@ -331,8 +331,7 @@ class CBF:
         LgB = {}
         X_query = self.f_full()[:2,:].T
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
-        print(self.Poe)
-        print(self.N)
+        #print(self.N)
         K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
         #tim = time.time()
         k_inv = cp.linalg.inv(K)
@@ -376,6 +375,7 @@ class CBF:
         f = cp.vstack((f,self.params.weightslack))
 
         try:
+            print(H.shape,f.shape,A.shape,b.shape)
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
             print(x)
             self.u = x[0]
