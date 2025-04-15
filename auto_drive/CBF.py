@@ -24,10 +24,10 @@ class CBF:
         self.params.y = 0.0
         self.params.Od = {}
         self.params.Y = {}
-        self.params.sigma_f = 1.0*10**1
+        self.params.sigma_f = 1.0*10**2
         
         pass
-        self.length_scale = 0.07    # found from  loop demo
+        self.length_scale = 0.04    # found from  loop demo
         self.time = 0.0
     # Dynamics #
 
