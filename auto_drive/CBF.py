@@ -24,10 +24,10 @@ class CBF:
         self.params.y = 0.0
         self.params.Od = {}
         self.params.Y = {}
-        self.params.sigma_f = 1.0*10**2
+        self.params.sigma_f = 1.0*10**1
         
         pass
-        self.length_scale = 0.04    # found from  loop demo
+        self.length_scale = 0.045    # found from  loop demo
         self.time = 0.0
     # Dynamics #
 
@@ -61,7 +61,7 @@ class CBF:
 
         # SHIFT BACK: adding +1 => "safe" defaults to +1, obstacle region near –1
         cbf_values = 1.0 + mean_pred
-        cbf_values = cp.clip(cbf_values, -1, 1)
+        #cbf_values = cp.clip(cbf_values, -1, 1)
 
         # Reshape for plotting
         cbf_grid = cbf_values.reshape((grid_resolution, grid_resolution))
