@@ -260,13 +260,7 @@ class CBF:
         # y_global = filtered_distance * cp.sin(filtered_angle + self.params.theta) + self.params.y
 
         # Stack the computed coordinates into a 2-column matrix
-        self.Poe = cp.hstack((x_lidar.reshape((-1, 1)), y_lidar.reshape((-1, 1))))
-        R90 = cp.array([[0, -1],
-                [1,  0]], dtype=cp.float32)
-
-        # Rotate self.Poe by performing a matrix multiplication.
-        # Each row in self.Poe is a point [x, y]
-        self.Poe = self.Poe @ R90.T 
+        self.Poe = cp.column_stack((-y_lidar, x_lidar))
 
     # def setObjects(self,distance,angle):                               
     #     """
