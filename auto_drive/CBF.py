@@ -331,7 +331,7 @@ class CBF:
         LgB = {}
         X_query = self.f_full()[:2,:].T
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
-
+        print(self.Poe)
         K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
         #tim = time.time()
         k_inv = cp.linalg.inv(K)
