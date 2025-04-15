@@ -6,6 +6,8 @@ import torch
 from qpth.qp import QPFunction
 import numpy as np
 import time
+import matplotlib.pyplot as plt
+import numpy as np
 
 class CBF:
     # Initiate Car
@@ -249,28 +251,47 @@ class CBF:
     #     #filtered_angle = cp.array(filtered_angle).reshape((self.N,1))
     #     self.Poe = cp.hstack((x_lidar,y_lidar)).reshape((self.N,2))
 
-    def vis_barriers(self,X_train,K,k_inv):
-        # Define a grid for visualization
-
-        grid_size = 100
+    def plot_cbf_barriers(self, X_train, K,k_inv):
+        """
+        Visualizes the CBF (Barrier) over a 2D grid using a contour plot.
+        
+        Parameters:
+            X_train (cp.ndarray): Training input points (from lidar data, for example).
+            K (cp.ndarray): Kernel matrix computed from training data.
+        """
+        # Use the existing vis_barriers method to get the grid results.
+        # Note: vis_barriers returns (mu_grid, var_grid, x_lidar, y_lidar)
+        mu_grid, var_grid, x_lidar, y_lidar = self.vis_barriers(X_train, K, k_inv)
+        
+        # Convert CuPy arrays to NumPy arrays for plotting.
+        mu_grid_np = cp.asnumpy(mu_grid)
+        # var_grid_np = cp.asnumpy(var_grid)  # If you wish to use the variance in plotting.
+        x_lidar_np = cp.asnumpy(x_lidar)
+        y_lidar_np = cp.asnumpy(y_lidar)
+        
+        # In vis_barriers, the grid was constructed with these fixed parameters.
+        grid_size = mu_grid_np.shape[0]
         x_width = 2.0
         y_width = 2.0
-        x_lidar = self.Poe[:, 0]
-        y_lidar = self.Poe[:, 1]
-        x_grid, y_grid = cp.meshgrid(cp.linspace(-x_width, x_width, grid_size), cp.linspace(-y_width, y_width, grid_size))
-        X_test = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
         
-        # Predict GP mean and variance
-        K_star = self.rbf_kernel(X_test, X_train, self.length_scale, self.params.sigma_f)
-        K_ss = self.rbf_kernel(X_test, X_test, self.length_scale, self.params.sigma_f)
-        print(K_star.shape,k_inv.shape,self.Y.shape)
-        mu_test = K_star.T @ k_inv @ self.Y
-        var_test = cp.diag(K_ss - K_star @ cp.linalg.pinv(K) @ K_star.T)
+        # Create the grid vectors using NumPy.
+        x_vals = np.linspace(-x_width, x_width, grid_size)
+        y_vals = np.linspace(-y_width, y_width, grid_size)
+        X_vals, Y_vals = np.meshgrid(x_vals, y_vals)
         
-        # Reshape for plotting
-        mu_grid = mu_test.reshape(grid_size, grid_size)
-        var_grid = var_test.reshape(grid_size, grid_size)
-        return mu_grid, var_grid, x_lidar, y_lidar
+        # Plot the contour (using the mean value as the barrier function)
+        plt.figure(figsize=(8, 6))
+        contour = plt.contourf(X_vals, Y_vals, mu_grid_np, levels=50, cmap='viridis')
+        plt.colorbar(contour, label='CBF Value')
+        
+        # Optionally, overlay the original lidar points.
+        plt.scatter(x_lidar_np, y_lidar_np, color='red', marker='x', label='Lidar Points')
+        
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.title('Control Barrier Function Visualization')
+        plt.legend()
+        plt.show()
 
 
     def rbf_kernel(self, X1, X2, length_scale, sigma_f):
@@ -396,15 +417,16 @@ class CBF:
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
-        stuff = self.vis_barriers(self.Poe,K,k_inv)
+        self.plot_cbf_barriers(self.Poe, K, k_inv)
         try:
+
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
             print(x)
             self.u = x[0]
             self.params.gamma = float(x[1])
             self.params.v = float(x[0])
             self.params.weightslack = float(x[2])
-            return x,self.f_full(),stuff
+            return x,self.f_full()
         except Exception as e:
             #print('failed constraints')
             print(f"An error occurred: {e}")
