@@ -330,13 +330,12 @@ class CBF:
         LfB = {}
         LgB = {}
         X_query = self.f_full()[:2,:].T
-
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
 
         K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
-        
+        #tim = time.time()
         k_inv = cp.linalg.inv(K)
-        
+        #print('inverse time')
         
         #print(X_query.shape)
         #k_test = self.rbf_kernel(self.f_full().T,cp.hstack((self.Poe,cp.zeros((self.Poe.shape[0],2)))).T,self.length_scale,self.params.sigma_f)
@@ -348,7 +347,7 @@ class CBF:
         b = self.lg_cbf_function(dcbf) 
         #b = b @ self.u_ref 
         b = b.reshape((b.size,1)) 
-        A = - (self.lf_cbf_function(dcbf) + 8*cbf**3)
+        A = - (self.lf_cbf_function(dcbf) + cbf**3)
         A = cp.hstack((cp.zeros((A.shape[0],1)), A , cp.zeros((A.shape[0],1))))
 
         # umax constraints
