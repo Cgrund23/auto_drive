@@ -73,11 +73,12 @@ class CBF:
 
         plt.figure(figsize=(8, 6))
         contour = plt.contourf(x_grid_np, y_grid_np, cbf_grid_np, levels=50, cmap='viridis')
-        plt.colorbar(contour, label='CBF Value')
+        plt.colorbar(contour,label='CBF Value')
         plt.xlabel('X')
         plt.ylabel('Y')
         plt.title('Visualized CBF Barriers (Safe ~ +1, Obstacles ~ –1)')
         plt.scatter(training_np[:, 0], training_np[:, 1], color='red', marker='x', label='Obstacle Lidar Pts')
+        zero_level = plt.contour(x_grid_np, y_grid_np, cbf_grid_np, levels=[0], colors='black', linewidths=2)
         plt.legend()
         plt.show()
             
