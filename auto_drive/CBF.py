@@ -264,7 +264,7 @@ class CBF:
         K_star = self.rbf_kernel(X_test, X_train, self.length_scale, self.params.sigma_f)
         K_ss = self.rbf_kernel(X_test, X_test, self.length_scale, self.params.sigma_f)
         print(K_star.shape,k_inv.shape,self.Y.shape)
-        mu_test = K_star @ k_inv @ self.Y
+        mu_test = K_star.T @ k_inv @ self.Y
         var_test = cp.diag(K_ss - K_star @ cp.linalg.pinv(K) @ K_star.T)
         
         # Reshape for plotting
