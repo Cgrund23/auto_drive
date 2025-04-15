@@ -67,6 +67,7 @@ class CBF:
         x_grid_np = cp.asnumpy(x_grid)
         y_grid_np = cp.asnumpy(y_grid)
         cbf_grid_np = cp.asnumpy(cbf_grid)
+        training_np = cp.asnumpy(training_data)
         
         # Plot a filled contour of the CBF values
         plt.figure(figsize=(8, 6))
@@ -75,6 +76,9 @@ class CBF:
         plt.xlabel('X')
         plt.ylabel('Y')
         plt.title('Visualized CBF Barriers on 2D Grid')
+        # Overlay a scatter plot for the lidar (training) points.
+        plt.scatter(training_np[:, 0], training_np[:, 1], color='red', marker='x', label='Lidar Points')
+    
         plt.show()
         
     
