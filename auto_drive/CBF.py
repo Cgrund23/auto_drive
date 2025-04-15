@@ -40,47 +40,47 @@ class CBF:
         t = cp.array([0.0, 0.0 , 1.0])
         return cp.vstack((x,y,t))
     
-    def vis_barrier(self,K,K_inv,training_data, Y, length_scale=0.095, sigma_f=10, 
-                             grid_limits=((-2, 2), (-2, 2)), grid_resolution=100):
-            # Compute the kernel matrix for the training points        
-        # Create a 2D grid over which to evaluate the CBF
+    def vis_barrier(
+        self, K, K_inv, training_data, Y, length_scale=0.095, sigma_f=10,
+        grid_limits=((-2, 2), (-2, 2)), grid_resolution=100
+    ):
         (x_min, x_max), (y_min, y_max) = grid_limits
         x_lin = cp.linspace(x_min, x_max, grid_resolution)
         y_lin = cp.linspace(y_min, y_max, grid_resolution)
         x_grid, y_grid = cp.meshgrid(x_lin, y_lin)
         grid_points = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
-        
-        # Compute the kernel between each grid point and each training point
+
+        # --- SHIFT Y so that far away from obstacles is "1" by default
+        #     If your original Y is –1 for obstacles, do Y' = Y - 1 => –2 for obstacles
+        shifted_Y = Y - 1.0
+
+        # Cross-kernel
         K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
-        
-        # Perform the Gaussian Process prediction (assuming zero prior mean)
-        # Here the GP mean is used to define the barrier function.
-        mean_pred = cp.dot(K_star, cp.dot(K_inv, Y))
-        
-        # Define the CBF as an offset (here, 1 + prediction)
-        cbf_values = mean_pred  # Shape: (grid_resolution**2, 1)
-        
-        # Reshape the values back to a grid for plotting
+        # GP prediction
+        mean_pred = cp.dot(K_star, cp.dot(K_inv, shifted_Y))
+
+        # SHIFT BACK: adding +1 => "safe" defaults to +1, obstacle region near –1
+        cbf_values = 1.0 + mean_pred
+
+        # Reshape for plotting
         cbf_grid = cbf_values.reshape((grid_resolution, grid_resolution))
-        
-        # Convert the CuPy arrays to NumPy arrays for Matplotlib
+
+        # Plot
         x_grid_np = cp.asnumpy(x_grid)
         y_grid_np = cp.asnumpy(y_grid)
         cbf_grid_np = cp.asnumpy(cbf_grid)
         training_np = cp.asnumpy(training_data)
-        
-        # Plot a filled contour of the CBF values
+
         plt.figure(figsize=(8, 6))
         contour = plt.contourf(x_grid_np, y_grid_np, cbf_grid_np, levels=50, cmap='viridis')
         plt.colorbar(contour, label='CBF Value')
         plt.xlabel('X')
         plt.ylabel('Y')
-        plt.title('Visualized CBF Barriers on 2D Grid')
-        # Overlay a scatter plot for the lidar (training) points.
-        plt.scatter(training_np[:, 0], training_np[:, 1], color='red', marker='x', label='Lidar Points')
-    
+        plt.title('Visualized CBF Barriers (Safe ~ +1, Obstacles ~ –1)')
+        plt.scatter(training_np[:, 0], training_np[:, 1], color='red', marker='x', label='Obstacle Lidar Pts')
+        plt.legend()
         plt.show()
-        
+            
     
     def f_full(self):
         """Returns the next state using CuPy arrays.
