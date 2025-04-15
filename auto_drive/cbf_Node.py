@@ -91,7 +91,7 @@ class Controller_Node(Node):
         #self.v = msg.twist.twist.linear.x
         self.v = 1.0
         #self.CBFobj.updateState(self.x,self.y,self.theta,self.v)
-        self.CBFobj.updateState(0.0,0.0,self.theta,self.v)
+        #self.CBFobj.updateState(0.0,0.0,self.theta,self.v)
         #total_time = time.time() - start
         #self.get_logger().info(f"pose callback time: {total_time:.3f}")
 
@@ -108,8 +108,8 @@ class Controller_Node(Node):
         
         #try:
         start = time.time()
-        u, state = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=0,y=0,theta=0,v=self.v))
-        
+        u, state, stuff = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=0,y=0,theta=0,v=self.v))
+        print(stuff.shape)
         #print("success")
         #print(u)
         msg = Float32MultiArray()

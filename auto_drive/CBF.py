@@ -4,7 +4,7 @@ from qpsolvers import solve_qp
 import cupy as cp
 import torch
 from qpth.qp import QPFunction
-#import numpy as np
+import numpy as np
 import time
 
 class CBF:
@@ -249,6 +249,29 @@ class CBF:
     #     #filtered_angle = cp.array(filtered_angle).reshape((self.N,1))
     #     self.Poe = cp.hstack((x_lidar,y_lidar)).reshape((self.N,2))
 
+    def vis_barriers(self,X_train,K,k_inv):
+        # Define a grid for visualization
+
+        grid_size = 100
+        x_width = 2.0
+        y_width = 2.0
+        x_lidar = self.Poe[:, 0]
+        y_lidar = self.Poe[:, 1]
+        x_grid, y_grid = np.meshgrid(np.linspace(-x_width, x_width, grid_size), np.linspace(-y_width, y_width, grid_size))
+        X_test = np.column_stack((x_grid.ravel(), y_grid.ravel()))
+        
+        # Predict GP mean and variance
+        K_star = self.rbf_kernel(X_test, X_train, self.length_scale, self.params.sigma_f)
+        K_ss = self.rbf_kernel(X_test, X_test, self.length_scale, self.params.sigma_f)
+        
+        mu_test = K_star @ k_inv @ self.Y
+        var_test = np.diag(K_ss - K_star @ np.linalg.pinv(K) @ K_star.T)
+        
+        # Reshape for plotting
+        mu_grid = mu_test.reshape(grid_size, grid_size)
+        var_grid = var_test.reshape(grid_size, grid_size)
+        return mu_grid, var_grid, x_lidar, y_lidar
+
 
     def rbf_kernel(self, X1, X2, length_scale, sigma_f):
         """
@@ -373,7 +396,7 @@ class CBF:
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
-
+        stuff = self.vis_barriers(X_query,K,k_inv)
         try:
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
             print(x)
@@ -381,7 +404,7 @@ class CBF:
             self.params.gamma = float(x[1])
             self.params.v = float(x[0])
             self.params.weightslack = float(x[2])
-            return x,self.f_full()
+            return x,self.f_full(),stuff
         except Exception as e:
             #print('failed constraints')
             print(f"An error occurred: {e}")
