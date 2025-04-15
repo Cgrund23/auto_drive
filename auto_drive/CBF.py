@@ -55,7 +55,7 @@ class CBF:
         
         # Perform the Gaussian Process prediction (assuming zero prior mean)
         # Here the GP mean is used to define the barrier function.
-        mean_pred = cp.dot(K_star, cp.dot(K_inv, Y))
+        mean_pred = cp.dot(K_star, cp.dot(K_inv, -Y))
         
         # Define the CBF as an offset (here, 1 + prediction)
         cbf_values = 1 + mean_pred  # Shape: (grid_resolution**2, 1)
@@ -77,7 +77,7 @@ class CBF:
         plt.ylabel('Y')
         plt.title('Visualized CBF Barriers on 2D Grid')
         # Overlay a scatter plot for the lidar (training) points.
-        plt.scatter(training_np[:, 1], training_np[:, 0], color='red', marker='x', label='Lidar Points')
+        plt.scatter(training_np[:, 0], training_np[:, 1], color='red', marker='x', label='Lidar Points')
     
         plt.show()
         
