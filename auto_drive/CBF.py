@@ -388,6 +388,7 @@ class CBF:
         #k_test = self.rbf_kernel(self.f_full().T,cp.hstack((self.Poe,cp.zeros((self.Poe.shape[0],2)))).T,self.length_scale,self.params.sigma_f)
         #print(k_test.shape)
         cbf = self.cbf_function(K_star.T,k_inv)
+        print(max(abs(cbf)))
         cbf = cp.clip(cbf, -1, 1)
         dcbf = self.dcbf_function(x_query=X_query,k_star=K_star.T,X_train=self.Poe,k_inv=k_inv,length_scale=self.length_scale)
 
@@ -417,7 +418,7 @@ class CBF:
         weight_input = cp.diag(cp.array([1.0, 1.0]))
         
         # H = cp.eye(3)
-        H = cp.diag(cp.array([1.0, 100.0, 1.0]))
+        H = cp.diag(cp.array([1.0, 1.0, 1.0]))
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
