@@ -396,7 +396,7 @@ class CBF:
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
-        stuff = self.vis_barriers(X_query,K,k_inv)
+        stuff = self.vis_barriers(self.Poe,K,k_inv)
         try:
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
             print(x)
