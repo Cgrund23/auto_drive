@@ -109,9 +109,6 @@ class Controller_Node(Node):
         #try:
         start = time.time()
         u, state = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=0,y=0,theta=0,v=self.v))
-        
-        #print("success")
-        #print(u)
         msg = Float32MultiArray()
         msg.data = set(state.ravel().get())
         self.state_publisher.publish(msg)
