@@ -349,7 +349,7 @@ class CBF:
         b = b.reshape((b.size,1)) 
         A = - (self.lf_cbf_function(dcbf) + cbf**3)
         A = cp.hstack((cp.zeros((A.shape[0],1)), A , cp.zeros((A.shape[0],1))))
-
+        print(A.shape,b.shape)
         # umax constraints
         
         k = cp.hstack(([cp.eye(self.params.udim), cp.zeros((self.params.udim, 1))]))
@@ -375,7 +375,6 @@ class CBF:
         f = cp.vstack((f,self.params.weightslack))
 
         try:
-            print(H.shape,f.shape,A.shape,b.shape)
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
             print(x)
             self.u = x[0]

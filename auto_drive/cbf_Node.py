@@ -59,11 +59,11 @@ class Controller_Node(Node):
 
             # Obstacle position
             #TODO will be from lidar and continually updated figured out
-            r_max: float = 2.5
+            r_max: float = 2
             cbf_gamma: float = 1.0
             # Desired target point 
             #TODO this will still exist need to find a way to relate global to local
-            weightslack:float =10.0
+            weightslack:float = 1.0
             cbfrate:float = 1.0
             #self.length_scale = 0.08    # found from  loop demo
 
