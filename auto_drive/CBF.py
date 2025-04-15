@@ -41,7 +41,7 @@ class CBF:
         return cp.vstack((x,y,t))
     
     def vis_barrier(
-        self, K, K_inv, training_data, Y, length_scale=0.01, sigma_f=10,
+        self, K, K_inv, training_data, Y, length_scale=0.001, sigma_f=10,
         grid_limits=((-2, 2), (-2, 2)), grid_resolution=100
     ):
         (x_min, x_max), (y_min, y_max) = grid_limits
