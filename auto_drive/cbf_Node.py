@@ -76,7 +76,7 @@ class Controller_Node(Node):
         self.u_ref = [self.params.v,0.0]
 
         # Publisher and Subscriber
-        self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/ackermann_cmd", 10)
+        self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)
         #self.state_publisher = self.create_publisher(Float32MultiArray, "/state", 10) 
 
     def pose_callback(self,msg):
