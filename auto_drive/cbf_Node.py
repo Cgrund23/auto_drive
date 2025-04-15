@@ -109,9 +109,9 @@ class Controller_Node(Node):
         #try:
         start = time.time()
         u, state = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=0,y=0,theta=0,v=self.v))
-        msg = Float32MultiArray()
-        msg.data = set(state.ravel().get())
-        self.state_publisher.publish(msg)
+        #msg = Float32MultiArray()
+        #msg.data = set(state.ravel().get())
+        #self.state_publisher.publish(msg)
         self.send_vel(u[0],u[1])#*10**4)
         total_time = time.time() - start
         self.get_logger().info(f"Constraint Cost time: {total_time:.3f}")
