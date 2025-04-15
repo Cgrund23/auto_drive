@@ -61,6 +61,7 @@ class CBF:
 
         # SHIFT BACK: adding +1 => "safe" defaults to +1, obstacle region near –1
         cbf_values = 1.0 + mean_pred
+        cbf_values = cp.clip(cbf_values, -1, 1)
 
         # Reshape for plotting
         cbf_grid = cbf_values.reshape((grid_resolution, grid_resolution))
