@@ -40,6 +40,44 @@ class CBF:
         t = cp.array([0.0, 0.0 , 1.0])
         return cp.vstack((x,y,t))
     
+    def vis_barrier(self,K,K_inv,training_data, Y, length_scale=0.095, sigma_f=10, 
+                             grid_limits=((-2, 2), (-2, 2)), grid_resolution=100):
+            # Compute the kernel matrix for the training points        
+        # Create a 2D grid over which to evaluate the CBF
+        (x_min, x_max), (y_min, y_max) = grid_limits
+        x_lin = cp.linspace(x_min, x_max, grid_resolution)
+        y_lin = cp.linspace(y_min, y_max, grid_resolution)
+        x_grid, y_grid = cp.meshgrid(x_lin, y_lin)
+        grid_points = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
+        
+        # Compute the kernel between each grid point and each training point
+        K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
+        
+        # Perform the Gaussian Process prediction (assuming zero prior mean)
+        # Here the GP mean is used to define the barrier function.
+        mean_pred = cp.dot(K_star, cp.dot(K_inv, Y))
+        
+        # Define the CBF as an offset (here, 1 + prediction)
+        cbf_values = 1 + mean_pred  # Shape: (grid_resolution**2, 1)
+        
+        # Reshape the values back to a grid for plotting
+        cbf_grid = cbf_values.reshape((grid_resolution, grid_resolution))
+        
+        # Convert the CuPy arrays to NumPy arrays for Matplotlib
+        x_grid_np = cp.asnumpy(x_grid)
+        y_grid_np = cp.asnumpy(y_grid)
+        cbf_grid_np = cp.asnumpy(cbf_grid)
+        
+        # Plot a filled contour of the CBF values
+        plt.figure(figsize=(8, 6))
+        contour = plt.contourf(x_grid_np, y_grid_np, cbf_grid_np, levels=50, cmap='viridis')
+        plt.colorbar(contour, label='CBF Value')
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.title('Visualized CBF Barriers on 2D Grid')
+        plt.show()
+        
+    
     def f_full(self):
         """Returns the next state using CuPy arrays.
 
@@ -251,48 +289,7 @@ class CBF:
     #     #filtered_angle = cp.array(filtered_angle).reshape((self.N,1))
     #     self.Poe = cp.hstack((x_lidar,y_lidar)).reshape((self.N,2))
 
-    def plot_cbf_barriers(self, X_train, K,k_inv):
-        """
-        Visualizes the CBF (Barrier) over a 2D grid using a contour plot.
-        
-        Parameters:
-            X_train (cp.ndarray): Training input points (from lidar data, for example).
-            K (cp.ndarray): Kernel matrix computed from training data.
-        """
-        # Use the existing vis_barriers method to get the grid results.
-        # Note: vis_barriers returns (mu_grid, var_grid, x_lidar, y_lidar)
-        mu_grid, var_grid, x_lidar, y_lidar = self.vis_barriers(X_train, K, k_inv)
-        
-        # Convert CuPy arrays to NumPy arrays for plotting.
-        mu_grid_np = cp.asnumpy(mu_grid)
-        # var_grid_np = cp.asnumpy(var_grid)  # If you wish to use the variance in plotting.
-        x_lidar_np = cp.asnumpy(x_lidar)
-        y_lidar_np = cp.asnumpy(y_lidar)
-        
-        # In vis_barriers, the grid was constructed with these fixed parameters.
-        grid_size = mu_grid_np.shape[0]
-        x_width = 2.0
-        y_width = 2.0
-        
-        # Create the grid vectors using NumPy.
-        x_vals = np.linspace(-x_width, x_width, grid_size)
-        y_vals = np.linspace(-y_width, y_width, grid_size)
-        X_vals, Y_vals = np.meshgrid(x_vals, y_vals)
-        
-        # Plot the contour (using the mean value as the barrier function)
-        plt.figure(figsize=(8, 6))
-        contour = plt.contourf(X_vals, Y_vals, mu_grid_np, levels=50, cmap='viridis')
-        plt.colorbar(contour, label='CBF Value')
-        
-        # Optionally, overlay the original lidar points.
-        plt.scatter(x_lidar_np, y_lidar_np, color='red', marker='x', label='Lidar Points')
-        
-        plt.xlabel('X')
-        plt.ylabel('Y')
-        plt.title('Control Barrier Function Visualization')
-        plt.legend()
-        plt.show()
-
+   
 
     def rbf_kernel(self, X1, X2, length_scale, sigma_f):
         """
@@ -417,7 +414,8 @@ class CBF:
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
-        self.plot_cbf_barriers(self.Poe, K, k_inv)
+        self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale, sigma_f=10, 
+                             grid_limits=((-2, 2), (-2, 2)), grid_resolution=100)
         try:
 
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
