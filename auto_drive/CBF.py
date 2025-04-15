@@ -58,7 +58,7 @@ class CBF:
         mean_pred = cp.dot(K_star, cp.dot(K_inv, -Y))
         
         # Define the CBF as an offset (here, 1 + prediction)
-        cbf_values = 1 + mean_pred  # Shape: (grid_resolution**2, 1)
+        cbf_values = mean_pred  # Shape: (grid_resolution**2, 1)
         
         # Reshape the values back to a grid for plotting
         cbf_grid = cbf_values.reshape((grid_resolution, grid_resolution))
