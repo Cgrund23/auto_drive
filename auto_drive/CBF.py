@@ -469,7 +469,7 @@ class CBF:
         """
         g = self.g_full()
         print('dcbf g')
-        print(dcbf @ g)
+        print(dcbf.T @ g)
         return dcbf.T @ g
 
     # Constraints/Cost
