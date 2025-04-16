@@ -52,7 +52,7 @@ class CBF:
 
         # --- SHIFT Y so that far away from obstacles is "1" by default
         #     If your original Y is –1 for obstacles, do Y' = Y - 1 => –2 for obstacles
-        shifted_Y = Y
+        shifted_Y = -Y
 
         # Cross-kernel
         K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
@@ -60,7 +60,7 @@ class CBF:
         mean_pred = cp.dot(K_star, cp.dot(K_inv, shifted_Y))
 
         # SHIFT BACK: adding +1 => "safe" defaults to +1, obstacle region near –1
-        cbf_values = mean_pred
+        cbf_values = 1.0 + mean_pred
         #cbf_values = cp.clip(cbf_values, -1, 1)
 
         # Reshape for plotting
@@ -367,7 +367,7 @@ class CBF:
         # Stack the computed coordinates into a 2-column matrix
         self.Poe = cp.column_stack((-y_lidar, x_lidar))
          # Update the number of points
-        self.N = x_lidar.size
+        self.N = filtered_distance.size
 
         # Create associated arrays directly on the GPU
         self.Y = -1 * cp.ones(self.N)
