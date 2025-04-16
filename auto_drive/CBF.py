@@ -27,7 +27,7 @@ class CBF:
         self.params.sigma_f = 1.0*10**1
         
         pass
-        self.length_scale = 0.04    # found from  loop demo
+        self.length_scale = 0.06    # found from  loop demo
         self.time = 0.0
     # Dynamics #
 
@@ -422,8 +422,8 @@ class CBF:
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
-        # self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale, sigma_f=10, 
-        #                     grid_limits=((-2, 2), (-2, 2)), grid_resolution=100)
+        self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale, sigma_f=10, 
+                            grid_limits=((-2, 2), (-2, 2)), grid_resolution=100)
         try:
 
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
