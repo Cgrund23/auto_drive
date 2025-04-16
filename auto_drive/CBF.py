@@ -353,13 +353,7 @@ class CBF:
         # filtered_distance = distance[mask_range]
         # filtered_angle = angle[mask_range]
 
-        # Update the number of points
-        self.N = filtered_distance.size
-
-        # Create associated arrays directly on the GPU
-        self.Y = -1 * cp.ones(self.N)
-        self.NY = cp.ones(self.N)
-        self.Dist = filtered_distance.reshape((-1, 1))
+       
 
         # Compute local coordinates (you can also compute global if needed)
         # Local coordinates:
@@ -372,6 +366,13 @@ class CBF:
 
         # Stack the computed coordinates into a 2-column matrix
         self.Poe = cp.column_stack((-y_lidar, x_lidar))
+         # Update the number of points
+        self.N = x_lidar.size
+
+        # Create associated arrays directly on the GPU
+        self.Y = -1 * cp.ones(self.N)
+        self.NY = cp.ones(self.N)
+        self.Dist = filtered_distance.reshape((-1, 1))
 
     # def setObjects(self,distance,angle):                               
     #     """
