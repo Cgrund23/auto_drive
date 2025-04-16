@@ -84,7 +84,7 @@ class CBF:
         plt.show()
 
     def vis_barrier_and_dcbf_origin(self, training_data, Y, length_scale=0.001, sigma_f=10,
-                                    grid_limits=((-2, 2), (-2, 2)), grid_resolution=500):
+                                    grid_limits=((-2, 2), (-2, 2)), grid_resolution=200):
         """
         Visualizes the barrier function and overlays the gradient (dCBF) at the origin as an arrow.
         
