@@ -52,7 +52,7 @@ class CBF:
 
         # --- SHIFT Y so that far away from obstacles is "1" by default
         #     If your original Y is –1 for obstacles, do Y' = Y - 1 => –2 for obstacles
-        shifted_Y = -Y
+        shifted_Y = Y - 1
 
         # Cross-kernel
         K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
