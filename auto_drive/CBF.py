@@ -87,76 +87,78 @@ class CBF:
                  grid_limits=((-2, 2), (-2, 2)), grid_resolution=20):
         """
         Visualizes the gradient (dCBF) of the control barrier function as a vector field.
-
-        The GP model uses an offset so that far from obstacles the CBF defaults to +1.
-        The gradient at a query point x is computed as:
-            grad = -1/(length_scale^2) * sum_j ( (x - x_j) * k(x, x_j) * w_j )
+        
+        The gradient for a query point x is approximated as:
+            grad(x) = -1/(length_scale^2) * sum_j [ (x - x_j) * k(x, x_j) * w_j ]
         where w = K_inv * (Y - 1).
-
+        
         Parameters
         ----------
         training_data : cp.ndarray
-            CuPy array of shape (N, 2) containing training (lidar) points.
+            CuPy array of shape (N, 2) with training (lidar) points.
         Y : cp.ndarray
-            CuPy array of target barrier values (e.g. -1 for obstacles) of shape (N, 1) or (N,).
+            CuPy array of target barrier values (e.g., -1 for obstacles).
         length_scale : float, optional
-            RBF kernel length scale. Default is 0.001.
+            Length scale for the RBF kernel. Default is 0.001.
         sigma_f : float, optional
             Signal variance of the RBF kernel. Default is 10.
         grid_limits : tuple, optional
-            ((x_min, x_max), (y_min, y_max)) limits of the grid. Default is ((-2, 2), (-2, 2)).
+            ((x_min, x_max), (y_min, y_max)) limits for the grid. Default is ((-2, 2), (-2, 2)).
         grid_resolution : int, optional
-            Number of grid points per axis. Default is 20.
+            Number of grid points along each axis. Default is 20.
         """
-        # Create a 2D grid over the specified limits.
+        # Create a 2D grid for query points.
         (x_min, x_max), (y_min, y_max) = grid_limits
         x_lin = cp.linspace(x_min, x_max, grid_resolution)
         y_lin = cp.linspace(y_min, y_max, grid_resolution)
         x_grid, y_grid = cp.meshgrid(x_lin, y_lin)
-        # Each query point is a 2D coordinate; reshape into (M, 2)
-        X_query = cp.column_stack((x_grid.ravel(), y_grid.ravel()))  # shape (M, 2) with M = grid_resolution**2
+        X_query = cp.column_stack((x_grid.ravel(), y_grid.ravel()))  # (M, 2), M = grid_resolution**2
 
-        # Compute the kernel matrix for the training data and its inverse.
+        # Compute kernel matrix for training data and its inverse.
         K = self.rbf_kernel(training_data, training_data, length_scale, sigma_f)
         K_inv = cp.linalg.inv(K)
 
-        # Shift the training labels so that far away, the default GP mean is +1:
+        # Shift the target such that far away defaults to 1.
         shifted_Y = Y - 1.0
 
-        # Compute weights: w = K_inv * (Y - 1)
+        # Compute GP weights: w = K_inv*(Y-1)
         w = cp.dot(K_inv, shifted_Y)  # shape (N, 1)
         w_flat = cp.ravel(w)          # shape (N,)
 
-        # Compute the gradient at each query point in a vectorized manner.
-        # For each query point x and each training point x_j:
-        #   diff = x - x_j  -> shape (M, N, 2)
-        diff = X_query[:, None, :] - training_data[None, :, :]  # shape (M, N, 2)
-        # Compute the kernel between each query and each training point; shape (M, N)
+        # Vectorized gradient calculation.
+        # diff has shape (M, N, 2): each query point minus each training point.
+        diff = X_query[:, None, :] - training_data[None, :, :]
+        # k_mat (M, N): kernel values between each query and training point.
         k_mat = self.rbf_kernel(X_query, training_data, length_scale, sigma_f)
-        # Compute the gradient:
-        # For each query point, grad(x) = -1/(length_scale^2) * sum_j [ diff_{ij} * k_mat_{ij} * w_j ]
-        gradients = - cp.sum(diff * k_mat[..., None] * w_flat[None, :, None], axis=1) / (length_scale**2)  # shape (M, 2)
+        # Compute gradients: shape (M, 2)
+        gradients = - cp.sum(diff * k_mat[..., None] * w_flat[None, :, None], axis=1) / (length_scale**2)
 
-        # Reshape the gradient components back into grid form for plotting.
+        # (Optional) Print statistics to help with debugging.
+        print("Gradient stats: min =", cp.min(gradients).item(),
+              "max =", cp.max(gradients).item())
+
+        # Reshape gradient components to grid shape.
         U = gradients[:, 0].reshape((grid_resolution, grid_resolution))
         V = gradients[:, 1].reshape((grid_resolution, grid_resolution))
-        # Convert grid arrays from CuPy to NumPy for matplotlib.
+
+        # Convert from CuPy to NumPy arrays for matplotlib.
         Xq_np = cp.asnumpy(x_grid)
         Yq_np = cp.asnumpy(y_grid)
         U_np = cp.asnumpy(U)
         V_np = cp.asnumpy(V)
+        training_np = cp.asnumpy(training_data)
 
-        # Create a quiver (vector field) plot of the gradient field.
+        # Create a quiver plot of the dCBF vector field.
         plt.figure(figsize=(8, 6))
-        plt.quiver(Xq_np, Yq_np, U_np, V_np, color='white')
+        # Adjust 'scale' to make arrows visibly larger if needed.
+        q = plt.quiver(Xq_np, Yq_np, U_np, V_np, color='blue', angles='xy', scale_units='xy', scale=0.1, width=0.005)
         plt.xlabel('X')
         plt.ylabel('Y')
         plt.title('dCBF (Gradient) Field')
-        # Optionally, overlay the training points.
-        training_np = cp.asnumpy(training_data)
+        # Overlay the training points.
         plt.scatter(training_np[:, 0], training_np[:, 1], color='red', marker='x', label='Training Points')
         plt.legend()
-        plt.show()        
+        plt.show()       
     
     def f_full(self):
         """Returns the next state using CuPy arrays.
