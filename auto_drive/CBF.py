@@ -180,7 +180,7 @@ class CBF:
         # Overlay the dCBF arrow at the origin.
         # Choose a suitable scaling factor (scale=1 here means no automatic scaling; adjust if needed).
         plt.quiver(0, 0, gradient_origin_np[0], gradient_origin_np[1],
-                   color='blue', angles='xy', scale_units='xy', scale=100, width=0.5)
+                   color='blue', angles='xy', scale_units='xy', scale=1, width=0.5)
         plt.scatter([0], [0], color='blue', s=50, label='Origin dCBF')
         
         plt.xlabel('X')
@@ -534,7 +534,7 @@ class CBF:
         # self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale, sigma_f=10, 
         #                     grid_limits=((-2, 2), (-2, 2)), grid_resolution=100)
         #self.vis_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale, sigma_f=1)
-        self.vis_barrier_and_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale,grid_resolution=200, sigma_f=1)
+        self.vis_barrier_and_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale,grid_resolution=500, sigma_f=1)
         try:
 
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
