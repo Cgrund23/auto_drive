@@ -83,83 +83,67 @@ class CBF:
         plt.legend()
         plt.show()
 
-    def vis_dcbf(self, training_data, Y, length_scale=0.001, sigma_f=10,
-                 grid_limits=((-2, 2), (-2, 2)), grid_resolution=20):
+    def vis_dcbf_origin(self, training_data, Y, length_scale=0.001, sigma_f=10):
         """
-        Visualizes the gradient (dCBF) of the control barrier function as a vector field.
-        
-        The gradient for a query point x is approximated as:
-            grad(x) = -1/(length_scale^2) * sum_j [ (x - x_j) * k(x, x_j) * w_j ]
-        where w = K_inv * (Y - 1).
-        
+        Visualizes the gradient (dCBF) of the control barrier function at the origin only.
+
+        The gradient at the origin is computed using the GP parameters.
+        Given a query point x (here the origin), the gradient is approximated by:
+            grad(x) = -1/(length_scale^2) * sum_j [ (x - x_j) * k(x, x_j) * w_j ],
+        where w = K_inv * (Y - 1) and k(.,.) is the RBF kernel.
+
         Parameters
         ----------
         training_data : cp.ndarray
-            CuPy array of shape (N, 2) with training (lidar) points.
+            CuPy array of shape (N, 2) containing the training (lidar) points.
         Y : cp.ndarray
             CuPy array of target barrier values (e.g., -1 for obstacles).
         length_scale : float, optional
-            Length scale for the RBF kernel. Default is 0.001.
+            RBF kernel length scale. Default is 0.001.
         sigma_f : float, optional
             Signal variance of the RBF kernel. Default is 10.
-        grid_limits : tuple, optional
-            ((x_min, x_max), (y_min, y_max)) limits for the grid. Default is ((-2, 2), (-2, 2)).
-        grid_resolution : int, optional
-            Number of grid points along each axis. Default is 20.
         """
-        # Create a 2D grid for query points.
-        (x_min, x_max), (y_min, y_max) = grid_limits
-        x_lin = cp.linspace(x_min, x_max, grid_resolution)
-        y_lin = cp.linspace(y_min, y_max, grid_resolution)
-        x_grid, y_grid = cp.meshgrid(x_lin, y_lin)
-        X_query = cp.column_stack((x_grid.ravel(), y_grid.ravel()))  # (M, 2), M = grid_resolution**2
-
-        # Compute kernel matrix for training data and its inverse.
+        # Compute the kernel matrix for the training points and its inverse.
         K = self.rbf_kernel(training_data, training_data, length_scale, sigma_f)
         K_inv = cp.linalg.inv(K)
 
-        # Shift the target such that far away defaults to 1.
+        # Shift training labels so that far away the GP defaults to 1.
         shifted_Y = Y - 1.0
 
-        # Compute GP weights: w = K_inv*(Y-1)
+        # Compute the weights: w = K_inv * (Y - 1)
         w = cp.dot(K_inv, shifted_Y)  # shape (N, 1)
         w_flat = cp.ravel(w)          # shape (N,)
 
-        # Vectorized gradient calculation.
-        # diff has shape (M, N, 2): each query point minus each training point.
+        # Define the query point as the origin
+        X_query = cp.array([[0.0, 0.0]])  # shape (1, 2)
+
+        # Compute the difference between the query and each training point.
+        # diff shape: (1, N, 2)
         diff = X_query[:, None, :] - training_data[None, :, :]
-        # k_mat (M, N): kernel values between each query and training point.
+        
+        # Compute the kernel between the query and each training point. Shape: (1, N)
         k_mat = self.rbf_kernel(X_query, training_data, length_scale, sigma_f)
-        # Compute gradients: shape (M, 2)
-        gradients = - cp.sum(diff * k_mat[..., None] * w_flat[None, :, None], axis=1) / (length_scale**2)
-
-        # (Optional) Print statistics to help with debugging.
-        print("Gradient stats: min =", cp.min(gradients).item(),
-              "max =", cp.max(gradients).item())
-
-        # Reshape gradient components to grid shape.
-        U = gradients[:, 0].reshape((grid_resolution, grid_resolution))
-        V = gradients[:, 1].reshape((grid_resolution, grid_resolution))
-
-        # Convert from CuPy to NumPy arrays for matplotlib.
-        Xq_np = cp.asnumpy(x_grid)
-        Yq_np = cp.asnumpy(y_grid)
-        U_np = cp.asnumpy(U)
-        V_np = cp.asnumpy(V)
-        training_np = cp.asnumpy(training_data)
-
-        # Create a quiver plot of the dCBF vector field.
-        plt.figure(figsize=(8, 6))
-        # Adjust 'scale' to make arrows visibly larger if needed.
-        q = plt.quiver(Xq_np, Yq_np, U_np, V_np, color='blue', angles='xy', scale_units='xy', scale=0.001, width=0.005)
+        
+        # Compute the gradient at the origin:
+        #   grad = -1/(length_scale^2) * sum_j [ (x - x_j) * k(x, x_j) * w_j ]
+        gradient = - cp.sum(diff * k_mat[..., None] * w_flat[None, :, None], axis=1) / (length_scale**2)
+        # gradient now is shape (1, 2)
+        
+        # Convert gradient to NumPy array for plotting.
+        gradient_np = cp.asnumpy(gradient)[0]
+        
+        # Plot the gradient as an arrow at the origin.
+        plt.figure(figsize=(6, 6))
+        plt.quiver(0, 0, gradient_np[0], gradient_np[1],
+                   color='blue', angles='xy', scale_units='xy', scale=1, width=0.005)
+        plt.scatter([0], [0], color='red')  # mark the origin
+        plt.xlim(-1, 1)
+        plt.ylim(-1, 1)
         plt.xlabel('X')
         plt.ylabel('Y')
-        plt.title('dCBF (Gradient) Field')
-        # Overlay the training points.
-        plt.scatter(training_np[:, 0], training_np[:, 1], color='red', marker='x', label='Training Points')
-        plt.legend()
-        plt.show()       
-    
+        plt.title('dCBF Gradient at the Origin')
+        plt.grid(True)
+        plt.show()
     def f_full(self):
         """Returns the next state using CuPy arrays.
 
@@ -500,8 +484,7 @@ class CBF:
         f = cp.vstack((f,self.params.weightslack))
         # self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale, sigma_f=10, 
         #                     grid_limits=((-2, 2), (-2, 2)), grid_resolution=100)
-        self.vis_dcbf(training_data= self.Poe, Y=self.Y, length_scale=self.length_scale, sigma_f=1,
-                 grid_limits=((-2, 2), (-2, 2)), grid_resolution=20)
+        self.vis_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale, sigma_f=1)
         try:
 
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
