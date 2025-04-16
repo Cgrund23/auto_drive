@@ -180,7 +180,7 @@ class CBF:
         # Overlay the dCBF arrow at the origin.
         # Choose a suitable scaling factor (scale=1 here means no automatic scaling; adjust if needed).
         plt.quiver(0, 0, gradient_origin_np[0], gradient_origin_np[1],
-                   color='blue', angles='xy', scale_units='xy', scale=1, width=0.005)
+                   color='blue', angles='xy', scale_units='xy', scale=10, width=0.005)
         plt.scatter([0], [0], color='blue', s=50, label='Origin dCBF')
         
         plt.xlabel('X')
