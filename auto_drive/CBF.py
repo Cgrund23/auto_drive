@@ -151,7 +151,7 @@ class CBF:
         # Create a quiver plot of the dCBF vector field.
         plt.figure(figsize=(8, 6))
         # Adjust 'scale' to make arrows visibly larger if needed.
-        q = plt.quiver(Xq_np, Yq_np, U_np, V_np, color='blue', angles='xy', scale_units='xy', scale=0.1, width=0.005)
+        q = plt.quiver(Xq_np, Yq_np, U_np, V_np, color='blue', angles='xy', scale_units='xy', scale=0.001, width=0.005)
         plt.xlabel('X')
         plt.ylabel('Y')
         plt.title('dCBF (Gradient) Field')
