@@ -442,7 +442,7 @@ class CBF:
         Computes the CBF
         """
         #print(x_test.shape,X_train.shape)
-        return  1 + (K_star.T @ k_inv @ (self.Y - 1))
+        return  1 - 2 * (K_star.T @ k_inv @ (self.Y))
         #return (1 - 2 * x_test.T @ X_train @ self.NY)
         #return 1-2*(self.rbf_kernel(x_test, X_train, length_scale, sigma_f))
         #return  self.rbf_kernel(x_test, X_train, length_scale, sigma_f) @ alpha - safe_dist
@@ -502,7 +502,7 @@ class CBF:
         #print(X_query.shape)
         #k_test = self.rbf_kernel(self.f_full().T,cp.hstack((self.Poe,cp.zeros((self.Poe.shape[0],2)))).T,self.length_scale,self.params.sigma_f)
         #print(k_test.shape)
-        cbf = self.cbf_function(K_star.T,k_inv)@ self.Y.T
+        cbf = self.cbf_function(K_star.T,k_inv)
         print(max(abs(cbf)))
         cbf = cp.clip(cbf, -1, 1)
         dcbf = self.dcbf_function(x_query=X_query,k_star=K_star.T,X_train=self.Poe,k_inv=k_inv,length_scale=self.length_scale)
