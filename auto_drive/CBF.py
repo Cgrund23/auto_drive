@@ -342,11 +342,16 @@ class CBF:
             angle = cp.asarray(angle)
 
         # Create a boolean mask for points within the max range
-        mask = distance < self.params.r_max
+        mask_range = distance < self.params.r_max
 
+        mask_angles = (angle >= -cp.pi) & (angle <= cp.pi)
+        mask_combined = mask_range & mask_angles
+
+        filtered_distance = distance[mask_combined][::2]
+        filtered_angle    = angle[mask_combined][::2]
         # Apply the mask to filter distances and angles
-        filtered_distance = distance[mask]
-        filtered_angle = angle[mask]
+        # filtered_distance = distance[mask_range]
+        # filtered_angle = angle[mask_range]
 
         # Update the number of points
         self.N = filtered_distance.size
@@ -358,12 +363,12 @@ class CBF:
 
         # Compute local coordinates (you can also compute global if needed)
         # Local coordinates:
-        x_lidar = filtered_distance * cp.cos(filtered_angle)
-        y_lidar = filtered_distance * cp.sin(filtered_angle)
+        # x_lidar = filtered_distance * cp.cos(filtered_angle)
+        # y_lidar = filtered_distance * cp.sin(filtered_angle)
 
-        # If you need global coordinates, add the vehicle's pose offsets:
-        # x_global = filtered_distance * cp.cos(filtered_angle + self.params.theta) + self.params.x
-        # y_global = filtered_distance * cp.sin(filtered_angle + self.params.theta) + self.params.y
+        # Every other
+        x_lidar = filtered_distance[::2] * cp.cos(filtered_angle[::2])
+        y_lidar = filtered_distance[::2] * cp.sin(filtered_angle[::2])
 
         # Stack the computed coordinates into a 2-column matrix
         self.Poe = cp.column_stack((-y_lidar, x_lidar))
