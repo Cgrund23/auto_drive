@@ -343,12 +343,14 @@ class CBF:
 
         # Create a boolean mask for points within the max range
         mask_range = distance < self.params.r_max
+        filtered_distance = distance[mask_range]
+        filtered_angle    = angle[mask_range]
+        mask_angles = (filtered_angle >= -cp.pi) & (filtered_angle <= cp.pi)
+        filtered_distance = distance[mask_angles]
+        filtered_angle    = angle[mask_angles]
 
-        mask_angles = (angle >= -cp.pi) & (angle <= cp.pi)
-        mask_combined = mask_range & mask_angles
-
-        filtered_distance = distance[mask_combined][::2]
-        filtered_angle    = angle[mask_combined][::2]
+        
+        
         # Apply the mask to filter distances and angles
         # filtered_distance = distance[mask_range]
         # filtered_angle = angle[mask_range]
