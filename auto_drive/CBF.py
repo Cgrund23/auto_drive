@@ -83,67 +83,113 @@ class CBF:
         plt.legend()
         plt.show()
 
-    def vis_dcbf_origin(self, training_data, Y, length_scale=0.001, sigma_f=10):
+    def vis_barrier_and_dcbf_origin(self, training_data, Y, length_scale=0.001, sigma_f=10,
+                                    grid_limits=((-2, 2), (-2, 2)), grid_resolution=100):
         """
-        Visualizes the gradient (dCBF) of the control barrier function at the origin only.
-
-        The gradient at the origin is computed using the GP parameters.
-        Given a query point x (here the origin), the gradient is approximated by:
-            grad(x) = -1/(length_scale^2) * sum_j [ (x - x_j) * k(x, x_j) * w_j ],
-        where w = K_inv * (Y - 1) and k(.,.) is the RBF kernel.
-
+        Visualizes the barrier function and overlays the gradient (dCBF) at the origin as an arrow.
+        
+        Barrier:
+          - Computes the GP-based barrier function on a 2D grid.
+          - Uses shifted training labels so that far from obstacles the default is +1.
+          - Clips values between -1 and +1.
+          - Plots the barrier with a filled contour plot along with the training (lidar) points and
+            a black contour line at the 0-level set.
+        
+        dCBF at Origin:
+          - Computes the dCBF (gradient) at the origin using the same GP parameters.
+          - Overlays an arrow at (0,0) showing the gradient direction and magnitude.
+        
         Parameters
         ----------
         training_data : cp.ndarray
             CuPy array of shape (N, 2) containing the training (lidar) points.
         Y : cp.ndarray
-            CuPy array of target barrier values (e.g., -1 for obstacles).
+            CuPy array of target barrier values (e.g., -1 for obstacles); shape can be (N,) or (N,1).
         length_scale : float, optional
             RBF kernel length scale. Default is 0.001.
         sigma_f : float, optional
             Signal variance of the RBF kernel. Default is 10.
+        grid_limits : tuple, optional
+            ((x_min, x_max), (y_min, y_max)) limits for the grid. Default is ((-2, 2), (-2, 2)).
+        grid_resolution : int, optional
+            Number of grid points along each axis for the barrier visualization. Default is 100.
         """
-        # Compute the kernel matrix for the training points and its inverse.
+        # -------------------------
+        # Barrier Visualization Part:
+        # -------------------------
+        (x_min, x_max), (y_min, y_max) = grid_limits
+        x_lin = cp.linspace(x_min, x_max, grid_resolution)
+        y_lin = cp.linspace(y_min, y_max, grid_resolution)
+        x_grid, y_grid = cp.meshgrid(x_lin, y_lin)
+        grid_points = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
+        
+        # Compute the kernel matrix for training data and its inverse.
         K = self.rbf_kernel(training_data, training_data, length_scale, sigma_f)
         K_inv = cp.linalg.inv(K)
-
-        # Shift training labels so that far away the GP defaults to 1.
+        
+        # Shift training labels: if obstacles are -1 then shifted_Y = Y - 1 gives -2 (forcing default far away to +1).
         shifted_Y = Y - 1.0
-
-        # Compute the weights: w = K_inv * (Y - 1)
+        
+        # Compute cross-kernel between grid points and training data.
+        K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
+        # Gaussian Process prediction (assuming zero prior mean)
+        mean_pred = cp.dot(K_star, cp.dot(K_inv, shifted_Y))
+        # Shift back by adding 1 so that away from obstacles we approach +1.
+        cbf_values = 1.0 + mean_pred
+        # Clip the barrier values between -1 and +1.
+        cbf_values = cp.clip(cbf_values, -1, 1)
+        # Reshape into grid for plotting.
+        cbf_grid = cbf_values.reshape((grid_resolution, grid_resolution))
+        
+        # -------------------------
+        # dCBF at the Origin Part:
+        # -------------------------
+        # Define the query point as the origin.
+        X_query = cp.array([[0.0, 0.0]])  # shape (1, 2)
+        # Compute GP weights: w = K_inv * (Y - 1)
         w = cp.dot(K_inv, shifted_Y)  # shape (N, 1)
         w_flat = cp.ravel(w)          # shape (N,)
-
-        # Define the query point as the origin
-        X_query = cp.array([[0.0, 0.0]])  # shape (1, 2)
-
-        # Compute the difference between the query and each training point.
-        # diff shape: (1, N, 2)
-        diff = X_query[:, None, :] - training_data[None, :, :]
         
-        # Compute the kernel between the query and each training point. Shape: (1, N)
-        k_mat = self.rbf_kernel(X_query, training_data, length_scale, sigma_f)
+        # Compute differences between the origin and each training point.
+        diff = X_query[:, None, :] - training_data[None, :, :]  # shape (1, N, 2)
+        # Compute kernel values between the origin and each training point.
+        k_mat = self.rbf_kernel(X_query, training_data, length_scale, sigma_f)  # shape (1, N)
+        # Calculate the gradient at the origin.
+        gradient_origin = - cp.sum(diff * k_mat[..., None] * w_flat[None, :, None], axis=1) / (length_scale**2)
+        # Convert gradient to a NumPy array.
+        gradient_origin_np = cp.asnumpy(gradient_origin)[0]
         
-        # Compute the gradient at the origin:
-        #   grad = -1/(length_scale^2) * sum_j [ (x - x_j) * k(x, x_j) * w_j ]
-        gradient = - cp.sum(diff * k_mat[..., None] * w_flat[None, :, None], axis=1) / (length_scale**2)
-        # gradient now is shape (1, 2)
+        # -------------------------
+        # Plotting both the barrier and the dCBF arrow
+        # -------------------------
+        # Convert grid arrays from CuPy to NumPy.
+        x_grid_np = cp.asnumpy(x_grid)
+        y_grid_np = cp.asnumpy(y_grid)
+        cbf_grid_np = cp.asnumpy(cbf_grid)
+        training_np = cp.asnumpy(training_data)
         
-        # Convert gradient to NumPy array for plotting.
-        gradient_np = cp.asnumpy(gradient)[0]
+        plt.figure(figsize=(8, 6))
+        # Plot filled contour of the barrier function.
+        contour = plt.contourf(x_grid_np, y_grid_np, cbf_grid_np, levels=50, cmap='viridis', vmin=-1, vmax=1)
+        plt.colorbar(contour, label='CBF Value')
+        # Add a black contour line at the 0 level set.
+        plt.contour(x_grid_np, y_grid_np, cbf_grid_np, levels=[0], colors='black', linewidths=2)
+        # Plot the training points.
+        plt.scatter(training_np[:, 0], training_np[:, 1], color='red', marker='x', label='Obstacle Lidar Pts')
         
-        # Plot the gradient as an arrow at the origin.
-        plt.figure(figsize=(6, 6))
-        plt.quiver(0, 0, gradient_np[0], gradient_np[1],
+        # Overlay the dCBF arrow at the origin.
+        # Choose a suitable scaling factor (scale=1 here means no automatic scaling; adjust if needed).
+        plt.quiver(0, 0, gradient_origin_np[0], gradient_origin_np[1],
                    color='blue', angles='xy', scale_units='xy', scale=1, width=0.005)
-        plt.scatter([0], [0], color='red')  # mark the origin
-        plt.xlim(-1, 1)
-        plt.ylim(-1, 1)
+        plt.scatter([0], [0], color='blue', s=50, label='Origin dCBF')
+        
         plt.xlabel('X')
         plt.ylabel('Y')
-        plt.title('dCBF Gradient at the Origin')
-        plt.grid(True)
+        plt.title('Barrier Function with dCBF at the Origin')
+        plt.legend()
         plt.show()
+
+
     def f_full(self):
         """Returns the next state using CuPy arrays.
 
@@ -413,6 +459,8 @@ class CBF:
         Derivitive of the cbf function by the forced dynamics
         """
         f = self.f_full()
+        print('dcbf f')
+        print(dcbf.T @ f)
         return dcbf.T @ f
      
     def lg_cbf_function(self,dcbf):
@@ -420,7 +468,8 @@ class CBF:
         Derivitive of the cbf function by the Icput dynamics
         """
         g = self.g_full()
-        #print(dcbf.shape,g.shape)
+        print('dcbf g')
+        print(dcbf @ g)
         return dcbf.T @ g
 
     # Constraints/Cost
@@ -484,7 +533,8 @@ class CBF:
         f = cp.vstack((f,self.params.weightslack))
         # self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale, sigma_f=10, 
         #                     grid_limits=((-2, 2), (-2, 2)), grid_resolution=100)
-        self.vis_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale, sigma_f=1)
+        #self.vis_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale, sigma_f=1)
+        self.vis_barrier_and_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale, sigma_f=1)
         try:
 
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
