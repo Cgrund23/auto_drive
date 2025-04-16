@@ -134,7 +134,7 @@ def main(args=None):
     controller.get_logger().info("Hello friend!")
     print(os.cpu_count())
     # Use a multi-threaded executor (for example, with 4 threads)
-    executor = MultiThreadedExecutor(num_threads=6)
+    executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(controller)
     try:
         executor.spin()
