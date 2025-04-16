@@ -346,8 +346,8 @@ class CBF:
         filtered_distance = distance[mask_range]
         filtered_angle    = angle[mask_range]
         mask_angles = (filtered_angle >= -cp.pi) & (filtered_angle <= cp.pi)
-        filtered_distance = distance[mask_angles]
-        filtered_angle    = angle[mask_angles]
+        filtered_distance = filtered_distance[mask_angles]
+        filtered_angle    = filtered_angle[mask_angles]
 
         
         
