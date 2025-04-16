@@ -52,7 +52,7 @@ class CBF:
 
         # --- SHIFT Y so that far away from obstacles is "1" by default
         #     If your original Y is –1 for obstacles, do Y' = Y - 1 => –2 for obstacles
-        shifted_Y = Y - 1.0
+        shifted_Y = -Y
 
         # Cross-kernel
         K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
@@ -61,7 +61,7 @@ class CBF:
 
         # SHIFT BACK: adding +1 => "safe" defaults to +1, obstacle region near –1
         cbf_values = 1.0 + mean_pred
-        cbf_values = cp.clip(cbf_values, -1, 1)
+        #cbf_values = cp.clip(cbf_values, -1, 1)
 
         # Reshape for plotting
         cbf_grid = cbf_values.reshape((grid_resolution, grid_resolution))
