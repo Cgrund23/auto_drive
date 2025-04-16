@@ -42,7 +42,7 @@ class CBF:
     
     def vis_barrier(
         self, K, K_inv, training_data, Y, length_scale=0.001, sigma_f=10,
-        grid_limits=((-2, 2), (-2, 2)), grid_resolution=100
+        grid_limits=((-2, 2), (-2, 2)), grid_resolution=500
     ):
         (x_min, x_max), (y_min, y_max) = grid_limits
         x_lin = cp.linspace(x_min, x_max, grid_resolution)
@@ -531,10 +531,10 @@ class CBF:
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
-        # self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale, sigma_f=10, 
-        #                     grid_limits=((-2, 2), (-2, 2)), grid_resolution=100)
-        #self.vis_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale, sigma_f=1)
-        self.vis_barrier_and_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale,grid_resolution=300, sigma_f=1)
+        self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale, sigma_f=10, 
+                            grid_limits=((-2, 2), (-2, 2)), grid_resolution=500)
+      
+        #self.vis_barrier_and_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale,grid_resolution=300, sigma_f=1)
         try:
 
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
