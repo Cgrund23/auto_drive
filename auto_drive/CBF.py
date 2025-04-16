@@ -60,7 +60,7 @@ class CBF:
         mean_pred = cp.dot(K_star, cp.dot(K_inv, shifted_Y))
 
         # SHIFT BACK: adding +1 => "safe" defaults to +1, obstacle region near –1
-        cbf_values = 1.0 + mean_pred
+        cbf_values = mean_pred
         #cbf_values = cp.clip(cbf_values, -1, 1)
 
         # Reshape for plotting
