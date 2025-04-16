@@ -84,7 +84,7 @@ class CBF:
         plt.show()
 
     def vis_barrier_and_dcbf_origin(self, training_data, Y, length_scale=0.001, sigma_f=10,
-                                    grid_limits=((-2, 2), (-2, 2)), grid_resolution=100):
+                                    grid_limits=((-2, 2), (-2, 2)), grid_resolution=1000):
         """
         Visualizes the barrier function and overlays the gradient (dCBF) at the origin as an arrow.
         
@@ -180,7 +180,7 @@ class CBF:
         # Overlay the dCBF arrow at the origin.
         # Choose a suitable scaling factor (scale=1 here means no automatic scaling; adjust if needed).
         plt.quiver(0, 0, gradient_origin_np[0], gradient_origin_np[1],
-                   color='blue', angles='xy', scale_units='xy', scale=10, width=0.005)
+                   color='blue', angles='xy', scale_units='xy', scale=100, width=0.5)
         plt.scatter([0], [0], color='blue', s=50, label='Origin dCBF')
         
         plt.xlabel('X')
