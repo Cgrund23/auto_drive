@@ -49,7 +49,7 @@ class CBF:
         y_lin = cp.linspace(y_min, y_max, grid_resolution)
         x_grid, y_grid = cp.meshgrid(x_lin, y_lin)
         grid_points = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
-
+        np.save('points.npy', cp.asnumpy(training_data))  # Save grid points for debugging
         # --- SHIFT Y so that far away from obstacles is "1" by default
         #     If your original Y is –1 for obstacles, do Y' = Y - 1 => –2 for obstacles
         shifted_Y = Y - 1
@@ -348,7 +348,7 @@ class CBF:
         mask_angles = (filtered_angle >= -cp.pi) & (filtered_angle <= cp.pi)
         filtered_distance = filtered_distance[mask_angles]
         filtered_angle    = filtered_angle[mask_angles]
-
+        
         
         
         # Apply the mask to filter distances and angles
