@@ -55,7 +55,7 @@ class CBF:
         # Cross-kernel
         K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
         # GP prediction
-        mean_pred = cp.dot(K_star, cp.dot(K_inv, shifted_Y))
+        mean_pred = cp.dot(K_star, cp.dot(K_inv, Y))
 
         # SHIFT BACK: adding +1 => "safe" defaults to +1, obstacle region near –1
         cbf_values = mean_pred
