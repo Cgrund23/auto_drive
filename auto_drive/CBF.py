@@ -50,7 +50,7 @@ class CBF:
         x_grid, y_grid = cp.meshgrid(x_lin, y_lin)
         grid_points = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
       
-        shifted_Y = self.distances - 1
+        shifted_Y = self.distances
 
         # Cross-kernel
         K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
