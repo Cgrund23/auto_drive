@@ -51,14 +51,14 @@ class CBF:
         grid_points = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
 
         #shifted_Y = -1 * np.ones(self.distances.shape)
-        Y
+        Y = Y - 1.0  # Shift labels so that far from obstacles the default is +1
         # Cross-kernel
         K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
         # GP prediction
         mean_pred = cp.dot(K_star, cp.dot(K_inv, Y))
 
         # SHIFT BACK: adding +1 => "safe" defaults to +1, obstacle region near –1
-        cbf_values = mean_pred
+        cbf_values = mean_pred + 1
         #cbf_values = cp.clip(cbf_values, -1, 1)
 
         # Reshape for plotting
