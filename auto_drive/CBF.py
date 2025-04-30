@@ -59,7 +59,7 @@ class CBF:
 
         # SHIFT BACK: adding +1 => "safe" defaults to +1, obstacle region near –1
         cbf_values = 1.0 + mean_pred
-        cbf_values = cp.clip(cbf_values, -1, 1)
+        #cbf_values = cp.clip(cbf_values, -1, 1)
 
         # Reshape for plotting
         cbf_grid = cbf_values.reshape((grid_resolution, grid_resolution))
@@ -514,7 +514,7 @@ class CBF:
         b = b.reshape((b.size,1)) 
         A = - (self.lf_cbf_function(dcbf) + cbf**3)
         A = cp.hstack((cp.zeros((A.shape[0],1)), A , cp.zeros((A.shape[0],1))))
-        print(A.shape,b.shape)
+        
         # umax constraints
         
         k = cp.hstack(([cp.eye(self.params.udim), cp.zeros((self.params.udim, 1))]))
@@ -532,7 +532,7 @@ class CBF:
         b = cp.vstack((b,-k.reshape((k.size,1))))
         weight_input = cp.eye(2)
         weight_input = cp.diag(cp.array([1.0, 1.0]))
-        
+        print(A.shape,b.shape)
         # H = cp.eye(3)
         H = cp.diag(cp.array([1.0, 1.0*10**-6, 1.0]))
         
