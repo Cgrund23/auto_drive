@@ -49,9 +49,9 @@ class CBF:
         y_lin = cp.linspace(y_min, y_max, grid_resolution)
         x_grid, y_grid = cp.meshgrid(x_lin, y_lin)
         grid_points = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
-      
-        shifted_Y = -1 * np.ones(self.distances.shape)
 
+        #shifted_Y = -1 * np.ones(self.distances.shape)
+        Y
         # Cross-kernel
         K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
         # GP prediction
