@@ -49,10 +49,8 @@ class CBF:
         y_lin = cp.linspace(y_min, y_max, grid_resolution)
         x_grid, y_grid = cp.meshgrid(x_lin, y_lin)
         grid_points = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
-        np.save('points.npy', cp.asnumpy(training_data))  # Save grid points for debugging
-        # --- SHIFT Y so that far away from obstacles is "1" by default
-        #     If your original Y is –1 for obstacles, do Y' = Y - 1 => –2 for obstacles
-        shifted_Y = Y - 1
+      
+        shifted_Y = self.distances
 
         # Cross-kernel
         K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
@@ -71,6 +69,7 @@ class CBF:
         y_grid_np = cp.asnumpy(y_grid)
         cbf_grid_np = cp.asnumpy(cbf_grid)
         training_np = cp.asnumpy(training_data)
+        np.save('points.npy', (training_np))
 
         plt.figure(figsize=(8, 6))
         contour = plt.contourf(x_grid_np, y_grid_np, cbf_grid_np, levels=50, cmap='winter')
@@ -365,7 +364,7 @@ class CBF:
         # Every other
         x_lidar = filtered_distance[::2] * cp.cos(filtered_angle[::2])
         y_lidar = filtered_distance[::2] * cp.sin(filtered_angle[::2])
-
+        self.distances = filtered_distance[::2]
         # Stack the computed coordinates into a 2-column matrix
         self.Poe = cp.column_stack((-y_lidar, x_lidar))
          # Update the number of points

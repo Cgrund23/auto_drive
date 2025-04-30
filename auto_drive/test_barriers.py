@@ -15,10 +15,11 @@ def rbf_kernel(X1, X2, length_scale, sigma_f):
     return sigma_f**2 * np.exp(-0.5 * sqdist / length_scale**2)  # Same kernel as in paper
  
 # function defining CBF (simple - not the one on GP Lidar paper)
-def cbf_function(x_test, safe_dist):
+def cbf_function(K_star, alpha):
     """
     Computes the CBF at certain distance.
     """
+    return  1 - 2 * (K_star.T @ alpha)
     return  rbf_kernel(x_test, X_train, length_scale, sigma_f) @ alpha - safe_dist
  
  
@@ -84,8 +85,8 @@ def draw_detailed_turtlebot(ax, center=(0, 0), base_radius=1, wheel_width=0.2, w
  
 # Step 1: Simulate LiDAR Data
 num_points = 50
-x_width = 20
-y_width = 20
+x_width = 2
+y_width = 2
 x0, y0 = 0, 0
  
 num_lines = num_points
@@ -114,7 +115,8 @@ for nB in np.arange(0, num_barriers):
  
     line_start = np.array([x_start, y_start])
     line_end = np.array([x_end, y_end])
- 
+    
+
     for theta in angles:
         m = np.tan(theta)
         # since the lines start at (0,0) then the intercept is 0
@@ -132,7 +134,11 @@ for nB in np.arange(0, num_barriers):
  
 x_lidar = np.array(x_lidar)
 y_lidar = np.array(y_lidar)
- 
+
+point = np.load('auto_drive/points.npy', allow_pickle=True)
+x_lidar = point[:, 0]
+y_lidar = point[:, 1]
+
 distances = np.sqrt(x_lidar**2 + y_lidar**2)
 angles = np.arctan2(y_lidar, x_lidar)
  
@@ -154,16 +160,17 @@ plt.legend()
  
 # Step 2: Gaussian Process (GP) Model Training
 sigma_f = 1.0  # set to 1 as in paper
-length_scale = 1.0
-noise_variance = 1e-4
- 
+length_scale = .05 # what im using in real code
+noise_variance = 0.0 #1e-4
+
 X_train = np.column_stack((x_lidar, y_lidar))
 Y_train = distances
+Y_train = -1*np.ones(distances.shape)  # Initialize Y_train with -1 values
  
 # Compute the covariance matrices
 K = rbf_kernel(X_train, X_train, length_scale, sigma_f) + noise_variance * np.eye(len(X_train))
 alpha = np.linalg.pinv(K) @ Y_train
- 
+
 # Define a grid for visualization
 grid_size = 100
 x_grid, y_grid = np.meshgrid(np.linspace(-x_width, x_width, grid_size), np.linspace(-y_width, y_width, grid_size))
@@ -179,6 +186,8 @@ var_test = np.diag(K_ss - K_star @ np.linalg.pinv(K) @ K_star.T)
 # Reshape for plotting
 mu_grid = mu_test.reshape(grid_size, grid_size)
 var_grid = var_test.reshape(grid_size, grid_size)
+ 
+alpha1 = K_star @ Y_train
  
 # plt.figure()
 # plt.contourf(x_grid, y_grid, mu_grid, 20, cmap='viridis')
@@ -202,16 +211,18 @@ var_grid = var_test.reshape(grid_size, grid_size)
 # plt.xlim([-x_width, x_width])
 # plt.ylim([-y_width, y_width])
 # plt.legend()
- 
+
  
 # Step 4: Define and Visualize trivial Control Barrier Function (CBF)
-safe_distance = 0.5
- 
-cbf_values = cbf_function(X_test, safe_distance)
+safe_distance = 0.2
+print(X_test.shape)
+cbf_values = cbf_function(X_test, alpha1)
+print(cbf_values)
 cbf_grid = cbf_values.reshape(grid_size, grid_size)
  
 fig, ax = plt.subplots()
-plt.contourf(x_grid, y_grid, cbf_grid, 20, cmap='twilight')
+plt.contourf(x_grid, y_grid, cbf_grid, 20, cmap='inferno')
+plt.colorbar(label='CBF Value', orientation='vertical')
 # plt.colorbar()
 plt.title('2D Area Map')
 plt.xlabel('X [m]')
@@ -221,25 +232,26 @@ scatter = plt.scatter(x_lidar, y_lidar, color='red', label='LiDAR Points', s=15)
 # plt.contour(x_grid, y_grid, cbf_grid, [0], colors='black', linewidths=2)  # CBF boundary
 # Plotting contour for CBF boundary at h(x) = 0
 cbf_contour = plt.contour(x_grid, y_grid, cbf_grid, [0], colors='black', linewidths=2)
+
  
 # Create legend entries
 # Add legend for contour level of interest
 contour_legend = mlines.Line2D([], [], color='black', linewidth=2, label='CBF Boundary (h(x)=0)')
 plt.legend(handles=[contour_legend, plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='red', markersize=10, label='LiDAR Points')], loc='lower right')
- 
+#plt.colorbar(cbf_contour, label='CBF Value')
  
 plt.xlim([-x_width, x_width])
 plt.ylim([-y_width, y_width])
  
-draw_detailed_turtlebot(ax, center=(0, 0), base_radius=2, wheel_width=0.4, wheel_height=1,
-                        sensor_radius=0.3, caster_wheel_radius=0.2, orientation_deg=45)
+draw_detailed_turtlebot(ax, center=(0, 0), base_radius=.2, wheel_width=0.04, wheel_height=.1,
+                        sensor_radius=0.03, caster_wheel_radius=0.02, orientation_deg=45)
  
 # Draw lines from the origin to each LiDAR point
 for x_l, y_l in zip(x_lidar, y_lidar):
     plt.plot([x0, x_l], [y0, y_l], color='green', linewidth=1.0, linestyle=':')
  
-plt.show(block=False)  # Non-blocking, so both figures appear
+plt.show()  # Non-blocking, so both figures appear
  
-plt.waitforbuttonpress()
+#plt.waitforbuttonpress()
  
-plt.close('all')
+#plt.close('all')
