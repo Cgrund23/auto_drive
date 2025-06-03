@@ -100,7 +100,7 @@ class Controller_Node(Node):
         #numpoints = len(r) # hard code instead
         #start = time.time()
         self.params.ranges = cp.array(msg.ranges)
-        
+        print(self.params.ranges.shape)
         angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
         self.CBFobj.setObjects(self.params.ranges,angle)
         #total_time = time.time() - start
