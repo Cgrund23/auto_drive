@@ -24,10 +24,10 @@ class CBF:
         self.params.y = 0.0
         self.params.Od = {}
         self.params.Y = {}
-        self.params.sigma_f = 1.0*10**1
+        self.params.sigma_f = 1.0
         
         pass
-        self.length_scale = 0.1    # found from  loop demo
+        self.length_scale = 0.08    # found from  loop demo
         self.time = 0.0
     # Dynamics #
 
@@ -51,14 +51,16 @@ class CBF:
         grid_points = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
 
         #shifted_Y = -1 * np.ones(self.distances.shape)
-        Y = Y - 1.0  # Shift labels so that far from obstacles the default is +1
+        Y = -Y  # Shift labels so that far from obstacles the default is +1
         # Cross-kernel
+        K = self.rbf_kernel(training_data, training_data, length_scale, sigma_f)
         K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
         # GP prediction
-        mean_pred = cp.dot(K_star, cp.dot(K_inv, Y))
+        alpha = cp.linalg.pinv(K) @ (Y - 1)  # Compute alpha for GP prediction
+        cbf_values = (K_star @ alpha) + 1  # Mean prediction at grid points
 
         # SHIFT BACK: adding +1 => "safe" defaults to +1, obstacle region near –1
-        cbf_values = mean_pred + 1
+
         #cbf_values = cp.clip(cbf_values, -1, 1)
 
         # Reshape for plotting
@@ -69,7 +71,7 @@ class CBF:
         y_grid_np = cp.asnumpy(y_grid)
         cbf_grid_np = cp.asnumpy(cbf_grid)
         training_np = cp.asnumpy(training_data)
-        np.save('points.npy', (training_np))
+        #np.save('points.npy', (training_np))
 
         plt.figure(figsize=(8, 6))
         contour = plt.contourf(x_grid_np, y_grid_np, cbf_grid_np, levels=50, cmap='winter')

@@ -39,7 +39,7 @@ class Controller_Node(Node):
 
             # Car info
 
-            v: float = 0.9 # velocity
+            v: float = 1.0 # velocity
             u_max: float = [1.5,0.85] # max speed,angle
             u_min: float = [-1.0,-0.85] # min speed,angle
 
