@@ -58,7 +58,7 @@ class CBF:
         # GP prediction
         alpha = cp.linalg.pinv(K) @ (Y - 1)  # Compute alpha for GP prediction
         cbf_values = (K_star @ alpha) + 1  # Mean prediction at grid points
-
+        cbf_values = np.clip(cbf_values,-1,1)
         # SHIFT BACK: adding +1 => "safe" defaults to +1, obstacle region near –1
 
         #cbf_values = cp.clip(cbf_values, -1, 1)
