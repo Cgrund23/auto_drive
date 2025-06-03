@@ -419,7 +419,7 @@ class CBF:
         #print(X1.shape,X2.shape)
                                                                               # note the dimentions in the sums!
                                                                                       # all distances between pairs of points
-        return sigma_f * cp.exp((-0.5/length_scale**2) * sqdist)                      # Same kernel as in paper
+        return sigma_f * cp.exp(-0.5 * sqdist/length_scale**2)                      # Same kernel as in paper
 
     def rbf_kernel_grad_input(X1, X2, length_scale, sigma_f):
         """
@@ -443,22 +443,18 @@ class CBF:
         Computes the CBF
         """
         #print(x_test.shape,X_train.shape)
-        return  1 - 2 * (K_star.T @ k_inv @ (self.Y))
-        #return (1 - 2 * x_test.T @ X_train @ self.NY)
-        #return 1-2*(self.rbf_kernel(x_test, X_train, length_scale, sigma_f))
-        #return  self.rbf_kernel(x_test, X_train, length_scale, sigma_f) @ alpha - safe_dist
+        return  (K_star @ (k_inv @ (self.Y - 1 ))) + 1.0
       
     def dcbf_function(self, x_query, X_train, k_star, k_inv, length_scale):
         """
         Compute the derivitive of the cbf function
         """
-        diff = x_query - X_train
-        #print(k_star.shape,diff.shape)
+        diff = X_train
+        
         grad =  - (1 / (length_scale**2)) * k_star.T * diff.T
-        #print(grad.shape)
+        
         grad_h = (self.Y.T @ k_inv @ grad.T)
-        #print(cp.vstack((grad_h, cp.zeros((2, grad_h.shape[1])))).shape)
-        #print(grad_h.shape)
+
         return cp.vstack((grad_h.reshape((2,1)), cp.zeros((2, 1))))
 
     def lf_cbf_function(self,dcbf):
@@ -503,7 +499,7 @@ class CBF:
         #print(X_query.shape)
         #k_test = self.rbf_kernel(self.f_full().T,cp.hstack((self.Poe,cp.zeros((self.Poe.shape[0],2)))).T,self.length_scale,self.params.sigma_f)
         #print(k_test.shape)
-        cbf = self.cbf_function(K_star.T,k_inv)
+        cbf = self.cbf_function(K_star, k_inv)
         print(max(abs(cbf)))
         cbf = cp.clip(cbf, -1, 1)
         dcbf = self.dcbf_function(x_query=X_query,k_star=K_star.T,X_train=self.Poe,k_inv=k_inv,length_scale=self.length_scale)
