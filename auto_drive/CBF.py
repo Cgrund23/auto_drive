@@ -50,7 +50,7 @@ class CBF:
         x_grid, y_grid = cp.meshgrid(x_lin, y_lin)
         grid_points = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
 
-        Y = -1 * np.ones(self.distances.shape)
+        Y = -1 * cp.ones(self.distances.shape)
         #Y = -Y  # Shift labels so that far from obstacles the default is +1
         # Cross-kernel
         K = self.rbf_kernel(training_data, training_data, length_scale, sigma_f)
