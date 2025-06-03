@@ -100,6 +100,7 @@ class Controller_Node(Node):
         #numpoints = len(r) # hard code instead
         #start = time.time()
         self.params.ranges = (msg.ranges)
+        print(self.params.ranges)
         self.params.ranges = cp.array(self.params.ranges)
         self.params.ranges = cp.array(msg.ranges)
         angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
