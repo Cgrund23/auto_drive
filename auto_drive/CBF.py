@@ -409,17 +409,28 @@ class CBF:
     #     self.Poe = cp.hstack((x_lidar,y_lidar)).reshape((self.N,2))
 
    
-
+    # function for RBF kernel
     def rbf_kernel(self, X1, X2, length_scale, sigma_f):
         """
         Computes the RBF (Radial Basis Function) kernel between X1 and X2.
         """
+        sqdist = np.sum(X1**2, 1).reshape(-1, 1) + np.sum(X2**2, 1) - 2 * X1 @ X2.T  # distance between points in X1 and X2
+                                                                                    # note the dimentions in the sums!
+                                                                                    # This is to create a matrix containing
+                                                                                    # all distances between pairs of points
+        return sigma_f**2 * cp.exp(-0.5 / length_scale**2 * sqdist)  # Same kernel as in paper
+
+
+    # def rbf_kernel(self, X1, X2, length_scale, sigma_f):
+    #     """
+    #     Computes the RBF (Radial Basis Function) kernel between X1 and X2.
+    #     """
         
-        sqdist = (cp.sum(X1**2, 1).reshape(-1, 1) + cp.sum(X2**2, 1)) - 2 * X1 @ X2.T  # distance between points in X1 and X2
-        #print(X1.shape,X2.shape)
-                                                                              # note the dimentions in the sums!
-                                                                                      # all distances between pairs of points
-        return sigma_f * cp.exp(-0.5 * sqdist/length_scale**2)                      # Same kernel as in paper
+    #     sqdist = (cp.sum(X1**2, 1).reshape(-1, 1) + cp.sum(X2**2, 1)) - 2 * X1 @ X2.T  # distance between points in X1 and X2
+    #     #print(X1.shape,X2.shape)
+    #                                                                           # note the dimentions in the sums!
+    #                                                                                   # all distances between pairs of points
+    #     return sigma_f * cp.exp(-0.5 * sqdist/length_scale**2)                      # Same kernel as in paper
 
     def rbf_kernel_grad_input(X1, X2, length_scale, sigma_f):
         """

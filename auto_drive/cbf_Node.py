@@ -73,7 +73,8 @@ class Controller_Node(Node):
         self.y = 0.0
         self.theta = 0.0
         self.v = 0.0
-        self.u_ref = [self.params.v,0.0]
+        #self.u_ref = [self.params.v,0.0]
+        self.u_ref = [1.0,0.0]
 
         # Publisher and Subscriber
         self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)
@@ -100,12 +101,11 @@ class Controller_Node(Node):
         #numpoints = len(r) # hard code instead
         #start = time.time()
         self.params.ranges = cp.array(msg.ranges)
-        print(self.params.ranges.shape)
+        
         angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
         self.CBFobj.setObjects(self.params.ranges,angle)
         #total_time = time.time() - start
         #self.get_logger().info(f"Set time: {total_time:.3f}")
-        # here
         
         #try:
         start = time.time()
