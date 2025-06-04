@@ -57,6 +57,7 @@ class CBF:
         K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
         # GP prediction
         alpha = cp.linalg.pinv(K) @ (Y - 1)  # Compute alpha for GP prediction
+        cbf_values = self.cbf_function(K_star, K)
         cbf_values = (K_star @ alpha) + 1  # Mean prediction at grid points
         #cbf_values = cp.clip(cbf_values,-1,1)
         # SHIFT BACK: adding +1 => "safe" defaults to +1, obstacle region near –1
