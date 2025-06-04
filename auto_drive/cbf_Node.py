@@ -74,7 +74,7 @@ class Controller_Node(Node):
         self.theta = 0.0
         self.v = 0.0
         #self.u_ref = [self.params.v,0.0]
-        self.u_ref = [1.0,0.0]
+        self.u_ref = [0.8,-0.001]
 
         # Publisher and Subscriber
         self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)
@@ -90,7 +90,7 @@ class Controller_Node(Node):
         #print('V')
         #print(self.v)
         #self.v = msg.twist.twist.linear.x
-        self.v = 1.0
+        self.v = 0.8
         #self.CBFobj.updateState(self.x,self.y,self.theta,self.v)
         #self.CBFobj.updateState(0.0,0.0,self.theta,self.v)
         #total_time = time.time() - start
@@ -124,8 +124,8 @@ class Controller_Node(Node):
         
     def send_vel(self,x,z):
         msg = AckermannDriveStamped()
-        msg.drive.speed = 0.0#float(x)  # Set desired velocity in m/s
-        msg.drive.steering_angle = -float(z) * 2 # Set steering angle in radians
+        msg.drive.speed = float(x)  # Set desired velocity in m/s
+        msg.drive.steering_angle = -float(z) * 5 # Set steering angle in radians
         # self.get_logger().info('msg =: "%s"' % my_msg)
         self.my_vel_command.publish(msg)
 
