@@ -7,6 +7,7 @@ from qpth.qp import QPFunction
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
 import numpy as np
 
 class CBF:
@@ -40,6 +41,55 @@ class CBF:
         t = cp.array([0.0, 0.0 , 1.0])
         return cp.vstack((x,y,t))
     
+
+    def draw_detailed_turtlebot(self, ax, center=(0, 0), base_radius=1, wheel_width=0.1, wheel_height=0.5,
+                                sensor_radius=0.15, caster_wheel_radius=0.1, orientation_deg=0):
+        x, y = center  # Unpack the center coordinates
+    
+        # Draw the base (outer circle) with rotation
+        #base_x, base_y = rotate(x, y, orientation_deg)
+        #base = plt.Circle((base_x, base_y), base_radius, color='lightblue', fill=True)
+        req_width = 0.2
+        req_length = 0.35
+        base = plt.Rectangle((-req_width/2, -req_length/2),req_width, req_length, color='black',) # type: ignore
+        ax.add_patch(base)
+    
+        # Draw the rear left wheel with rotation
+        left_wheel_x = x - req_width/2 - wheel_width
+        left_wheel_y = y + req_length/2 * .8 - wheel_height / 2
+        
+        left_wheel = plt.Rectangle((left_wheel_x, left_wheel_y),
+                                wheel_width, wheel_height, color='gray', angle=0)
+        ax.add_patch(left_wheel)
+    
+        # Draw the rear right wheel with rotation
+        right_wheel_x = x + req_width/2  #wheel_width / 2
+        right_wheel_y = y + req_length/2 * 0.8 - wheel_height / 2
+        #right_wheel_x_rot, right_wheel_y_rot = rotate(right_wheel_x - x, right_wheel_y - y, orientation_deg)
+        right_wheel = plt.Rectangle((x + right_wheel_x, y + right_wheel_y),
+                                    wheel_width, wheel_height, color='gray', angle=0)
+        ax.add_patch(right_wheel)
+
+        # Draw the front left wheel with rotation
+        left_wheel_x = x - req_width/2 - wheel_width
+        left_wheel_y = y - req_length/2 * .8 - wheel_height / 2
+        
+        front_left_wheel = plt.Rectangle((left_wheel_x, left_wheel_y),
+                                wheel_width, wheel_height, color='gray', angle=0)
+        ax.add_patch(front_left_wheel)
+    
+        # Draw the front wheel with rotation
+        right_wheel_x = x + req_width/2  #wheel_width / 2
+        right_wheel_y = y - req_length/2 * 0.8 - wheel_height / 2
+        #right_wheel_x_rot, right_wheel_y_rot = rotate(right_wheel_x - x, right_wheel_y - y, orientation_deg)
+        front_right_wheel = plt.Rectangle((x + right_wheel_x, y + right_wheel_y),
+                                    wheel_width, wheel_height, color='gray', angle=0)
+        ax.add_patch(front_right_wheel)
+    
+        # Draw a small lidar or camera sensor on top with rotation
+        sensor = plt.Circle((x, y), sensor_radius, color='orange', fill=True)
+        ax.add_patch(sensor)
+
     def vis_barrier(
         self, K, K_inv, training_data, Y, length_scale=0.001, sigma_f=10,
         grid_limits=((-2, 2), (-2, 2)), grid_resolution=500
@@ -82,6 +132,8 @@ class CBF:
         plt.title('Visualized CBF Barriers (Safe ~ +1, Obstacles ~ –1)')
         plt.scatter(training_np[:, 0], training_np[:, 1], color='red', marker='x', label='Obstacle Lidar Pts')
         zero_level = plt.contour(x_grid_np, y_grid_np, cbf_grid_np, levels=[0], colors='black', linewidths=2)
+        self.draw_detailed_turtlebot(ax, center=(0, 0), base_radius=.2, wheel_width=0.04, wheel_height=.1,
+                        sensor_radius=0.03, caster_wheel_radius=0.02, orientation_deg=45)
         plt.legend()
         plt.show()
 
