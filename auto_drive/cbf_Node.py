@@ -125,7 +125,7 @@ class Controller_Node(Node):
     def send_vel(self,x,z):
         msg = AckermannDriveStamped()
         msg.drive.speed = 0.0#float(x)  # Set desired velocity in m/s
-        msg.drive.steering_angle = float(z) * 10 # Set steering angle in radians
+        msg.drive.steering_angle = -float(z) * 2 # Set steering angle in radians
         # self.get_logger().info('msg =: "%s"' % my_msg)
         self.my_vel_command.publish(msg)
 
