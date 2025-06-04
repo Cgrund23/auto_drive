@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.3.8)  4 JUN 2025 07:30
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.3.8)  4 JUN 2025 10:01
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -211,6 +211,36 @@ File: pdftex.def 2024/04/13 v1.2c Graphics/color driver for pdftex
 ))
 \Gin@req@height=\dimen174
 \Gin@req@width=\dimen175
+) (/usr/local/texlive/2025/texmf-dist/tex/latex/caption/subcaption.sty
+Package: subcaption 2023/07/28 v1.6b Sub-captions (AR)
+ (/usr/local/texlive/2025/texmf-dist/tex/latex/caption/caption.sty
+Package: caption 2023/08/05 v3.6o Customizing captions (AR)
+ (/usr/local/texlive/2025/texmf-dist/tex/latex/caption/caption3.sty
+Package: caption3 2023/07/31 v2.4d caption3 kernel (AR)
+\caption@tempdima=\dimen176
+\captionmargin=\dimen177
+\caption@leftmargin=\dimen178
+\caption@rightmargin=\dimen179
+\caption@width=\dimen180
+\caption@indent=\dimen181
+\caption@parindent=\dimen182
+\caption@hangindent=\dimen183
+Package caption Info: Unknown document class (or package),
+(caption)             standard defaults will be used.
+Package caption Info: \@makecaption = \long macro:#1#2->\ifx \@captype \@IEEEtablestring \footnotesize \bgroup \par \centering \@IEEEtabletopskipstrut {\normalfont \footnotesize #1}\\{\normalfont \footnotesize \scshape #2}\par \addvspace {0.5\baselineskip }\egroup \@IEEEtablecaptionsepspace \else \@IEEEfigurecaptionsepspace \setbox \@tempboxa \hbox {\normalfont \footnotesize {#1.}\nobreakspace \nobreakspace #2}\ifdim \wd \@tempboxa >\hsize \setbox \@tempboxa \hbox {\normalfont \footnotesize {#1.}\nobreakspace \nobreakspace }\parbox [t]{\hsize }{\normalfont \footnotesize \noindent \unhbox \@tempboxa #2}\else \ifCLASSOPTIONconference \hbox to\hsize {\normalfont \footnotesize \hfil \box \@tempboxa \hfil }\else \hbox to\hsize {\normalfont \footnotesize \box \@tempboxa \hfil }\fi \fi \fi  on input line 1175.
+)
+
+Package caption Warning: Unknown document class (or package),
+(caption)                standard defaults will be used.
+See the caption package documentation for explanation.
+
+\c@caption@flags=\count293
+\c@continuedfloat=\count294
+)
+Package caption Info: New subtype `subfigure' on input line 238.
+\c@subfigure=\count295
+Package caption Info: New subtype `subtable' on input line 238.
+\c@subtable=\count296
 ) (/usr/local/texlive/2025/texmf-dist/tex/latex/base/textcomp.sty
 Package: textcomp 2024/04/24 v2.1b Standard LaTeX package
 ) (/usr/local/texlive/2025/texmf-dist/tex/latex/xcolor/xcolor.sty
@@ -231,39 +261,43 @@ Package xcolor Info: Model `Gray' substituted by `gray' on input line 1371.
 Package xcolor Info: Model `wave' substituted by `hsb' on input line 1372.
 ) (/usr/local/texlive/2025/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
 File: l3backend-pdftex.def 2024-05-08 L3 backend support: PDF output (pdfTeX)
-\l__color_backend_stack_int=\count293
+\l__color_backend_stack_int=\count297
 \l__pdf_internal_box=\box56
+) (./conference_101719.aux
+
+LaTeX Warning: Label `fig:low sf' multiply defined.
+
 )
-No file conference_101719.aux.
 \openout1 = `conference_101719.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 10.
-LaTeX Font Info:    ... okay on input line 10.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 10.
-LaTeX Font Info:    ... okay on input line 10.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 10.
-LaTeX Font Info:    ... okay on input line 10.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 10.
-LaTeX Font Info:    ... okay on input line 10.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 10.
-LaTeX Font Info:    ... okay on input line 10.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 10.
-LaTeX Font Info:    ... okay on input line 10.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 10.
-LaTeX Font Info:    ... okay on input line 10.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+
 -- Lines per column: 56 (exact).
 (/usr/local/texlive/2025/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
-\scratchcounter=\count294
-\scratchdimen=\dimen176
+\scratchcounter=\count298
+\scratchdimen=\dimen184
 \scratchbox=\box57
-\nofMPsegments=\count295
-\nofMParguments=\count296
+\nofMPsegments=\count299
+\nofMParguments=\count300
 \everyMPshowfont=\toks24
-\MPscratchCnt=\count297
-\MPscratchDim=\dimen177
-\MPnumerator=\count298
-\makeMPintoPDFobject=\count299
+\MPscratchCnt=\count301
+\MPscratchDim=\dimen185
+\MPnumerator=\count302
+\makeMPintoPDFobject=\count303
 \everyMPtoPDFconversion=\toks25
 ) (/usr/local/texlive/2025/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
 Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
@@ -271,39 +305,39 @@ Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 48
  (/usr/local/texlive/2025/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg
 File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Live
 ))
-
-LaTeX Warning: Citation `cbfgp' on page 1 undefined on input line 33.
-
-
-LaTeX Warning: Citation `lidargpu' on page 1 undefined on input line 35.
+Package caption Info: Begin \AtBeginDocument code.
+Package caption Info: End \AtBeginDocument code.
 
 
-LaTeX Warning: Citation `CBFs' on page 1 undefined on input line 38.
+LaTeX Warning: Citation `cbfgp' on page 1 undefined on input line 36.
 
 
-LaTeX Warning: Citation `konda_characterizing_2020' on page 1 undefined on input line 38.
+LaTeX Warning: Citation `lidargpu' on page 1 undefined on input line 38.
+
+
+LaTeX Warning: Citation `CBFs' on page 1 undefined on input line 41.
+
+
+LaTeX Warning: Citation `konda_characterizing_2020' on page 1 undefined on input line 41.
 
 <Map.png, id=1, 1537.745pt x 963.6pt>
 File: Map.png Graphic file (type png)
 <use Map.png>
-Package pdftex.def Info: Map.png  used on input line 41.
+Package pdftex.def Info: Map.png  used on input line 44.
 (pdftex.def)             Requested size: 252.0pt x 141.45123pt.
 
 
 
-LaTeX Warning: Citation `spline' on page 1 undefined on input line 46.
+LaTeX Warning: Citation `spline' on page 1 undefined on input line 49.
 
 
-LaTeX Warning: Citation `lidar_rgb' on page 1 undefined on input line 46.
+LaTeX Warning: Citation `lidar_rgb' on page 1 undefined on input line 49.
 
 
-LaTeX Warning: Citation `jian_dynamic_2023' on page 1 undefined on input line 46.
+LaTeX Warning: Citation `jian_dynamic_2023' on page 1 undefined on input line 49.
 
 
-LaTeX Warning: Citation `liu_clf-cbf_2023' on page 1 undefined on input line 46.
-
-
-LaTeX Warning: Reference `fig:Map' on page 1 undefined on input line 48.
+LaTeX Warning: Citation `liu_clf-cbf_2023' on page 1 undefined on input line 49.
 
 
 
@@ -312,106 +346,114 @@ LaTeX Warning: Reference `fig:Map' on page 1 undefined on input line 48.
 
  <./Map.png>]
 
-LaTeX Warning: Citation `cbfgp' on page 2 undefined on input line 50.
+LaTeX Warning: Citation `cbfgp' on page 2 undefined on input line 53.
 
 
-LaTeX Warning: Citation `cbfgp' on page 2 undefined on input line 50.
+LaTeX Warning: Citation `cbfgp' on page 2 undefined on input line 53.
 
-LaTeX Font Info:    Trying to load font information for U+msa on input line 53.
+LaTeX Font Info:    Trying to load font information for U+msa on input line 56.
 (/usr/local/texlive/2025/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 53.
+LaTeX Font Info:    Trying to load font information for U+msb on input line 56.
  (/usr/local/texlive/2025/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
 
-
-LaTeX Warning: Citation `cbfgp' on page 2 undefined on input line 61.
-
-
-LaTeX Warning: Reference `fig:Map' on page 2 undefined on input line 75.
+LaTeX Warning: Citation `cbfgp' on page 2 undefined on input line 64.
 
 
-LaTeX Warning: Reference `fig:l = 0.75' on page 2 undefined on input line 75.
 
-
-LaTeX Warning: Reference `fig:l =1.1' on page 2 undefined on input line 75.
-
+<sim0.08.png, id=15, 462.528pt x 346.896pt>
+File: sim0.08.png Graphic file (type png)
+<use sim0.08.png>
+Package pdftex.def Info: sim0.08.png  used on input line 86.
+(pdftex.def)             Requested size: 165.12378pt x 123.84499pt.
+<sim0.1.png, id=16, 462.528pt x 346.896pt>
+File: sim0.1.png Graphic file (type png)
+<use sim0.1.png>
+Package pdftex.def Info: sim0.1.png  used on input line 90.
+(pdftex.def)             Requested size: 165.12378pt x 123.84499pt.
+<sim0.15.png, id=17, 462.528pt x 346.896pt>
+File: sim0.15.png Graphic file (type png)
+<use sim0.15.png>
+Package pdftex.def Info: sim0.15.png  used on input line 94.
+(pdftex.def)             Requested size: 165.12378pt x 123.84499pt.
 
 
 [2]
-<l = 1.1.png, id=27, 552.0625pt x 462.72874pt>
+<LS0.08_min obj.png, id=30, 578.16pt x 433.62pt>
+File: LS0.08_min obj.png Graphic file (type png)
+<use LS0.08_min obj.png>
+Package pdftex.def Info: LS0.08_min obj.png  used on input line 104.
+(pdftex.def)             Requested size: 252.0pt x 189.00032pt.
+<LS0.08_pillow.png, id=31, 578.16pt x 433.62pt>
+File: LS0.08_pillow.png Graphic file (type png)
+<use LS0.08_pillow.png>
+Package pdftex.def Info: LS0.08_pillow.png  used on input line 111.
+(pdftex.def)             Requested size: 252.0pt x 189.00032pt.
+<minobj_0.08.png, id=32, 462.528pt x 346.896pt>
+File: minobj_0.08.png Graphic file (type png)
+<use minobj_0.08.png>
+Package pdftex.def Info: minobj_0.08.png  used on input line 118.
+(pdftex.def)             Requested size: 252.0pt x 189.00427pt.
+
+
+
+
+[3 <./sim0.08.png> <./sim0.1.png> <./sim0.15.png> <./LS0.08_min obj.png> <./LS0.08_pillow.png> <./minobj_0.08.png>]
+<l = 1.1.png, id=44, 552.0625pt x 462.72874pt>
 File: l = 1.1.png Graphic file (type png)
 <use l = 1.1.png>
-Package pdftex.def Info: l = 1.1.png  used on input line 79.
+Package pdftex.def Info: l = 1.1.png  used on input line 128.
 (pdftex.def)             Requested size: 252.0pt x 211.22679pt.
-<l = 0.75.png, id=28, 552.0625pt x 462.72874pt>
+<l = 0.75.png, id=45, 552.0625pt x 462.72874pt>
 File: l = 0.75.png Graphic file (type png)
 <use l = 0.75.png>
-Package pdftex.def Info: l = 0.75.png  used on input line 86.
+Package pdftex.def Info: l = 0.75.png  used on input line 135.
 (pdftex.def)             Requested size: 252.0pt x 211.22679pt.
 
 
-LaTeX Warning: Reference `fig:l = 0.75' on page 3 undefined on input line 91.
+LaTeX Warning: Reference `fig:l = 1.2' on page 4 undefined on input line 140.
 
 
-LaTeX Warning: Reference `fig:l = 1.2' on page 3 undefined on input line 91.
 
-
-LaTeX Warning: Reference `fig:l =1.1' on page 3 undefined on input line 91.
-
-<distance.png, id=29, 707.64375pt x 375.4025pt>
+<distance.png, id=46, 707.64375pt x 375.4025pt>
 File: distance.png Graphic file (type png)
 <use distance.png>
-Package pdftex.def Info: distance.png  used on input line 97.
+Package pdftex.def Info: distance.png  used on input line 146.
 (pdftex.def)             Requested size: 252.0pt x 133.68411pt.
-
-
-<variance.png, id=30, 707.64375pt x 386.44376pt>
+<variance.png, id=47, 707.64375pt x 386.44376pt>
 File: variance.png Graphic file (type png)
 <use variance.png>
-Package pdftex.def Info: variance.png  used on input line 104.
+Package pdftex.def Info: variance.png  used on input line 153.
 (pdftex.def)             Requested size: 252.0pt x 137.616pt.
 
-LaTeX Warning: Reference `fig:path 75' on page 3 undefined on input line 110.
+LaTeX Warning: Reference `fig:path 75' on page 4 undefined on input line 159.
 
-
-LaTeX Warning: Reference `fig:min dist' on page 3 undefined on input line 110.
-
-
-LaTeX Warning: Reference `fig:min dist' on page 3 undefined on input line 110.
-
-<smallsf.png, id=31, 744.28062pt x 740.26563pt>
+<smallsf.png, id=48, 744.28062pt x 740.26563pt>
 File: smallsf.png Graphic file (type png)
 <use smallsf.png>
-Package pdftex.def Info: smallsf.png  used on input line 113.
+Package pdftex.def Info: smallsf.png  used on input line 162.
 (pdftex.def)             Requested size: 189.0pt x 187.9802pt.
 
 
-[3 <./l = 1.1.png> <./l = 0.75.png> <./distance.png>]
-<lowSF.png, id=40, 745.78625pt x 737.75626pt>
+[4 <./l = 1.1.png> <./l = 0.75.png> <./distance.png>]
+<lowSF.png, id=55, 745.78625pt x 737.75626pt>
 File: lowSF.png Graphic file (type png)
 <use lowSF.png>
-Package pdftex.def Info: lowSF.png  used on input line 121.
+Package pdftex.def Info: lowSF.png  used on input line 170.
 (pdftex.def)             Requested size: 189.0pt x 186.96022pt.
 
 
-LaTeX Warning: Reference `fig:variance sf' on page 4 undefined on input line 125.
-
-<low adapt.png, id=41, 745.78625pt x 737.75626pt>
+<low adapt.png, id=56, 745.78625pt x 737.75626pt>
 File: low adapt.png Graphic file (type png)
 <use low adapt.png>
-Package pdftex.def Info: low adapt.png  used on input line 131.
+Package pdftex.def Info: low adapt.png  used on input line 180.
 (pdftex.def)             Requested size: 189.0pt x 186.96022pt.
 
-LaTeX Warning: Reference `fig:variance sf' on page 4 undefined on input line 136.
 
-
-
-
-
-[4 <./variance.png> <./smallsf.png> <./lowSF.png> <./low adapt.png>]
+[5 <./variance.png> <./smallsf.png> <./lowSF.png> <./low adapt.png>]
 No file conference_101719.bbl.
 
 ** Conference Paper **
@@ -428,7 +470,7 @@ Before submitting the final camera ready copy, remember to:
 
 
 
-[5
+[6
 
 ] (./conference_101719.aux)
  ***********
@@ -440,22 +482,22 @@ L3 programming layer <2025-01-18>
 LaTeX Warning: There were undefined references.
 
 
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
+LaTeX Warning: There were multiply-defined labels.
 
  ) 
 Here is how much of TeX's memory you used:
- 4235 strings out of 473190
- 66656 string characters out of 5715801
- 477738 words of memory out of 5000000
- 27457 multiletter control sequences out of 15000+600000
- 594110 words of font info for 105 fonts, out of 8000000 for 9000
+ 5756 strings out of 473190
+ 95929 string characters out of 5715801
+ 504165 words of memory out of 5000000
+ 28967 multiletter control sequences out of 15000+600000
+ 595190 words of font info for 106 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 57i,8n,65p,2011b,266s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on conference_101719.pdf (5 pages, 1271502 bytes).
+ 67i,8n,77p,2002b,518s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
+Output written on conference_101719.pdf (6 pages, 1728778 bytes).
 PDF statistics:
- 115 PDF objects out of 1000 (max. 8388607)
- 60 compressed objects within 1 object stream
+ 130 PDF objects out of 1000 (max. 8388607)
+ 62 compressed objects within 1 object stream
  0 named destinations out of 1000 (max. 500000)
- 47 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 77 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -4,6 +4,9 @@
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{algorithmic}
 \usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{graphicx}
+\usepackage{subcaption}
 \usepackage{textcomp}
 \usepackage{xcolor}
 
@@ -20,7 +23,7 @@ Burlington VT, USA }
 \maketitle
 
 \begin{abstract}
-Ensuring safety in autonomous systems operating in dynamic environments is critical. LiDAR-based perception enables real-time mapping for safety-critical control, with Control Barrier Functions (CBFs) maintaining safe system states. However, static safety factors in CBFs can limit performance in complex environments. This paper introduces a method for synthesizing barriers from LiDAR data using Gaussian Processes (GPs) with an adaptive safety factor. The approach ensures robust navigation in open areas and adaptability in tight spaces by dynamically adjusting the variance of the GP over time based on the vehicle's relation to the environment. \textcolor{blue}{The safety of the system is improved by changing the safety function from a stationary process to a non-stationary random process.} Simulations demonstrate successful obstacle avoidance and navigation through diverse scenarios, balancing safety and performance.
+Ensuring safety in autonomous systems operating in dynamic environments is critical. LiDAR-based perception enables real-time mapping for safety-critical control, with Control Barrier Functions (CBFs) maintaining safe system states. However, static safety factors in CBFs can limit performance in complex environments. This paper introduces a method for synthesizing barriers from LiDAR data using Gaussian Processes (GPs) with an adaptive safety factor. The approach ensures robust navigation in open areas and adaptability in tight spaces by dynamically adjusting the variance of the GP over time based on the vehicle's relation to the environment. Simulations demonstrate successful obstacle avoidance and navigation through diverse scenarios, balancing safety and performance.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -71,7 +74,53 @@ l = \sqrt{\frac{|| p_i - p_j ||^2}{SF}}.
 \end{equation}
 This formulation changes the variance based on a set desired SF and the average distance the barriers are from the vehicle. The result of this adaption will encourage the vehicle to proffer areas without barriers while still being able to perform in areas with narrow barriers. When the path is forced into a tight corridor the average distance between the vehicle and the barriers will be small requiring a smaller safety factor to be used. This method will persuade the vehicle to remain in open areas by enforcing a larger safety while still being able to relax in narrow passages. 
 
-\section{Data}
+\section{Real Data}
+The data in this section is from a lidar sensor mounted on a 1/10th scale vehicle. The sensor is 2-D and has 270 degrees field of view. Objects were placed in the enviornment to represent obstacles the sensor would encounter. The vehicle was at rest and a few scans were taken with varrying saftey factors to demonstrait the effects of the safety factor on the resulting barriers. The LiDAR points were processed to create Gaussian kernels, in both real time on the vehicle and post prosessed offline to compair. 
+The images 
+
+\begin{figure*}[!t]
+    \centering
+    \subfloat[$l = 0.08$]{%
+        \includegraphics[width=0.32\textwidth]{sim0.08.png}%
+        \label{fig:l=0.08}%
+    }\hfill
+    \subfloat[$l = 0.1$]{%
+        \includegraphics[width=0.32\textwidth]{sim0.1.png}%
+        \label{fig:l=0.1}%
+    }\hfill
+    \subfloat[$l = 0.15$]{%
+        \includegraphics[width=0.32\textwidth]{sim0.15.png}%
+        \label{fig:l=0.15}%
+    }
+    \caption{Gaussian Kernels Based on Simulation LiDAR Points for varying length‐scales $l$.}
+    \label{fig:gaussian-kernels}
+\end{figure*}
+
+\ref{fig:gaussian-kernels} show the resulting Gaussian kernels based on the LiDAR points for different safety factors. The kernels were created using the same method as described in the previous section. The variance was set to $l = 0.08$, $l = 0.1$, and $l = 0.15$ respectively. The resulting kernels show that as the variance increases, the safe set expands, creating a larger area around the obstacles. This is evident in \ref{fig:l=0.15} where the kernel has expanded to cover more of the space around the obstacles compared to \ref{fig:l=0.08}. The safe sets are shown in black with positive values representing safe areas and negative values representing unsafe areas. The larger safety factor in \ref{fig:l=0.15} creates a greater unsafe set than the relaxed one, which also makes the corridor in which the vehicle must travel through unsafe despite there being enough room for the vehicle to pass. On the contrary, the small safe factor does not expand the LiDAR points enough to connect them making the environment appear to have holes in the barriers due to the space between LiDAR points.
+
+Real-time data compairing to the offline prosessing. 
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1\linewidth]{LS0.08_min obj.png}
+    \caption{Gaussian Kernels Based on Real-time LiDAR Points $l = 0.08$}
+    \label{fig:min}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1\linewidth]{LS0.08_pillow.png}
+    \caption{Gaussian Kernels Based on Real-time LiDAR Points with barrier $l = 0.08$}
+    \label{fig:pillow}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1\linewidth]{minobj_0.08.png}
+    \caption{Gaussian Kernels Based on Real-time LiDAR Points with barrier $l = 0.08$}
+    \label{fig:minobj}
+\end{figure}
+
+\section{Sim Data}
 The data provided is from a Python simulation consisting of an Ackerman steering vehicle with a 2-D LiDAR sensor fixed on the top of it. The sensor has a 360-degree view of the environment consisting of 360 points. This is a standard array for many real-world LiDAR arrays with a resolution of $1$ degree per sample. The data has been filtered such that only the points that hit an obstacle within the horizon distance are considered. This is to save processing time and have there be no processing when no obstacle is detected within the horizon. \textcolor{blue}{Collecting sensor data is a stochastic process because of the added white noise. The environment in which the vehicle navigates is dynamic and is unknown to the vehicle before it is observed through the LiDAR data. Since the environment could contain a variety of different features that require different safety factors, Having a non-stationary variance in the process that creates the barriers lead to an increase in robustness of the systems overall features while still achieving the desired task.} Since the data is an approximation of where the actual obstacle lies, the points must be converted into usable barriers before they can be used in a control action. Figure \ref{fig:Map} depicts the map used for the simulation. The shapes were chosen to give the vehicle a challenge going from an open area through a narrow corridor to get to the final goal. The red line is a preset path that puts the vehicle's desired position near or through obstacles to demonstrate the CBF's ability to avoid the obstacle while relaxing its goal tracking. Within Fig. \ref{fig:l = 0.75} and Fig. \ref{fig:l =1.1} the process of converting the LiDAR points into a kernel through the proposed Gaussian process is shown with different stationary variances. 
 
 \begin{figure}[htbp]
