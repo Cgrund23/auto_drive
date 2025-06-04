@@ -528,8 +528,8 @@ class CBF:
         Derivitive of the cbf function by the forced dynamics
         """
         f = self.f_full()
-        print('dcbf f')
-        print(dcbf.T @ f)
+        #print('dcbf f')
+        #print(dcbf.T @ f)
         return dcbf.T @ f
      
     def lg_cbf_function(self,dcbf):
@@ -537,8 +537,8 @@ class CBF:
         Derivitive of the cbf function by the Icput dynamics
         """
         g = self.g_full()
-        print('dcbf g')
-        print(dcbf.T @ g)
+        #print('dcbf g')
+        #print(dcbf.T @ g)
         return dcbf.T @ g
 
     # Constraints/Cost
@@ -566,7 +566,7 @@ class CBF:
         #k_test = self.rbf_kernel(self.f_full().T,cp.hstack((self.Poe,cp.zeros((self.Poe.shape[0],2)))).T,self.length_scale,self.params.sigma_f)
         #print(k_test.shape)
         cbf = self.cbf_function(K_star, k_inv)
-        print(max(abs(cbf)))
+        #print(max(abs(cbf)))
         cbf = cp.clip(cbf, -1, 1)
         dcbf = self.dcbf_function(x_query=X_query,k_star=K_star.T,X_train=self.Poe,k_inv=k_inv,length_scale=self.length_scale)
 
@@ -594,14 +594,14 @@ class CBF:
         b = cp.vstack((b,-k.reshape((k.size,1))))
         weight_input = cp.eye(2)
         weight_input = cp.diag(cp.array([1.0, 1.0]))
-        print(A.shape,b.shape)
+        #print(A.shape,b.shape)
         # H = cp.eye(3)
         H = cp.diag(cp.array([1.0, 1.0*10**-6, 1.0]))
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
-        self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale*2, sigma_f=1, 
-                            grid_limits=((-2, 2), (-2, 2)), grid_resolution=400)
+        #self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale*2, sigma_f=1, 
+        #                    grid_limits=((-2, 2), (-2, 2)), grid_resolution=400)
       
         #self.vis_barrier_and_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale,grid_resolution=300, sigma_f=1)
         try:
