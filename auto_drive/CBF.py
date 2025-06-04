@@ -124,7 +124,7 @@ class CBF:
         training_np = cp.asnumpy(training_data)
         #np.save('points.npy', (training_np))
         fig, ax = plt.subplots()
-        plt.figure(figsize=(8, 6))
+        #plt.figure(figsize=(8, 6))
         contour = plt.contourf(x_grid_np, y_grid_np, cbf_grid_np, levels=50, cmap='winter')
         plt.colorbar(contour,label='CBF Value')
         plt.xlabel('X')
