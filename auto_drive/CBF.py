@@ -566,7 +566,7 @@ class CBF:
         """
         diff = X_train
         
-        grad =  - (1 / (length_scale**2)) * k_star.T * diff.T
+        grad =  - (1 / (length_scale**2)) * k_star.T @ diff.T
         
         grad_h = (self.Y.T @ k_inv @ grad.T)
 
