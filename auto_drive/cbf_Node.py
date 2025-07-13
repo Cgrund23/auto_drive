@@ -113,7 +113,9 @@ class Controller_Node(Node):
         #msg = Float32MultiArray()
         #msg.data = set(state.ravel().get())
         #self.state_publisher.publish(msg)
-        self.send_vel(u[0],u[1])#*10**4)
+        print(state)
+        for i in range(2):
+            self.send_vel(u[0],u[1])#*10**4)
         total_time = time.time() - start
         self.get_logger().info(f"Constraint Cost time: {total_time:.3f}")
         
@@ -125,8 +127,8 @@ class Controller_Node(Node):
     def send_vel(self,x,z):
         msg = AckermannDriveStamped()
         msg.drive.speed = float(x)  # Set desired velocity in m/s
-        msg.drive.steering_angle = -float(z) * 5 # Set steering angle in radians
-        # self.get_logger().info('msg =: "%s"' % my_msg)
+        msg.drive.steering_angle = -float(z) # Set steering angle in radians
+        self.get_logger().info('msg =: "%s"' % msg)
         self.my_vel_command.publish(msg)
 
 def main(args=None):
