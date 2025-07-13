@@ -140,7 +140,7 @@ class CBF:
 
     def vis_cbf_gradient_field(
         self, K, K_inv, training_data, Y, length_scale=0.001, sigma_f=10,
-        grid_limits=((-2, 2), (-2, 2)), grid_resolution=50  # Lower res for clarity
+        grid_limits=((-2, 2), (-2, 2)), grid_resolution=25  # lower res for readability
     ):
         (x_min, x_max), (y_min, y_max) = grid_limits
         x_lin = cp.linspace(x_min, x_max, grid_resolution)
@@ -148,38 +148,41 @@ class CBF:
         x_grid, y_grid = cp.meshgrid(x_lin, y_lin)
         grid_points = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
 
-        # Compute kernel between grid points and training data
+        # Precompute kernel matrix for training data
         K_train = self.rbf_kernel(training_data, training_data, length_scale, sigma_f)
-        K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
+        K_inv = cp.linalg.pinv(K_train)
         alpha = cp.linalg.pinv(K_train) @ (Y - 1)
-        mean_pred = (K_star @ alpha) + 1
 
-        # Reshape mean prediction to grid
-        cbf_grid = mean_pred.reshape((grid_resolution, grid_resolution))
+        # Prepare to store gradients
+        U = cp.zeros(grid_points.shape[0])  # dCBF/dx
+        V = cp.zeros(grid_points.shape[0])  # dCBF/dy
 
-        # Compute gradients using finite differences
-        dx = (x_max - x_min) / (grid_resolution - 1)
-        dy = (y_max - y_min) / (grid_resolution - 1)
-        grad_x, grad_y = cp.gradient(cbf_grid, dx, dy)
+        for i, x_query in enumerate(grid_points):
+            k_star = self.rbf_kernel(x_query[cp.newaxis, :], training_data, length_scale, sigma_f)
+            grad = self.dcbf_function(x_query, training_data, k_star, K_inv, length_scale)
+            U[i] = grad[0]
+            V[i] = grad[1]
 
         # Convert to numpy for plotting
-        x_grid_np = cp.asnumpy(x_grid)
-        y_grid_np = cp.asnumpy(y_grid)
-        grad_x_np = cp.asnumpy(grad_x)
-        grad_y_np = cp.asnumpy(grad_y)
+        x_np = cp.asnumpy(grid_points[:, 0])
+        y_np = cp.asnumpy(grid_points[:, 1])
+        u_np = cp.asnumpy(U)
+        v_np = cp.asnumpy(V)
 
         # Plot vector field
         fig, ax = plt.subplots()
-        plt.quiver(x_grid_np, y_grid_np, grad_x_np, grad_y_np, angles='xy', scale_units='xy', scale=1.5, color='purple')
+        plt.quiver(x_np, y_np, u_np, v_np, angles='xy', scale_units='xy', scale=1.5, color='darkgreen')
         plt.xlabel('X')
         plt.ylabel('Y')
-        plt.title('Gradient of CBF Function (Vector Field)')
+        plt.title('CBF Gradient Vector Field')
         plt.grid(True)
 
         # Optional: draw robot at origin
         self.draw_detailed_turtlebot(ax, center=(0, 0), base_radius=.2, wheel_width=0.04, wheel_height=.1,
                                     sensor_radius=0.03, caster_wheel_radius=0.02, orientation_deg=45)
         plt.show()
+
+     
 
     def vis_barrier_and_dcbf_origin(self, training_data, Y, length_scale=0.001, sigma_f=10,
                                     grid_limits=((-2, 2), (-2, 2)), grid_resolution=200):
