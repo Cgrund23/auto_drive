@@ -35,7 +35,7 @@ class Controller_Node(Node):
         
 
         class params():
-            dt: float = 0.1#1/10 # 10ms
+            dt: float = 0.05#1/10 # 10ms
 
             # Car info
 
@@ -74,7 +74,7 @@ class Controller_Node(Node):
         self.theta = 0.0
         self.v = 0.0
         #self.u_ref = [self.params.v,0.0]
-        self.u_ref = [0.8,-0.001]
+        self.u_ref = [1.0,-0.001]
 
         # Publisher and Subscriber
         self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)
@@ -90,7 +90,7 @@ class Controller_Node(Node):
         #print('V')
         #print(self.v)
         #self.v = msg.twist.twist.linear.x
-        self.v = 0.8
+        self.v = 1.0
         #self.CBFobj.updateState(self.x,self.y,self.theta,self.v)
         #self.CBFobj.updateState(0.0,0.0,self.theta,self.v)
         #total_time = time.time() - start
