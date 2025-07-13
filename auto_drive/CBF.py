@@ -155,7 +155,7 @@ class CBF:
             cp.asnumpy(vec_points[:, 1]),
             cp.asnumpy(U),
             cp.asnumpy(V),
-            angles='xy', scale_units='xy', scale=1.5, color='black', alpha=0.7
+            angles='xy', scale_units='xy', scale=1, color='black', alpha=0.5
         )
 
         plt.legend()
