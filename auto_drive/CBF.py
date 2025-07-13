@@ -137,6 +137,50 @@ class CBF:
         plt.legend()
         plt.show()
 
+
+    def vis_cbf_gradient_field(
+        self, K, K_inv, training_data, Y, length_scale=0.001, sigma_f=10,
+        grid_limits=((-2, 2), (-2, 2)), grid_resolution=50  # Lower res for clarity
+    ):
+        (x_min, x_max), (y_min, y_max) = grid_limits
+        x_lin = cp.linspace(x_min, x_max, grid_resolution)
+        y_lin = cp.linspace(y_min, y_max, grid_resolution)
+        x_grid, y_grid = cp.meshgrid(x_lin, y_lin)
+        grid_points = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
+
+        # Compute kernel between grid points and training data
+        K_train = self.rbf_kernel(training_data, training_data, length_scale, sigma_f)
+        K_star = self.rbf_kernel(grid_points, training_data, length_scale, sigma_f)
+        alpha = cp.linalg.pinv(K_train) @ (Y - 1)
+        mean_pred = (K_star @ alpha) + 1
+
+        # Reshape mean prediction to grid
+        cbf_grid = mean_pred.reshape((grid_resolution, grid_resolution))
+
+        # Compute gradients using finite differences
+        dx = (x_max - x_min) / (grid_resolution - 1)
+        dy = (y_max - y_min) / (grid_resolution - 1)
+        grad_x, grad_y = cp.gradient(cbf_grid, dx, dy)
+
+        # Convert to numpy for plotting
+        x_grid_np = cp.asnumpy(x_grid)
+        y_grid_np = cp.asnumpy(y_grid)
+        grad_x_np = cp.asnumpy(grad_x)
+        grad_y_np = cp.asnumpy(grad_y)
+
+        # Plot vector field
+        fig, ax = plt.subplots()
+        plt.quiver(x_grid_np, y_grid_np, grad_x_np, grad_y_np, angles='xy', scale_units='xy', scale=1.5, color='purple')
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.title('Gradient of CBF Function (Vector Field)')
+        plt.grid(True)
+
+        # Optional: draw robot at origin
+        self.draw_detailed_turtlebot(ax, center=(0, 0), base_radius=.2, wheel_width=0.04, wheel_height=.1,
+                                    sensor_radius=0.03, caster_wheel_radius=0.02, orientation_deg=45)
+        plt.show()
+
     def vis_barrier_and_dcbf_origin(self, training_data, Y, length_scale=0.001, sigma_f=10,
                                     grid_limits=((-2, 2), (-2, 2)), grid_resolution=200):
         """
@@ -600,7 +644,7 @@ class CBF:
         f = cp.vstack((f,self.params.weightslack))
         # self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale*2, sigma_f=1, 
         #                    grid_limits=((-2, 2), (-2, 2)), grid_resolution=400)
-      
+        self.vis_cbf_gradient_field(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale*2, sigma_f=1)
         #self.vis_barrier_and_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale,grid_resolution=300, sigma_f=1)
         try:
 
