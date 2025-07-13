@@ -140,7 +140,7 @@ class CBF:
 
     def vis_cbf_gradient_field(
         self, K, K_inv, training_data, Y, length_scale=0.001, sigma_f=10,
-        grid_limits=((-2, 2), (-2, 2)), grid_resolution=25  # lower res for readability
+        grid_limits=((-2, 2), (-2, 2)), grid_resolution=25
     ):
         (x_min, x_max), (y_min, y_max) = grid_limits
         x_lin = cp.linspace(x_min, x_max, grid_resolution)
@@ -151,25 +151,27 @@ class CBF:
         # Precompute kernel matrix for training data
         K_train = self.rbf_kernel(training_data, training_data, length_scale, sigma_f)
         K_inv = cp.linalg.pinv(K_train)
-        alpha = cp.linalg.pinv(K_train) @ (Y - 1)
+        alpha = K_inv @ (Y - 1)
 
-        # Prepare to store gradients
-        U = cp.zeros(grid_points.shape[0])  # dCBF/dx
-        V = cp.zeros(grid_points.shape[0])  # dCBF/dy
+        # Allocate gradient components
+        U = cp.zeros(grid_points.shape[0])  # ∂CBF/∂x
+        V = cp.zeros(grid_points.shape[0])  # ∂CBF/∂y
 
         for i, x_query in enumerate(grid_points):
+            # k_star: shape (1, N)
             k_star = self.rbf_kernel(x_query[cp.newaxis, :], training_data, length_scale, sigma_f)
+            # Pass raw training_data as diff; let dcbf_function handle broadcasting
             grad = self.dcbf_function(x_query, training_data, k_star, K_inv, length_scale)
             U[i] = grad[0]
             V[i] = grad[1]
 
-        # Convert to numpy for plotting
+        # Convert to NumPy for plotting
         x_np = cp.asnumpy(grid_points[:, 0])
         y_np = cp.asnumpy(grid_points[:, 1])
         u_np = cp.asnumpy(U)
         v_np = cp.asnumpy(V)
 
-        # Plot vector field
+        # Plot
         fig, ax = plt.subplots()
         plt.quiver(x_np, y_np, u_np, v_np, angles='xy', scale_units='xy', scale=1.5, color='darkgreen')
         plt.xlabel('X')
@@ -177,7 +179,7 @@ class CBF:
         plt.title('CBF Gradient Vector Field')
         plt.grid(True)
 
-        # Optional: draw robot at origin
+        # Optional: draw robot
         self.draw_detailed_turtlebot(ax, center=(0, 0), base_radius=.2, wheel_width=0.04, wheel_height=.1,
                                     sensor_radius=0.03, caster_wheel_radius=0.02, orientation_deg=45)
         plt.show()
