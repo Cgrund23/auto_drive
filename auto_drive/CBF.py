@@ -161,7 +161,7 @@ class CBF:
             # k_star: shape (1, N)
             k_star = self.rbf_kernel(x_query[cp.newaxis, :], training_data, length_scale, sigma_f)
             # Pass raw training_data as diff; let dcbf_function handle broadcasting
-            grad = self.dcbf_function(x_query.T, training_data.T, k_star, K_inv, length_scale)
+            grad = self.dcbf_function(x_query, training_data.T, k_star.T, K_inv, length_scale)
             U[i] = grad[0]
             V[i] = grad[1]
 
@@ -560,7 +560,7 @@ class CBF:
         #print(x_test.shape,X_train.shape)
         return  (K_star @ (k_inv @ (self.Y - 1 ))) + 1.0
       
-    def dcbf_function(self, X_train, k_star, k_inv, length_scale):
+    def dcbf_function(self, x_query, X_train, k_star, k_inv, length_scale):
         """
         Compute the derivitive of the cbf function
         """
@@ -617,7 +617,7 @@ class CBF:
         cbf = self.cbf_function(K_star, k_inv)
         #print(max(abs(cbf)))
         cbf = cp.clip(cbf, -1, 1)
-        dcbf = self.dcbf_function(k_star=K_star.T,X_train=self.Poe,k_inv=k_inv,length_scale=self.length_scale)
+        dcbf = self.dcbf_function(x_query=X_query,k_star=K_star.T,X_train=self.Poe,k_inv=k_inv,length_scale=self.length_scale)
 
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
