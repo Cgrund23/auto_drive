@@ -91,7 +91,7 @@ class CBF:
         ax.add_patch(sensor)
 
     def vis_barrier(
-        self, K, K_inv, training_data, Y, length_scale=0.001, sigma_f=10,
+        self, K, K_inv, training_data, Y, length_scale=0.01, sigma_f=10,
         grid_limits=((-2, 2), (-2, 2)), grid_resolution=500
     ):
         (x_min, x_max), (y_min, y_max) = grid_limits
@@ -146,7 +146,7 @@ class CBF:
 
         for i, x_query in enumerate(vec_points):
             k_star_vec = self.rbf_kernel(x_query[cp.newaxis, :], training_data, length_scale, sigma_f).flatten()[:, cp.newaxis]
-            grad = self.dcbf_function(x_query, training_data, k_star_vec, K_inv, length_scale)
+            grad = -self.dcbf_function(x_query, training_data, k_star_vec, K_inv, length_scale)
             U[i] = grad[0]
             V[i] = grad[1]
 
