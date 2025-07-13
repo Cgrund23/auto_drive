@@ -161,7 +161,7 @@ class CBF:
             # k_star: shape (1, N)
             k_star = self.rbf_kernel(x_query[cp.newaxis, :], training_data, length_scale, sigma_f)
             # Pass raw training_data as diff; let dcbf_function handle broadcasting
-            grad = self.dcbf_function(x_query, training_data, k_star, K_inv, length_scale)
+            grad = self.dcbf_function(x_query.T, training_data.T, k_star, K_inv, length_scale)
             U[i] = grad[0]
             V[i] = grad[1]
 
