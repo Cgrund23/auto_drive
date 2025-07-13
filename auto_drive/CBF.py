@@ -618,8 +618,8 @@ class CBF:
        
         b = cp.vstack((b,-k.reshape((k.size,1))))
         weight_input = cp.eye(2)
-        weight_input = cp.diag(cp.array([1000.0, 1.0]))
-        H = cp.diag(cp.array([1.0, 10.0, 1.0]))
+        weight_input = cp.diag(cp.array([100.0, 1.0]))
+        H = cp.diag(cp.array([1.0, 1.0*10**-5, 1.0]))
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
