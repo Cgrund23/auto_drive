@@ -618,8 +618,8 @@ class CBF:
        
         b = cp.vstack((b,-k.reshape((k.size,1))))
         weight_input = cp.eye(2)
-        weight_input = cp.diag(cp.array([100.0, 1.0]))
-        H = cp.diag(cp.array([1.0, 1.0*10**-5, 1.0]))
+        weight_input = cp.diag(cp.array([1000.0, 1.0]))
+        H = cp.diag(cp.array([1.0, 1.0*10**-5, 10.0]))
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
@@ -632,8 +632,8 @@ class CBF:
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
             print(x)
             self.u = x
-            self.params.gamma = float(x[0])
-            self.params.v = float(x[1])
+            self.params.gamma = float(x[1])
+            self.params.v = float(x[0])
             self.params.weightslack = float(x[2])
             return x,self.f_full()
         except Exception as e:

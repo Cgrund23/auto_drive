@@ -74,7 +74,7 @@ class Controller_Node(Node):
         self.theta = 0.0
         self.v = 0.0
         #self.u_ref = [self.params.v,0.0]
-        self.u_ref = [1.0,-0.001]
+        self.u_ref = [1.0,0.001]
 
         # Publisher and Subscriber
         self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)
