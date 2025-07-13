@@ -134,57 +134,33 @@ class CBF:
         zero_level = plt.contour(x_grid_np, y_grid_np, cbf_grid_np, levels=[0], colors='black', linewidths=2)
         self.draw_detailed_turtlebot(ax, center=(0, 0), base_radius=.2, wheel_width=0.04, wheel_height=.1,
                         sensor_radius=0.03, caster_wheel_radius=0.02, orientation_deg=45)
-        plt.legend()
-        plt.show()
+        # === VECTOR FIELD OVERLAY (sparser grid for clarity) ===
+        vec_res = 25
+        x_vec = cp.linspace(x_min, x_max, vec_res)
+        y_vec = cp.linspace(y_min, y_max, vec_res)
+        x_vec_grid, y_vec_grid = cp.meshgrid(x_vec, y_vec)
+        vec_points = cp.column_stack((x_vec_grid.ravel(), y_vec_grid.ravel()))
 
+        U = cp.zeros(vec_points.shape[0])
+        V = cp.zeros(vec_points.shape[0])
 
-    def vis_cbf_gradient_field(
-        self, K, K_inv, training_data, Y, length_scale=0.001, sigma_f=10,
-        grid_limits=((-2, 2), (-2, 2)), grid_resolution=25
-    ):
-        (x_min, x_max), (y_min, y_max) = grid_limits
-        x_lin = cp.linspace(x_min, x_max, grid_resolution)
-        y_lin = cp.linspace(y_min, y_max, grid_resolution)
-        x_grid, y_grid = cp.meshgrid(x_lin, y_lin)
-        grid_points = cp.column_stack((x_grid.ravel(), y_grid.ravel()))
-
-        # Precompute kernel matrix for training data
-        K_train = self.rbf_kernel(training_data, training_data, length_scale, sigma_f)
-        K_inv = cp.linalg.pinv(K_train)
-        alpha = K_inv @ (Y - 1)
-
-        # Allocate gradient components
-        U = cp.zeros(grid_points.shape[0])  # ∂CBF/∂x
-        V = cp.zeros(grid_points.shape[0])  # ∂CBF/∂y
-
-        for i, x_query in enumerate(grid_points):
-            # k_star: shape (1, N)
-            k_star = self.rbf_kernel(x_query[cp.newaxis, :], training_data, length_scale, sigma_f)
-            # Pass raw training_data as diff; let dcbf_function handle broadcasting
-            grad = self.dcbf_function(x_query, training_data.T, k_star.T, K_inv, length_scale)
+        for i, x_query in enumerate(vec_points):
+            k_star_vec = self.rbf_kernel(x_query[cp.newaxis, :], training_data, length_scale, sigma_f).flatten()[:, cp.newaxis]
+            grad = self.dcbf_function(x_query, training_data, k_star_vec, K_inv, length_scale)
             U[i] = grad[0]
             V[i] = grad[1]
 
-        # Convert to NumPy for plotting
-        x_np = cp.asnumpy(grid_points[:, 0])
-        y_np = cp.asnumpy(grid_points[:, 1])
-        u_np = cp.asnumpy(U)
-        v_np = cp.asnumpy(V)
+        ax.quiver(
+            cp.asnumpy(vec_points[:, 0]),
+            cp.asnumpy(vec_points[:, 1]),
+            cp.asnumpy(U),
+            cp.asnumpy(V),
+            angles='xy', scale_units='xy', scale=1.5, color='black', alpha=0.7
+        )
 
-        # Plot
-        fig, ax = plt.subplots()
-        plt.quiver(x_np, y_np, u_np, v_np, angles='xy', scale_units='xy', scale=1.5, color='darkgreen')
-        plt.xlabel('X')
-        plt.ylabel('Y')
-        plt.title('CBF Gradient Vector Field')
-        plt.grid(True)
-
-        # Optional: draw robot
-        self.draw_detailed_turtlebot(ax, center=(0, 0), base_radius=.2, wheel_width=0.04, wheel_height=.1,
-                                    sensor_radius=0.03, caster_wheel_radius=0.02, orientation_deg=45)
+        plt.legend()
         plt.show()
 
-     
 
     def vis_barrier_and_dcbf_origin(self, training_data, Y, length_scale=0.001, sigma_f=10,
                                     grid_limits=((-2, 2), (-2, 2)), grid_resolution=200):
@@ -566,7 +542,7 @@ class CBF:
         """
         diff = X_train
         
-        grad =  - (1 / (length_scale**2)) * k_star.T @ diff.T
+        grad =  - (1 / (length_scale**2)) * k_star.T * diff.T
         
         grad_h = (self.Y.T @ k_inv @ grad.T)
 
@@ -647,9 +623,9 @@ class CBF:
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
-        # self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale*2, sigma_f=1, 
-        #                    grid_limits=((-2, 2), (-2, 2)), grid_resolution=400)
-        self.vis_cbf_gradient_field(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale*2, sigma_f=1)
+        self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale*2, sigma_f=1, 
+                            grid_limits=((-2, 2), (-2, 2)), grid_resolution=400)
+        #self.vis_cbf_gradient_field(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale*2, sigma_f=1)
         #self.vis_barrier_and_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale,grid_resolution=300, sigma_f=1)
         try:
 
