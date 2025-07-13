@@ -560,7 +560,7 @@ class CBF:
         #print(x_test.shape,X_train.shape)
         return  (K_star @ (k_inv @ (self.Y - 1 ))) + 1.0
       
-    def dcbf_function(self, x_query, X_train, k_star, k_inv, length_scale):
+    def dcbf_function(self, X_train, k_star, k_inv, length_scale):
         """
         Compute the derivitive of the cbf function
         """
@@ -617,7 +617,7 @@ class CBF:
         cbf = self.cbf_function(K_star, k_inv)
         #print(max(abs(cbf)))
         cbf = cp.clip(cbf, -1, 1)
-        dcbf = self.dcbf_function(x_query=X_query,k_star=K_star.T,X_train=self.Poe,k_inv=k_inv,length_scale=self.length_scale)
+        dcbf = self.dcbf_function(k_star=K_star.T,X_train=self.Poe,k_inv=k_inv,length_scale=self.length_scale)
 
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
