@@ -146,7 +146,7 @@ class CBF:
 
         for i, x_query in enumerate(vec_points):
             k_star_vec = self.rbf_kernel(x_query[cp.newaxis, :], training_data, length_scale, sigma_f).flatten()[:, cp.newaxis]
-            grad = -self.dcbf_function(x_query, training_data, k_star_vec, K_inv, length_scale)
+            grad = self.dcbf_function(x_query, training_data, k_star_vec, K_inv, length_scale)
             U[i] = grad[0]
             V[i] = grad[1]
 
@@ -155,7 +155,7 @@ class CBF:
             cp.asnumpy(vec_points[:, 1]),
             cp.asnumpy(U),
             cp.asnumpy(V),
-            angles='xy', scale_units='xy', scale=1, color='black', alpha=0.5
+            angles='xy', scale_units='xy', scale=1, color='black', alpha=0.85
         )
 
         plt.legend()
