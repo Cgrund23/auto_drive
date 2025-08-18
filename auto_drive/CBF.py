@@ -545,7 +545,7 @@ class CBF:
         
         f = (weight_input) @ (-self.u_ref).reshape(2,1)
         f = cp.vstack((f,self.params.weightslack))
-        self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale*2, sigma_f=1, 
+        #self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale*2, sigma_f=1, 
                            grid_limits=((-2, 2), (-2, 2)), grid_resolution=400)
         #self.vis_barrier_and_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale,grid_resolution=300, sigma_f=1)
         try:
