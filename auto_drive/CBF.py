@@ -40,7 +40,6 @@ class CBF:
         t = cp.array([0.0, 0.0 , 1.0])
         return cp.vstack((x,y,t))
     
-
     def draw_detailed_turtlebot(self, ax, center=(0, 0), base_radius=1, wheel_width=0.1, wheel_height=0.5,
                                 sensor_radius=0.15, caster_wheel_radius=0.1, orientation_deg=0):
         x, y = center  # Unpack the center coordinates
@@ -445,7 +444,7 @@ class CBF:
         y_lidar = cp.round(filtered_distance[::5] * cp.sin(filtered_angle[::5]).astype(cp.float32),5)
         self.distances = filtered_distance[::5]
         # Stack the computed coordinates into a 2-column matrix
-        self.Poe = cp.column_stack((x_lidar,-y_lidar))
+        self.Poe = cp.column_stack((-y_lidar,x_lidar))
          # Update the number of points
         self.N = x_lidar.size
 
