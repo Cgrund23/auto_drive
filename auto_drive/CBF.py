@@ -526,17 +526,17 @@ class CBF:
         b = b.T @ self.u_ref
         b = b.reshape((b.size,1)) 
         A = (self.lf_cbf_function(dcbf).T + cbf**3)
-        A = cp.hstack((cp.zeros((A.shape[0],1)), A , cp.eye((A.shape[0],1))))
+        A = cp.hstack((cp.zeros((A.shape[0],1)), A , cp.eye((A.shape[0]))))
         
         # umax constraints
         
-        k = cp.hstack(([cp.eye(self.params.udim), cp.ones((self.params.udim, 1))]))
+        k = cp.hstack(([cp.eye(self.params.udim), cp.eye((self.params.udim))]))
         A = cp.vstack((A,k))
         k = cp.array((self.params.u_max))
         b = cp.vstack((b.reshape((b.shape[0],1)),k.reshape((k.size,1))))
         
         # u_min constraints
-        A = cp.vstack((A,cp.hstack((cp.eye(self.params.udim), cp.eye((self.params.udim, 1))))))
+        A = cp.vstack((A,cp.hstack((cp.eye(self.params.udim), cp.eye((self.params.udim))))))
         k = cp.array((-self.params.u_min))
         b = cp.vstack((b,k.reshape((k.size,1))))
 
