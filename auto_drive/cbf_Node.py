@@ -83,14 +83,14 @@ class Controller_Node(Node):
     def pose_callback(self,msg):
         #print('pose')
         #start = time.time()
-        self.x = msg.pose.pose.position.x
-        self.y = msg.pose.pose.position.y
-        self.theta = msg.pose.pose.orientation.x
+        self.x = 0.0 #msg.pose.pose.position.x
+        self.y = 0.0 #msg.pose.pose.position.y
+        self.theta = 0.0 #msg.pose.pose.orientation.x
         angle_rate = msg.twist.twist.angular.z
         #print('V')
         #print(self.v)
         #self.v = msg.twist.twist.linear.x
-        self.v = 1.0
+        self.v = 1.5
         #self.CBFobj.updateState(self.x,self.y,self.theta,self.v)
         #self.CBFobj.updateState(0.0,0.0,self.theta,self.v)
         #total_time = time.time() - start
