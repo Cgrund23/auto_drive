@@ -564,8 +564,9 @@ class CBF:
         Derivitive of the cbf function by the Icput dynamics
         """
         g = self.g_full()
-        #print('dcbf g')
-        #print(dcbf.T @ g)
+        print('dcbf g')
+        print(g.shape,dcbf.shape)
+        print(g @ dcbf)
         return(g @ dcbf)
         return dcbf.T @ g
 
