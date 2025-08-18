@@ -159,7 +159,7 @@ plt.legend()
  
 # Step 2: Gaussian Process (GP) Model Training
 sigma_f = 1.0  # set to 1 as in paper
-length_scale = 0.15 # what im using in real code
+length_scale = 0.2 # what im using in real code
 noise_variance = 0 #1e-4 #1e-4
 
 X_train = np.column_stack((x_lidar, y_lidar))
