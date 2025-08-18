@@ -28,7 +28,7 @@ class CBF:
         self.params.sigma_f = 1.0
         
         pass
-        self.length_scale = 0.5    # found from  loop demo
+        self.length_scale = 1    # found from  loop demo
         self.time = 0.0
     # Dynamics #
 
@@ -611,17 +611,13 @@ class CBF:
         # umax constraints
         
         k = cp.hstack(([cp.eye(self.params.udim), cp.zeros((self.params.udim, 1))]))
-        #print(k.shape,A.shape)
         A = cp.vstack((A,k))
         k = cp.array((self.params.u_max))
         b = cp.vstack((b.reshape((b.shape[0],1)),k.reshape((k.size,1))))
         
         # u_min constraints
-        
         A = cp.vstack((A,cp.hstack((-cp.eye(self.params.udim), cp.zeros((self.params.udim, 1))))))
-       
         k = cp.array((self.params.u_min))
-       
         b = cp.vstack((b,-k.reshape((k.size,1))))
         weight_input = cp.eye(2)
         weight_input = cp.diag(cp.array([100000.0, 1.0]))
