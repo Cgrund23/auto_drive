@@ -4,7 +4,6 @@ from qpsolvers import solve_qp
 import cupy as cp
 import torch
 from qpth.qp import QPFunction
-import numpy as np
 import time
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
@@ -295,8 +294,8 @@ class CBF:
         The natural dynamics of the Ackermann steering bicycle model.
         """
         v = cp.asarray(self.params.v)
-        theta = cp.asarray(self.params.theta)
-        beta = cp.asarray(self.params.beta)
+        theta = 0.0 #cp.asarray(self.params.theta)
+        beta = 0.0 #cp.asarray(self.params.beta)
         dt = cp.asarray(self.params.dt)
         lf = cp.asarray(self.params.lf)
 
@@ -454,86 +453,21 @@ class CBF:
         self.Y = -1 * cp.ones(self.N)
         self.NY = cp.ones(self.N)
 
-
-    # def setObjects(self,distance,angle):                               
-    #     """
-    #     Take all lidar points and turn them into data
-    #     """
-    #     M = len(distance)   # Total Number of possible lidar data points
-    #     self.N = 0          # Total number of points in range
-
-    #     # Instantiate matrix
-    #     filtered_distance = []
-    #     filtered_angle = []
-
-    #     for k in range(M):
-    #     # Keep only points within max lidar field 
-    #         if distance[k] < self.params.r_max:                                
-    #             self.N += 1
-    #             filtered_distance.append(distance[k])
-    #             filtered_angle.append(angle[k]) 
-        
-    #     # Create value and distance to plant of all points
-    #     self.Y = -1*cp.ones(self.N)
-    #     self.NY = cp.ones(self.N)
-    #     #self.Dist = cp.array(filtered_distance).reshape((self.N,1))
-        
-    #     # Convert to x y cordinates Global frame
-    #     #x_lidar = cp.array(cp.array(filtered_distance) * cp.cos(cp.array(filtered_angle) + self.params.theta)+self.params.x).reshape((self.N, 1))
-    #     #y_lidar = cp.array(cp.array(filtered_distance) * cp.sin(cp.array(filtered_angle) + self.params.theta)+self.params.y).reshape((self.N, 1))
-        
-    #     # Convert to x y cordinates Local frame
-    #     x_lidar = cp.array(cp.array(filtered_distance) * cp.cos(cp.array(filtered_angle))).reshape((self.N, 1))
-    #     y_lidar = cp.array(cp.array(filtered_distance) * cp.sin(cp.array(filtered_angle))).reshape((self.N, 1))
-    #     #filtered_angle = cp.array(filtered_angle).reshape((self.N,1))
-    #     self.Poe = cp.hstack((x_lidar,y_lidar)).reshape((self.N,2))
-
-   
-    # function for RBF kernel
     def rbf_kernel(self, X1, X2, length_scale, sigma_f):
         """
         Computes the RBF (Radial Basis Function) kernel between X1 and X2.
         """
-        sqdist = np.sum(X1**2, 1).reshape(-1, 1) + np.sum(X2**2, 1) - 2 * X1 @ X2.T  # distance between points in X1 and X2
+        sqdist = cp.sum(X1**2, 1).reshape(-1, 1) + cp.sum(X2**2, 1) - 2 * X1 @ X2.T  # distance between points in X1 and X2
                                                                                     # note the dimentions in the sums!
                                                                                     # This is to create a matrix containing
                                                                                     # all distances between pairs of points
         return sigma_f**2 * cp.exp(-0.5 / length_scale**2 * sqdist)  # Same kernel as in paper
-
-
-    # def rbf_kernel(self, X1, X2, length_scale, sigma_f):
-    #     """
-    #     Computes the RBF (Radial Basis Function) kernel between X1 and X2.
-    #     """
-        
-    #     sqdist = (cp.sum(X1**2, 1).reshape(-1, 1) + cp.sum(X2**2, 1)) - 2 * X1 @ X2.T  # distance between points in X1 and X2
-    #     #print(X1.shape,X2.shape)
-    #                                                                           # note the dimentions in the sums!
-    #                                                                                   # all distances between pairs of points
-    #     return sigma_f * cp.exp(-0.5 * sqdist/length_scale**2)                      # Same kernel as in paper
-
-    def rbf_kernel_grad_input(X1, X2, length_scale, sigma_f):
-        """
-        Gradient of the RBF kernel w.r.t. X1.
-        Returns array of shape (N, M, D), where grad[i, j] = ∂k(X1[i], X2[j]) / ∂X1[i]
-        """
-        # Compute squared distances (N, M)
-        sqdist = cp.sum(X1**2, axis=1).reshape(-1, 1) + cp.sum(X2**2, axis=1) - 2 * X1 @ X2.T
-        K = sigma_f * cp.exp(-0.5 * sqdist / length_scale**2)
-
-        # (N, M, D): X2 - X1 for each pair
-        diff = X2[cp.newaxis, :, :] - X1[:, cp.newaxis, :]  # shape (N, M, D)
-
-        # Apply gradient formula
-        grad = (K[:, :, cp.newaxis] / length_scale**2) * diff  # shape (N, M, D)
-        return grad
     
 
     def cbf_function(self, K_star, k_inv):
         """
         Computes the CBF
         """
-        #print(x_test.shape,X_train.shape)
         return  (K_star @ (k_inv @ (self.Y - 1 ))) + 1.0
       
     def dcbf_function(self, x_query, X_train, k_star, k_inv, length_scale):
@@ -553,9 +487,6 @@ class CBF:
         Derivitive of the cbf function by the forced dynamics
         """
         f = self.f_full()
-        #print('dcbf f')
-        #print(f.shape,dcbf.shape)
-        #print(f.T @ dcbf)
         return(f.T @ dcbf)
         return dcbf.T @ f
      
@@ -564,45 +495,35 @@ class CBF:
         Derivitive of the cbf function by the Icput dynamics
         """
         g = self.g_full()
-        #print('dcbf g')
-        #print(g.shape,dcbf.shape)
-        #print(g.T @ dcbf)
         return(g.T @ dcbf)
         return dcbf.T @ g
 
     # Constraints/Cost
     def constraints_cost(self,u_ref,x,y,theta,v):
-        #self.updateState(v,theta)
+        self.updateState(0,0,v,0)
         
         #print(self.time - time.time())
-        self.params.x,self.params.y = x,y
+        #self.params.x,self.params.y = x,y
         # Create variables for optimisation 
         self.u_ref = cp.array(u_ref)
         A = cp.empty((0,2), float)
         B = {}
         b = cp.empty((0,1),float)
-        LfB = {}
-        LgB = {}
+       
         X_query = cp.array([0,0]).reshape(1,2) #self.f_full()[:2,:].T
         K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
-        #print(self.N)
+
         K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
-        #tim = time.time()
+
         k_inv = cp.linalg.inv(K)
-        #print('inverse time')
-        
-        #print(X_query.shape)
-        #k_test = self.rbf_kernel(self.f_full().T,cp.hstack((self.Poe,cp.zeros((self.Poe.shape[0],2)))).T,self.length_scale,self.params.sigma_f)
-        #print(k_test.shape)
+
         cbf = self.cbf_function(K_star, k_inv)
-        #print(max(abs(cbf)))
-        cbf = cp.clip(cbf, -1, 1)
+
+        #cbf = cp.clip(cbf, -1, 1)
         dcbf = self.dcbf_function(x_query=X_query,k_star=K_star.T,X_train=self.Poe,k_inv=k_inv,length_scale=self.length_scale)
 
-        ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
-        #print(b.shape)
-        #print(self.u_ref.shape)
+
         b = b.T @ self.u_ref
         b = b.reshape((b.size,1)) 
         A = - (self.lf_cbf_function(dcbf).T + cbf**3)
@@ -630,7 +551,6 @@ class CBF:
         #self.vis_cbf_gradient_field(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale*2, sigma_f=1)
         #self.vis_barrier_and_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale,grid_resolution=300, sigma_f=1)
         try:
-
             x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
             print(x)
             self.u = x
