@@ -553,7 +553,9 @@ class CBF:
         Derivitive of the cbf function by the forced dynamics
         """
         f = self.f_full()
-        #print('dcbf f')
+        print('dcbf f')
+        print(f.shape,dcbf.shape)
+        print(f @ dcbf)
         return(f @ dcbf)
         return dcbf.T @ f
      
