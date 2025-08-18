@@ -521,24 +521,26 @@ class CBF:
         #cbf = cp.clip(cbf, -1, 1)
         dcbf = self.dcbf_function(x_query=X_query,k_star=K_star.T,X_train=self.Poe,k_inv=k_inv,length_scale=self.length_scale)
 
-        b = self.lg_cbf_function(dcbf) 
+        b = - self.lg_cbf_function(dcbf) 
 
         b = b.T @ self.u_ref
         b = b.reshape((b.size,1)) 
-        A = - (self.lf_cbf_function(dcbf).T + cbf**3)
-        A = cp.hstack((cp.zeros((A.shape[0],1)), A , cp.zeros((A.shape[0],1))))
+        A = (self.lf_cbf_function(dcbf).T + cbf**3)
+        A = cp.hstack((cp.zeros((A.shape[0],1)), A , cp.eye((A.shape[0],1))))
         
         # umax constraints
         
-        k = cp.hstack(([cp.eye(self.params.udim), cp.zeros((self.params.udim, 1))]))
+        k = cp.hstack(([cp.eye(self.params.udim), cp.ones((self.params.udim, 1))]))
         A = cp.vstack((A,k))
         k = cp.array((self.params.u_max))
         b = cp.vstack((b.reshape((b.shape[0],1)),k.reshape((k.size,1))))
         
         # u_min constraints
-        A = cp.vstack((A,cp.hstack((-cp.eye(self.params.udim), cp.zeros((self.params.udim, 1))))))
-        k = cp.array((self.params.u_min))
-        b = cp.vstack((b,-k.reshape((k.size,1))))
+        A = cp.vstack((A,cp.hstack((cp.eye(self.params.udim), cp.eye((self.params.udim, 1))))))
+        k = cp.array((-self.params.u_min))
+        b = cp.vstack((b,k.reshape((k.size,1))))
+
+
         weight_input = cp.eye(2)
         weight_input = cp.diag(cp.array([100.0, 1.0]))
         H = cp.diag(cp.array([150, 1.0*10**-7, 10.0]))
