@@ -555,8 +555,8 @@ class CBF:
         f = self.f_full()
         print('dcbf f')
         print(f.shape,dcbf.shape)
-        print(f @ dcbf)
-        return(f @ dcbf)
+        print(f.T @ dcbf)
+        return(f.T @ dcbf)
         return dcbf.T @ f
      
     def lg_cbf_function(self,dcbf):
@@ -566,8 +566,8 @@ class CBF:
         g = self.g_full()
         print('dcbf g')
         print(g.shape,dcbf.shape)
-        print(g @ dcbf)
-        return(g @ dcbf)
+        print(g.T @ dcbf)
+        return(g.T @ dcbf)
         return dcbf.T @ g
 
     # Constraints/Cost
