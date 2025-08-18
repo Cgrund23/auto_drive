@@ -446,7 +446,7 @@ class CBF:
         y_lidar = cp.round(filtered_distance[::10] * cp.sin(filtered_angle[::10]).astype(cp.float32),5)
         self.distances = filtered_distance[::10]
         # Stack the computed coordinates into a 2-column matrix
-        self.Poe = cp.column_stack((-y_lidar, x_lidar))
+        self.Poe = cp.column_stack((x_lidar,y_lidar))
          # Update the number of points
         self.N = x_lidar.size
 
@@ -553,9 +553,9 @@ class CBF:
         Derivitive of the cbf function by the forced dynamics
         """
         f = self.f_full()
-        print('dcbf f')
-        print(f.shape,dcbf.shape)
-        print(f.T @ dcbf)
+        #print('dcbf f')
+        #print(f.shape,dcbf.shape)
+        #print(f.T @ dcbf)
         return(f.T @ dcbf)
         return dcbf.T @ f
      
@@ -564,9 +564,9 @@ class CBF:
         Derivitive of the cbf function by the Icput dynamics
         """
         g = self.g_full()
-        print('dcbf g')
-        print(g.shape,dcbf.shape)
-        print(g.T @ dcbf)
+        #print('dcbf g')
+        #print(g.shape,dcbf.shape)
+        #print(g.T @ dcbf)
         return(g.T @ dcbf)
         return dcbf.T @ g
 
@@ -601,8 +601,8 @@ class CBF:
 
         ##TODO add theta of all points to dcbf function??? 
         b = self.lg_cbf_function(dcbf) 
-        print(b.shape)
-        print(self.u_ref.shape)
+        #print(b.shape)
+        #print(self.u_ref.shape)
         b = b.T @ self.u_ref
         b = b.reshape((b.size,1)) 
         A = - (self.lf_cbf_function(dcbf).T + cbf**3)
