@@ -115,7 +115,7 @@ class Controller_Node(Node):
         #self.state_publisher.publish(msg)
         #print(state)
         for i in range(2):
-            self.send_vel(u[0],u[1]*10)
+            self.send_vel(u[0],u[1])
         total_time = time.time() - start
         self.get_logger().info(f"Constraint Cost time: {total_time:.3f}")
         
