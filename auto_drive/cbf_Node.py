@@ -102,7 +102,7 @@ class Controller_Node(Node):
         self.theta = 0.0
         self.v = 0.0
         #self.u_ref = [self.params.v,0.0]
-        self.u_ref = [1.0,0.0]
+        self.u_ref = [0.8,0.0]
 
                 # Initialize ULMs for ρ and α (you can tune beta0)
         self.ulm_rho = SecondOrderULM_KF(Ts=self.params.dt, beta0=1.0, y0=1.0)
