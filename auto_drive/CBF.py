@@ -498,67 +498,95 @@ class CBF:
         return dcbf.T @ g
 
     # Constraints/Cost
-    def constraints_cost(self,u_ref,x,y,theta,v):
-        self.updateState(0,0,v,0)
-        
-        #print(self.time - time.time())
-        #self.params.x,self.params.y = x,y
-        # Create variables for optimisation 
-        self.u_ref = cp.array(u_ref)
-        A = cp.empty((0,2), float)
-        B = {}
-        b = cp.empty((0,1),float)
-       
-        X_query = cp.array([0,0]).reshape(1,2) #self.f_full()[:2,:].T
-        K = self.rbf_kernel(self.Poe,self.Poe,self.length_scale,self.params.sigma_f)
+def constraints_cost(self, u_ref, x, y, theta, v):
 
-        K_star = self.rbf_kernel(X_query,self.Poe,self.length_scale,self.params.sigma_f)
+    # Update robot state
+    self.updateState(x, y, v, 0)
 
-        k_inv = cp.linalg.inv(K)
+    u_ref = cp.array(u_ref).reshape(2, 1)
 
-        cbf = self.cbf_function(K_star, k_inv)
+    # Query point (robot position)
+    X_query = cp.array([[0.0, 0.0]])
 
-        #cbf = cp.clip(cbf, -1, 1)
-        dcbf = self.dcbf_function(x_query=X_query,k_star=K_star.T,X_train=self.Poe,k_inv=k_inv,length_scale=self.length_scale)
+    # Kernel matrices
+    K = self.rbf_kernel(self.Poe, self.Poe, self.length_scale, self.params.sigma_f)
+    K_inv = cp.linalg.inv(K)
 
-        b = - self.lg_cbf_function(dcbf) 
+    K_star = self.rbf_kernel(X_query, self.Poe, self.length_scale, self.params.sigma_f)
 
-        b = b.T @ self.u_ref
-        b = b.reshape((b.size,1)) 
-        A = (self.lf_cbf_function(dcbf).T + cbf**3)
-        A = cp.hstack((cp.zeros((A.shape[0],1)), A , cp.eye((A.shape[0]))))
-        
-        # umax constraints
-        
-        k = cp.hstack(([cp.eye(self.params.udim), cp.eye((self.params.udim))]))
-        A = cp.vstack((A,k))
-        k = cp.array((self.params.u_max))
-        b = cp.vstack((b.reshape((b.shape[0],1)),k.reshape((k.size,1))))
-        
-        # u_min constraints
-        A = cp.vstack((A,cp.hstack((cp.eye(self.params.udim), cp.eye((self.params.udim))))))
-        k = cp.array((-self.params.u_min))
-        b = cp.vstack((b,k.reshape((k.size,1))))
+    # Compute barrier
+    h = self.cbf_function(K_star, K_inv)
 
+    # Compute gradient
+    dcbf = self.dcbf_function(
+        x_query=X_query,
+        X_train=self.Poe,
+        k_star=K_star.T,
+        k_inv=K_inv,
+        length_scale=self.length_scale
+    )
 
-        weight_input = cp.eye(2)
-        weight_input = cp.diag(cp.array([100.0, 1.0]))
-        H = cp.diag(cp.array([150, 1.0*10**-7, 10.0]))
-        
-        f = (weight_input) @ (-self.u_ref).reshape(2,1)
-        f = cp.vstack((f,self.params.weightslack))
-        #self.vis_barrier(K=K,K_inv=k_inv,training_data=self.Poe, Y = self.Y, length_scale=self.length_scale*2, sigma_f=1, 
-        #                  grid_limits=((-2, 2), (-2, 2)), grid_resolution=400)
-        #self.vis_barrier_and_dcbf_origin(training_data=self.Poe, Y=self.Y, length_scale=self.length_scale,grid_resolution=300, sigma_f=1)
-        try:
-            x = solve_qp(P=cp.asnumpy(H), q=cp.asnumpy(f), G=cp.asnumpy(A), h=cp.asnumpy(b), solver="clarabel") 
-            print(x)
-            self.u = x
-            self.params.gamma = float(x[1])
-            self.params.v = float(x[0])
-            self.params.weightslack = float(x[2])
-            return x,self.f_full()
-        except Exception as e:
-            #print('failed constraints')
-            print(f"An error occurred: {e}")
-            return [0,0],self.f_full()
+    # Lie derivatives
+    Lf_h = self.lf_cbf_function(dcbf)
+    Lg_h = self.lg_cbf_function(dcbf)
+
+    alpha = 5.0  # CBF gain
+
+    # ---- QP Constraint ----
+    # Lf_h + Lg_h u + alpha h >= -delta
+
+    A_cbf = -Lg_h
+    b_cbf = Lf_h + alpha * h
+
+    # ---- Input bounds ----
+
+    G_input = cp.vstack([
+        cp.eye(2),
+        -cp.eye(2)
+    ])
+
+    h_input = cp.vstack([
+        cp.array(self.params.u_max).reshape(2, 1),
+        -cp.array(self.params.u_min).reshape(2, 1)
+    ])
+
+    # Combine constraints
+    G = cp.vstack([A_cbf, G_input])
+    h_vec = cp.vstack([b_cbf, h_input])
+
+    # ---- Cost ----
+    W = cp.diag(cp.array([50.0, 1.0]))
+
+    H = cp.zeros((3, 3))
+    H[:2, :2] = W
+    H[2, 2] = 1000.0  # slack penalty
+
+    f = cp.vstack([
+        -W @ u_ref,
+        cp.array([[0.0]])
+    ])
+
+    # Slack variable
+    slack_col = cp.vstack([cp.array([[1.0]]), cp.zeros((G_input.shape[0], 1))])
+    G = cp.hstack([G, slack_col])
+
+    try:
+
+        sol = solve_qp(
+            P=cp.asnumpy(H),
+            q=cp.asnumpy(f),
+            G=cp.asnumpy(G),
+            h=cp.asnumpy(h_vec),
+            solver="clarabel"
+        )
+
+        u = sol[:2]
+
+        self.params.v = float(u[0])
+        self.params.gamma = float(u[1])
+
+        return u, self.f_full()
+
+    except Exception as e:
+        print("QP failed:", e)
+        return [0, 0], self.f_full()
