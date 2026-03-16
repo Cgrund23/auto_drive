@@ -7,7 +7,6 @@ from qpth.qp import QPFunction
 import time
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
-import numpy as np
 
 class CBF:
     # Initiate Car

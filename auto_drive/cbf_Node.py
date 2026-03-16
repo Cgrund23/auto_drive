@@ -23,14 +23,14 @@ from dataclasses import dataclass
 class SecondOrderULM_KF:
     def __init__(self, Ts, beta0, Q=None, R=None, y0=0.0):
         self.Ts = Ts
-        self.x = np.array([y0, 0.0, 0.0, beta0], dtype=float)
-        self.P = np.diag([1.0, 1.0, 10.0, 10.0])
-        self.Q = np.diag([1e-5,1e-4,1e-2,1e-2]) if Q is None else Q
-        self.R = np.array([[1e-4]]) if R is None else R
-        self.H = np.array([[1.0,0.0,0.0,0.0]])
+        self.x = cp.array([y0, 0.0, 0.0, beta0], dtype=float)
+        self.P = cp.diag([1.0, 1.0, 10.0, 10.0])
+        self.Q = cp.diag([1e-5,1e-4,1e-2,1e-2]) if Q is None else Q
+        self.R = cp.array([[1e-4]]) if R is None else R
+        self.H = cp.array([[1.0,0.0,0.0,0.0]])
     def predict(self, u):
         Ts = self.Ts
-        A = np.array([
+        A = cp.array([
             [1.0, Ts, 0.0, Ts*u],
             [0.0, 1.0, Ts, Ts*u],
             [0.0, 0.0, 1.0, 0.0],
@@ -42,7 +42,7 @@ class SecondOrderULM_KF:
         S = self.H @ self.P @ self.H.T + self.R
         K = self.P @ self.H.T / S
         self.x = self.x + (K.flatten() * (y_meas - self.H @ self.x))
-        self.P = (np.eye(4) - K @ self.H) @ self.P
+        self.P = (cp.eye(4) - K @ self.H) @ self.P
     def get_estimates(self):
         return tuple(self.x)  # returns (y_hat, ydot_hat, F_hat, beta_hat)
 
