@@ -108,6 +108,7 @@ class Controller_Node(Node):
         #self.get_logger().info(f"Set time: {total_time:.3f}")
         
         #try:
+        self.get_logger().info("trying again!")
         start = time.time()
         u, state = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=0,y=0,theta=0,v=self.v))
         #msg = Float32MultiArray()

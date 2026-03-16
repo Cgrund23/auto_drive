@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+import numpy as np
+import matplotlib.pyplot as plt
+
+def generate_obstacles(num_points=15, xlim=(-2, 2), ylim=(-2, 2)):
+    """
+    Generate random obstacles in 2D space
+    """
+    X = np.random.uniform(xlim[0], xlim[1], size=(num_points, 2))
+    Y = -np.ones(num_points)  # obstacles labeled -1
+    return X, Y
+
+def model_free_cbf(X_obs, Y_obs, alpha=1.0, grid_res=100):
+    """
+    Compute a model-free Fliess CBF barrier using n=2 (acceleration)
+    """
+    # Create a grid
+    x_min, x_max = -2, 2
+    y_min, y_max = -2, 2
+    X1, X2 = np.meshgrid(np.linspace(x_min, x_max, grid_res),
+                         np.linspace(y_min, y_max, grid_res))
+    grid_points = np.column_stack([X1.ravel(), X2.ravel()])
+
+    # For simplicity, estimate barrier as distance-based acceleration
+    # Compute squared distance to each obstacle
+    dist_sq = np.sum((grid_points[:, None, :] - X_obs[None, :, :])**2, axis=2)  # shape (grid_pts, num_obs)
+
+    # Model-free Fliess barrier estimate: inverse squared distance minus alpha*position
+    cbf_values = np.min(dist_sq, axis=1)  # nearest obstacle distance squared
+    cbf_values = 1 / (1 + cbf_values)  # closer obstacles -> smaller (more negative) barrier
+    # Shift so that far away = +1, near obstacles ~ -1
+    cbf_values = 2 * cbf_values - 1
+    cbf_values -= alpha * np.mean(grid_points, axis=1)  # simple Fliess model-free adjustment
+    cbf_values = np.clip(cbf_values, -1, 1)
+
+    return X1, X2, cbf_values.reshape(X1.shape)
+
+def plot_cbf(X1, X2, Z, obstacles):
+    """
+    Plot the model-free Fliess CBF barriers
+    """
+    plt.figure(figsize=(8,6))
+    contour = plt.contourf(X1, X2, Z, levels=50, cmap='viridis', vmin=-1, vmax=1)
+    plt.colorbar(contour, label='Model-Free Fliess CBF')
+    plt.scatter(obstacles[:, 0], obstacles[:, 1], color='red', marker='x', label='Obstacles')
+    plt.contour(X1, X2, Z, levels=[0], colors='black', linewidths=2)  # zero level set = barrier
+    plt.title('Model-Free Fliess CBF Barriers (n=2, Acceleration)')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.legend()
+    plt.show()
+
+if __name__ == "__main__":
+    X_obs, Y_obs = generate_obstacles()
+    X1, X2, Z = model_free_cbf(X_obs, Y_obs)
+    plot_cbf(X1, X2, Z, X_obs)
