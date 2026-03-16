@@ -41,7 +41,7 @@ class Controller_Node(Node):
 
             v: float = 1.0 # velocity
             u_max: float = [1.5,0.85] # max speed,angle
-            u_min: float = [-1.0,-0.85] # min speed,angle
+            u_min: float = [-0.25,-0.85] # min speed,angle
 
             # Starting pose
             beta: float = 0.0

@@ -618,6 +618,8 @@ class CBF:
 
             u = sol[:2]
 
+            u[1] = -u[1]
+
             self.params.v = float(u[0])
             self.params.gamma = float(u[1])
 
