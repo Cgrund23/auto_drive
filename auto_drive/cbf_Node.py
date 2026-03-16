@@ -16,7 +16,35 @@ from ackermann_msgs.msg import AckermannDriveStamped
 from auto_drive.CBF import CBF
 import time
 
+# After your other imports
+from dataclasses import dataclass
 
+# Add this below your imports
+class SecondOrderULM_KF:
+    def __init__(self, Ts, beta0, Q=None, R=None, y0=0.0):
+        self.Ts = Ts
+        self.x = np.array([y0, 0.0, 0.0, beta0], dtype=float)
+        self.P = np.diag([1.0, 1.0, 10.0, 10.0])
+        self.Q = np.diag([1e-5,1e-4,1e-2,1e-2]) if Q is None else Q
+        self.R = np.array([[1e-4]]) if R is None else R
+        self.H = np.array([[1.0,0.0,0.0,0.0]])
+    def predict(self, u):
+        Ts = self.Ts
+        A = np.array([
+            [1.0, Ts, 0.0, Ts*u],
+            [0.0, 1.0, Ts, Ts*u],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ])
+        self.x = A @ self.x
+        self.P = A @ self.P @ A.T + self.Q
+    def update(self, y_meas):
+        S = self.H @ self.P @ self.H.T + self.R
+        K = self.P @ self.H.T / S
+        self.x = self.x + (K.flatten() * (y_meas - self.H @ self.x))
+        self.P = (np.eye(4) - K @ self.H) @ self.P
+    def get_estimates(self):
+        return tuple(self.x)  # returns (y_hat, ydot_hat, F_hat, beta_hat)
 
 class Controller_Node(Node):
     def __init__(self):
@@ -40,8 +68,8 @@ class Controller_Node(Node):
             # Car info
 
             v: float = 1.0 # velocity
-            u_max: float = [1.5,0.85] # max speed,angle
-            u_min: float = [-0.25,-0.85] # min speed,angle
+            u_max: float = [1.0,0.85] # max speed,angle
+            u_min: float = [-0.0,-0.85] # min speed,angle
 
             # Starting pose
             beta: float = 0.0
@@ -76,6 +104,10 @@ class Controller_Node(Node):
         #self.u_ref = [self.params.v,0.0]
         self.u_ref = [1.0,0.0]
 
+                # Initialize ULMs for ρ and α (you can tune beta0)
+        self.ulm_rho = SecondOrderULM_KF(Ts=self.params.dt, beta0=1.0, y0=1.0)
+        self.ulm_alpha = SecondOrderULM_KF(Ts=self.params.dt, beta0=1.0, y0=5.0)  # alpha initial guess
+
         # Publisher and Subscriber
         self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)
         #self.state_publisher = self.create_publisher(Float32MultiArray, "/state", 10) 
@@ -98,32 +130,52 @@ class Controller_Node(Node):
 
 
     def lidar_pose_callback(self, msg):
-        #numpoints = len(r) # hard code instead
-        #start = time.time()
-        self.params.ranges = cp.array(msg.ranges)
-        
-        angle = cp.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
-        self.CBFobj.setObjects(self.params.ranges,angle)
-        #total_time = time.time() - start
-        #self.get_logger().info(f"Set time: {total_time:.3f}")
-        
-        #try:
-        self.get_logger().info("trying again!")
-        start = time.time()
-        u, state = (self.CBFobj.constraints_cost(u_ref=self.u_ref,x=0,y=0,theta=0,v=self.v))
-        #msg = Float32MultiArray()
-        #msg.data = set(state.ravel().get())
-        #self.state_publisher.publish(msg)
-        #print(state)
-        for i in range(2):
-            self.send_vel(u[0],u[1])
-        total_time = time.time() - start
-        self.get_logger().info(f"Constraint Cost time: {total_time:.3f}")
-        
-        # except Exception as e:
-        #     print('failed lidar')
-        #     print(f"An error occurred: {e}")
-        #     pass
+        """
+        Process LiDAR data, update ULM estimates, compute CBF-constrained control,
+        and send velocity commands.
+        """
+        start_time = time.time()
+
+        # --- Step 1: Extract LiDAR ranges and compute angles ---
+        ranges = cp.array(msg.ranges)
+        angles = cp.linspace(msg.angle_min, msg.angle_max, len(ranges))  # ensure same length
+
+        # --- Step 2: Update CBF object with obstacles ---
+        self.CBFobj.setObjects(ranges, angles)
+
+        # --- Step 3: Predict/update ULM estimates for rho and alpha ---
+        rho_meas = 1.0    # placeholder measurement
+        alpha_meas = 5.0  # placeholder measurement
+
+        self.ulm_rho.predict(self.u_ref[0])
+        self.ulm_alpha.predict(self.u_ref[1])
+
+        self.ulm_rho.update(rho_meas)
+        self.ulm_alpha.update(alpha_meas)
+
+        rho_hat, _, _, _ = self.ulm_rho.get_estimates()
+        alpha_hat, _, _, _ = self.ulm_alpha.get_estimates()
+        self.get_logger().info(f"ULM estimates: rho={rho_hat:.3f}, alpha={alpha_hat:.3f}")
+
+        # --- Step 4: Compute CBF-constrained control ---
+        try:
+            u, state = self.CBFobj.constraints_cost(
+                u_ref=self.u_ref,
+                x=self.x,
+                y=self.y,
+                theta=self.theta,
+                v=self.v,
+                alpha=alpha_hat
+            )
+        except Exception as e:
+            self.get_logger().error(f"CBF constraint cost failed: {e}")
+            u = [0.0, 0.0]
+
+        # --- Step 5: Send velocity command once ---
+        self.send_vel(u[0], u[1])
+
+        total_time = time.time() - start_time
+        self.get_logger().info(f"LiDAR callback total time: {total_time:.3f}s")
         
     def send_vel(self,x,z):
         msg = AckermannDriveStamped()

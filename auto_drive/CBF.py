@@ -473,7 +473,7 @@ class CBF:
         """
         Compute the derivitive of the cbf function
         """
-        diff = X_train
+        diff = x_query - X_train
         
         grad =  - (1 / (length_scale**2)) * k_star.T * diff.T
         
@@ -497,7 +497,9 @@ class CBF:
         return(g.T @ dcbf)
         return dcbf.T @ g
 
-    def constraints_cost(self, u_ref, x, y, theta, v):
+    def constraints_cost(self, u_ref, x, y, theta, v, alpha=None):
+        if alpha is None:
+            alpha = 5.0
 
         # ----------------------------
         # Update robot state
@@ -541,7 +543,6 @@ class CBF:
         Lf_h = self.lf_cbf_function(dcbf).reshape(1,1)
         Lg_h = self.lg_cbf_function(dcbf).reshape(1,2)
 
-        alpha = 5.0
 
         # ----------------------------
         # CBF constraint
