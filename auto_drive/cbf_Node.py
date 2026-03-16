@@ -122,7 +122,7 @@ class Controller_Node(Node):
         #print('V')
         #print(self.v)
         #self.v = msg.twist.twist.linear.x
-        self.v = 1.5
+        self.v = 1.0
         #self.CBFobj.updateState(self.x,self.y,self.theta,self.v)
         #self.CBFobj.updateState(0.0,0.0,self.theta,self.v)
         #total_time = time.time() - start
