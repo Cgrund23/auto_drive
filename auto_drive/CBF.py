@@ -443,7 +443,7 @@ class CBF:
         y_lidar = cp.round(filtered_distance[::5] * cp.sin(filtered_angle[::5]).astype(cp.float32),5)
         self.distances = filtered_distance[::5]
         # Stack the computed coordinates into a 2-column matrix
-        self.Poe = cp.column_stack((y_lidar,x_lidar))
+        self.Poe = cp.column_stack((x_lidar,y_lidar))
          # Update the number of points
         self.N = x_lidar.size
 
