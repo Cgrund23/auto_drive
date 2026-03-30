@@ -63,7 +63,7 @@ class Controller_Node(Node):
         
 
         class params():
-            dt: float = 1#0.05#1/10 # 10ms
+            dt: float = .2#0.05#1/10 # 10ms
 
             # Car info
 
