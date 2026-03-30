@@ -68,8 +68,8 @@ class Controller_Node(Node):
             # Car info
 
             v: float = 1.0 # velocity
-            u_max: float = [1.0,0.85] # max speed,angle
-            u_min: float = [-0.0,-0.85] # min speed,angle
+            u_max: float = [2.0,0.85] # max speed,angle
+            u_min: float = [0.5,-0.85] # min speed,angle
 
             # Starting pose
             beta: float = 0.0
@@ -102,7 +102,7 @@ class Controller_Node(Node):
         self.theta = 0.0
         self.v = 0.0
         #self.u_ref = [self.params.v,0.0]
-        self.u_ref = [0.5,0.0]
+        self.u_ref = [0.75,0.0]
 
                 # Initialize ULMs for ρ and α (you can tune beta0)
         self.ulm_rho = SecondOrderULM_KF(Ts=self.params.dt, beta0=1.0, y0=1.0)
