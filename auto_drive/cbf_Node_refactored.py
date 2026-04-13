@@ -275,20 +275,20 @@ class ControllerNode(Node):
     def __init__(self):
         super().__init__('ModelFreeCBF_Node')
 
-        # Parameters
-        self.dt = 0.05  # 20 Hz
+        # Parameters - HARDWARE TUNED
+        self.dt = 0.002  # 20 Hz
         self.v_max = 2.0
-        self.v_min = 0.5
+        self.v_min = 0.0  # CRITICAL: Allow robot to stop! Was 0.5
         self.omega_max = 0.85
         self.omega_min = -0.85
         self.r_max = 5.0
-        self.length_scale = 0.4
+        self.length_scale = 0.25  # Increased for smoother barrier
         self.sigma_f = 1.0
 
-        # HOCBF parameters (from paper, Section II-C)
-        self.lambda_0 = 1.0
-        self.lambda_1 = 1.0
-        self.c_q = 2.0  # Confidence quantile (2-sigma)
+        # HOCBF parameters (from paper, Section II-C) - RELAXED FOR FEASIBILITY
+        self.lambda_0 = 0.5  # Reduced from 1.0 for less aggressive constraints
+        self.lambda_1 = 0.5  # Reduced from 1.0 for less aggressive constraints
+        self.c_q = 1.0  # Reduced from 2.0 (1-sigma instead of 2-sigma) for less conservative margin
 
         # State
         self.x = 0.0
@@ -320,18 +320,28 @@ class ControllerNode(Node):
         # ROS2 subscriptions and publishers
         self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
         self.create_subscription(LaserScan, '/scan', self.lidar_callback, 10)
+        # Subscribe to reference commands (e.g., from planner or teleop)
+        self.create_subscription(AckermannDriveStamped, '/drive_ref', self.drive_ref_callback, 10)
         self.cmd_pub = self.create_publisher(AckermannDriveStamped, '/drive', 10)
 
         self.get_logger().info('Model-Free CBF Node initialized')
+        self.get_logger().info(f'  Control bounds: v∈[{self.v_min}, {self.v_max}], ω∈[{self.omega_min}, {self.omega_max}]')
+        self.get_logger().info(f'  CBF params: λ0={self.lambda_0}, λ1={self.lambda_1}, cq={self.c_q}')
+
+    def drive_ref_callback(self, msg):
+        """Update reference command from planner/teleop."""
+        self.u_ref = [float(msg.drive.speed), float(msg.drive.steering_angle)]
 
     def odom_callback(self, msg):
         """Update position from odometry."""
         self.x = msg.pose.pose.position.x
         self.y = msg.pose.pose.position.y
 
-        # Extract heading from quaternion (simplified for planar case)
-        # In practice, use proper quaternion to Euler conversion
-        self.theta = 0.0  # Placeholder
+        # Extract heading from quaternion (yaw for planar motion)
+        quat = msg.pose.pose.orientation
+        siny_cosp = 2.0 * (quat.w * quat.z + quat.x * quat.y)
+        cosy_cosp = 1.0 - 2.0 * (quat.y * quat.y + quat.z * quat.z)
+        self.theta = float(cp.arctan2(siny_cosp, cosy_cosp))
 
         self.v = msg.twist.twist.linear.x
 
@@ -401,10 +411,17 @@ class ControllerNode(Node):
         self.u_prev = u_safe
 
         total_time = time.time() - start_time
+
+        # Log control status
+        u_modified = (abs(u_safe[0] - self.u_ref[0]) > 0.01) or (abs(u_safe[1] - self.u_ref[1]) > 0.01)
+        status = "CBF ACTIVE" if u_modified else "SAFE"
+
         self.get_logger().info(
-            f'LiDAR callback: {total_time:.3f}s | '
+            f'[{status}] t={total_time:.3f}s | '
             f'q={q_hat:.3f} | q̇={qdot_hat:.3f} | '
-            f'F_q={F_q_hat:.3f} | u=[{u_safe[0]:.2f}, {u_safe[1]:.2f}]'
+            f'F_q={F_q_hat:.3f} | B_q={B_q_hat[0]:.3f},{B_q_hat[1]:.3f} | '
+            f'u_ref=[{self.u_ref[0]:.2f}, {self.u_ref[1]:.2f}] → '
+            f'u_safe=[{u_safe[0]:.2f}, {u_safe[1]:.2f}]'
         )
 
     def send_command(self, v, omega):

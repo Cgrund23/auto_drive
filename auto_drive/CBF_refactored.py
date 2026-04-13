@@ -263,12 +263,27 @@ class ModelFreeCBF:
             )
 
             if sol is None:
-                raise ValueError('QP solver returned None')
+                print(f'\n=== QP INFEASIBLE ===')
+                print(f'CBF constraint: -B_q @ u <= {float(-r_k):.4f}')
+                print(f'  B_q = {B_q_np}')
+                print(f'  r_k = {float(r_k):.4f}')
+                print(f'State: q={q_hat:.3f}, q̇={qdot_hat:.3f}')
+                print(f'ULM: F_q={F_q_hat:.3f}, B_q={B_q_np}')
+                print(f'Safety margin: σ={sigma_k:.3f}')
+                print(f'Control bounds: v∈[{u_min_np[0]:.2f}, {u_max_np[0]:.2f}], ω∈[{u_min_np[1]:.2f}, {u_max_np[1]:.2f}]')
+
+                # Check feasibility
+                feasible = self.check_feasibility(q_hat, qdot_hat, F_q_hat, B_q_np, sigma_k)
+                print(f'Feasibility check: {feasible}')
+                print(f'=====================\n')
+
+                # Return safe fallback
+                return [float(u_min_np[0]), 0.0]
 
             return [float(sol[0]), float(sol[1])]
 
         except Exception as e:
-            print(f'QP solve failed: {e}')
+            print(f'QP solve exception: {e}')
             print(f'  q_hat={q_hat:.3f}, qdot_hat={qdot_hat:.3f}')
             print(f'  F_q_hat={F_q_hat:.3f}, B_q_hat={B_q_np}')
             print(f'  r_k={float(r_k):.3f}, sigma_k={sigma_k:.3f}')
