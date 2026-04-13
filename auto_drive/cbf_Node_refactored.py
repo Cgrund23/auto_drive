@@ -283,7 +283,7 @@ class ControllerNode(Node):
         self.omega_min = -0.85
         self.r_max = 5.0
         self.r_min_obstacle = 0.3  # Only consider obstacles closer than this (meters)
-        self.length_scale = 0.25  # Increased for smoother barrier
+        self.length_scale = 0.5  # Increased for smoother barrier
         self.sigma_f = 1.0
 
         # HOCBF parameters (from paper, Section II-C) - RELAXED FOR FEASIBILITY
