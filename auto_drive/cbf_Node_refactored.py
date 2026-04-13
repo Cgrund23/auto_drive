@@ -282,8 +282,8 @@ class ControllerNode(Node):
         self.omega_max = 1.0
         self.omega_min = -1.0
         self.r_max = 5.0
-        self.r_min_obstacle = 0.5  # Only consider obstacles closer than this (meters)
-        self.length_scale = 0.1  # Increased for smoother barrier
+        self.r_min_obstacle = 0.25  # Only consider obstacles VERY close (meters)
+        self.length_scale = 0.05  # Very tight kernel - less bleed from distant obstacles
         self.sigma_f = 1.0
 
         # HOCBF parameters (from paper, Section II-C) - RELAXED FOR FEASIBILITY
@@ -395,8 +395,12 @@ class ControllerNode(Node):
         # Step 5: Get estimates for control
         q_hat, qdot_hat, F_q_hat, B_q_hat, P_safety = self.safety_ekf.get_estimates()
 
-        # SANITY CHECK: B_q[0] should be positive (velocity should help safety)
-        if B_q_hat[0] < 0.1:
+        # SANITY CHECK: Only activate CBF if actually in danger
+        # If barrier is high (q > 0.95) and no close obstacles, bypass CBF
+        if q_hat > 0.95 and n_obstacles == 0:
+            u_safe = self.u_ref
+        elif B_q_hat[0] < 0.1:
+            # Bad dynamics estimate
             self.get_logger().warn(f'Bad B_q estimate: {B_q_hat}, using reference command')
             u_safe = self.u_ref
         else:
