@@ -137,8 +137,8 @@ class Controller_Node(Node):
         start_time = time.time()
 
         # --- Step 1: Extract LiDAR ranges and compute angles ---
-        ranges = np.array(msg.ranges, dtype=np.float32)
-        angles = np.linspace(msg.angle_min, msg.angle_max, len(ranges), dtype=np.float32)
+        ranges = cp.array(msg.ranges, dtype=cp.float32)
+        angles = cp.linspace(msg.angle_min, msg.angle_max, len(ranges), dtype=cp.float32)
 
         self.CBFobj.setObjects(ranges, angles)
 
