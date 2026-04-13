@@ -176,18 +176,19 @@ class ModelFreeCBF:
             sigma: Safety margin c_q * σ̄_{η,k}
         """
         # Evaluate at worst case: u = u_max
-        u_wc = self.u_max
+        u_wc = cp.asarray(self.u_max)
+        P = cp.asarray(P)
 
         ell = cp.array([
             self.lambda_0 * self.lambda_1,
             self.lambda_0 + self.lambda_1,
             1.0,
-            u_wc[0],
-            u_wc[1]
+            float(u_wc[0]),
+            float(u_wc[1])
         ])
 
         sigma_sq = float(ell @ P @ ell)
-        sigma_bar = cp.sqrt(cp.maximum(sigma_sq, 0.0))
+        sigma_bar = float(cp.sqrt(cp.maximum(sigma_sq, 0.0)))
 
         return float(self.c_q * sigma_bar)
 
@@ -214,8 +215,9 @@ class ModelFreeCBF:
         Returns:
             u_safe: Safe control input [v, ω]
         """
-        u_ref = cp.array(u_ref)
-        B_q_hat = cp.array(B_q_hat)
+        # Ensure inputs are CuPy arrays
+        u_ref = cp.asarray(u_ref)
+        B_q_hat = cp.asarray(B_q_hat)
 
         # Compute safety margin
         sigma_k = self.compute_safety_margin(P, self.u_max)
@@ -224,17 +226,17 @@ class ModelFreeCBF:
         r_k = -F_q_hat - (self.lambda_0 + self.lambda_1) * qdot_hat - \
               self.lambda_0 * self.lambda_1 * q_hat + sigma_k
 
-        # QP formulation - convert CuPy to NumPy for QP solver
+        # QP formulation - explicitly convert CuPy to NumPy for QP solver
         # Cost: minimize ||u - u_ref||² = u^T I u - 2 u_ref^T u + const
         P_qp = np.eye(2, dtype=np.float64)
-        q_qp = -cp.asnumpy(u_ref).astype(np.float64)
 
-        # Inequality constraints: G u ≤ h
-        # 1. CBF: -B̂_q,k u ≤ -r_k
-        # 2. Bounds: u ≤ u_max, -u ≤ -u_min
-        B_q_np = cp.asnumpy(B_q_hat).astype(np.float64)
-        u_max_np = cp.asnumpy(self.u_max).astype(np.float64)
-        u_min_np = cp.asnumpy(self.u_min).astype(np.float64)
+        # Convert to numpy arrays explicitly
+        u_ref_np = np.array(u_ref.get(), dtype=np.float64)
+        B_q_np = np.array(B_q_hat.get(), dtype=np.float64)
+        u_max_np = np.array(self.u_max.get(), dtype=np.float64)
+        u_min_np = np.array(self.u_min.get(), dtype=np.float64)
+
+        q_qp = -u_ref_np
 
         G_np = np.vstack([
             -B_q_np.reshape(1, 2),  # CBF constraint
@@ -243,11 +245,11 @@ class ModelFreeCBF:
         ])
 
         h_np = np.array([
-            -float(r_k),
-            u_max_np[0],
-            u_max_np[1],
-            -u_min_np[0],
-            -u_min_np[1]
+            float(-r_k),
+            float(u_max_np[0]),
+            float(u_max_np[1]),
+            float(-u_min_np[0]),
+            float(-u_min_np[1])
         ], dtype=np.float64)
 
         # Solve QP
