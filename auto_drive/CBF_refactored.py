@@ -224,39 +224,37 @@ class ModelFreeCBF:
         r_k = -F_q_hat - (self.lambda_0 + self.lambda_1) * qdot_hat - \
               self.lambda_0 * self.lambda_1 * q_hat + sigma_k
 
-        # QP formulation
+        # QP formulation - convert to NumPy immediately to avoid CuPy conversion issues
         # Cost: minimize ||u - u_ref||² = u^T I u - 2 u_ref^T u + const
-        P_qp = cp.eye(2)
-        q_qp = -u_ref
+        P_qp = np.eye(2, dtype=np.float64)
+        q_qp = -cp.asnumpy(u_ref).astype(np.float64)
 
         # Inequality constraints: G u ≤ h
         # 1. CBF: -B̂_q,k u ≤ -r_k
         # 2. Bounds: u ≤ u_max, -u ≤ -u_min
-        G = cp.vstack([
-            -B_q_hat.reshape(1, 2),  # CBF constraint
-            cp.eye(2),               # u ≤ u_max
-            -cp.eye(2)               # -u ≤ -u_min
+        B_q_np = cp.asnumpy(B_q_hat).astype(np.float64)
+        u_max_np = cp.asnumpy(self.u_max).astype(np.float64)
+        u_min_np = cp.asnumpy(self.u_min).astype(np.float64)
+
+        G_np = np.vstack([
+            -B_q_np.reshape(1, 2),  # CBF constraint
+            np.eye(2),              # u ≤ u_max
+            -np.eye(2)              # -u ≤ -u_min
         ])
 
-        h = cp.array([
-            -r_k,
-            self.u_max[0],
-            self.u_max[1],
-            -self.u_min[0],
-            -self.u_min[1]
-        ])
-
-        # Convert to NumPy for qpsolvers
-        P_np = cp.asnumpy(P_qp).astype(np.float64)
-        q_np = cp.asnumpy(q_qp).astype(np.float64)
-        G_np = cp.asnumpy(G).astype(np.float64)
-        h_np = cp.asnumpy(h).astype(np.float64)
+        h_np = np.array([
+            -float(r_k),
+            u_max_np[0],
+            u_max_np[1],
+            -u_min_np[0],
+            -u_min_np[1]
+        ], dtype=np.float64)
 
         # Solve QP
         try:
             sol = solve_qp(
-                P=P_np,
-                q=q_np,
+                P=P_qp,
+                q=q_qp,
                 G=G_np,
                 h=h_np,
                 solver='clarabel'
@@ -270,10 +268,10 @@ class ModelFreeCBF:
         except Exception as e:
             print(f'QP solve failed: {e}')
             print(f'  q_hat={q_hat:.3f}, qdot_hat={qdot_hat:.3f}')
-            print(f'  F_q_hat={F_q_hat:.3f}, B_q_hat={cp.asnumpy(B_q_hat)}')
+            print(f'  F_q_hat={F_q_hat:.3f}, B_q_hat={B_q_np}')
             print(f'  r_k={float(r_k):.3f}, sigma_k={sigma_k:.3f}')
             # Return safe fallback
-            return [float(cp.asnumpy(self.u_min)[0]), 0.0]
+            return [float(u_min_np[0]), 0.0]
 
     def check_feasibility(self, q_hat, qdot_hat, F_q_hat, B_q_hat, sigma_k):
         """
