@@ -568,12 +568,12 @@ class CBF:
 
         try:
             sol = solve_qp(
-                P=cp.asnumpy(H),
-                q=cp.asnumpy(f),
-                G=cp.asnumpy(G),
-                h=cp.asnumpy(h_vec),
+                P = cp.asnumpy(H),
+                q = cp.asnumpy(f).flatten(),
+                G = cp.asnumpy(G),
+                h = cp.asnumpy(h_vec).flatten(),
                 solver="clarabel"
-            )
+)
 
             if sol is None:
                 raise ValueError("QP failed")
