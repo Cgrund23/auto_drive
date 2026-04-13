@@ -14,13 +14,14 @@ class ModelFreeCBF:
     Model-Free CBF using GP barriers and MIMO ULM dynamics estimation.
     """
 
-    def __init__(self, dt, u_min, u_max, r_max, length_scale, sigma_f, lambda_0, lambda_1, c_q):
+    def __init__(self, dt, u_min, u_max, r_max, r_min_obstacle, length_scale, sigma_f, lambda_0, lambda_1, c_q):
         """
         Args:
             dt: Sampling period
             u_min: Minimum control input [v_min, ω_min]
             u_max: Maximum control input [v_max, ω_max]
             r_max: Maximum LiDAR range
+            r_min_obstacle: Only consider obstacles closer than this
             length_scale: GP kernel length scale
             sigma_f: GP signal variance
             lambda_0, lambda_1: HOCBF parameters (Section II-C of paper)
@@ -30,6 +31,7 @@ class ModelFreeCBF:
         self.u_min = cp.array(u_min)
         self.u_max = cp.array(u_max)
         self.r_max = r_max
+        self.r_min_obstacle = r_min_obstacle
         self.length_scale = length_scale
         self.sigma_f = sigma_f
         self.lambda_0 = lambda_0
@@ -51,8 +53,8 @@ class ModelFreeCBF:
         ranges = cp.asarray(ranges)
         angles = cp.asarray(angles)
 
-        # Filter by range
-        mask = (ranges < self.r_max) & (ranges > 0.1)
+        # Filter by range - only consider close obstacles!
+        mask = (ranges < self.r_min_obstacle) & (ranges > 0.1)
         filtered_ranges = ranges[mask]
         filtered_angles = angles[mask]
 
@@ -190,7 +192,10 @@ class ModelFreeCBF:
         sigma_sq = float(ell @ P @ ell)
         sigma_bar = float(cp.sqrt(cp.maximum(sigma_sq, 0.0)))
 
-        return float(self.c_q * sigma_bar)
+        # Clamp safety margin to prevent infeasibility during EKF convergence
+        sigma = float(self.c_q * sigma_bar)
+        sigma_max = 1.0  # Maximum safety margin
+        return min(sigma, sigma_max)
 
     def compute_safe_control(self, u_ref, q_hat, qdot_hat, F_q_hat, B_q_hat, P):
         """
@@ -269,8 +274,9 @@ class ModelFreeCBF:
                 print(f'  r_k = {float(r_k):.4f}')
                 print(f'State: q={q_hat:.3f}, q̇={qdot_hat:.3f}')
                 print(f'ULM: F_q={F_q_hat:.3f}, B_q={B_q_np}')
-                print(f'Safety margin: σ={sigma_k:.3f}')
+                print(f'Safety margin: σ={sigma_k:.3f} (clamped)')
                 print(f'Control bounds: v∈[{u_min_np[0]:.2f}, {u_max_np[0]:.2f}], ω∈[{u_min_np[1]:.2f}, {u_max_np[1]:.2f}]')
+                print(f'Max achievable: B_q @ u_max = {float(B_q_np[0]*u_max_np[0] + B_q_np[1]*u_max_np[1]):.3f}')
 
                 # Check feasibility
                 feasible = self.check_feasibility(q_hat, qdot_hat, F_q_hat, B_q_np, sigma_k)

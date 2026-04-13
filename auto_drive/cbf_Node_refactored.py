@@ -44,8 +44,8 @@ class SafetyULM_EKF:
         if m_inputs > 1:
             self.x[4] = 0.1  # B_q,ω
 
-        # Covariance matrix
-        P_diag = [1.0, 1.0, 10.0] + [10.0] * m_inputs
+        # Covariance matrix - REDUCED for faster convergence
+        P_diag = [0.1, 0.1, 1.0] + [1.0] * m_inputs
         self.P = cp.diag(cp.array(P_diag))
 
         # Process noise (parameters F_q, B_q evolve slowly)
@@ -193,8 +193,8 @@ class PositionULM_EKF:
         self.x[5] = 0.0  # B_p,x,ω
         self.x[7] = 0.1  # B_p,y,ω
 
-        # Covariance
-        P_diag = [1.0, 1.0, 10.0, 10.0] + [10.0] * (2 * m_inputs)
+        # Covariance - REDUCED for faster convergence
+        P_diag = [0.1, 0.1, 1.0, 1.0] + [1.0] * (2 * m_inputs)
         self.P = cp.diag(cp.array(P_diag))
 
         # Process noise
@@ -282,13 +282,14 @@ class ControllerNode(Node):
         self.omega_max = 0.85
         self.omega_min = -0.85
         self.r_max = 5.0
+        self.r_min_obstacle = 0.3  # Only consider obstacles closer than this (meters)
         self.length_scale = 0.25  # Increased for smoother barrier
         self.sigma_f = 1.0
 
         # HOCBF parameters (from paper, Section II-C) - RELAXED FOR FEASIBILITY
         self.lambda_0 = 0.5  # Reduced from 1.0 for less aggressive constraints
         self.lambda_1 = 0.5  # Reduced from 1.0 for less aggressive constraints
-        self.c_q = 1.0  # Reduced from 2.0 (1-sigma instead of 2-sigma) for less conservative margin
+        self.c_q = 0.3  # Reduced from 2.0 for less conservative margin (0.3-sigma)
 
         # State
         self.x = 0.0
@@ -310,6 +311,7 @@ class ControllerNode(Node):
             u_min=[self.v_min, self.omega_min],
             u_max=[self.v_max, self.omega_max],
             r_max=self.r_max,
+            r_min_obstacle=self.r_min_obstacle,
             length_scale=self.length_scale,
             sigma_f=self.sigma_f,
             lambda_0=self.lambda_0,
@@ -352,6 +354,15 @@ class ControllerNode(Node):
 
         # Update CBF with obstacle points
         self.cbf.set_obstacles(ranges, angles)
+
+        # Debug: log obstacle count
+        n_obstacles = self.cbf.N
+        valid_ranges = ranges[(ranges > 0.1) & (ranges < self.r_max)]
+        if len(valid_ranges) > 0:
+            min_range = float(cp.min(valid_ranges))
+            self.get_logger().info(f'LiDAR: {n_obstacles} close obstacles (<{self.r_min_obstacle}m), closest scan at {min_range:.2f}m')
+        else:
+            self.get_logger().info(f'LiDAR: No valid scans')
 
         # Step 2: Predict EKFs
         self.safety_ekf.predict(self.u_prev)
