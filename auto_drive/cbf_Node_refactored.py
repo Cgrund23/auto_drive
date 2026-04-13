@@ -48,9 +48,9 @@ class SafetyULM_EKF:
         P_diag = [0.01, 0.01, 0.1] + [0.1] * m_inputs
         self.P = cp.diag(cp.array(P_diag))
 
-        # Process noise (parameters F_q, B_q evolve slowly)
+        # Process noise (parameters F_q, B_q evolve slowly but need correction ability)
         if Q is None:
-            Q_diag = [1e-6, 1e-5, 1e-3] + [1e-3] * m_inputs
+            Q_diag = [1e-6, 1e-5, 1e-2] + [1e-2] * m_inputs  # Increased for B_q parameters
             self.Q = cp.diag(cp.array(Q_diag))
         else:
             self.Q = Q
@@ -157,16 +157,44 @@ class SafetyULM_EKF:
         # Covariance update
         self.P = (cp.eye(len(self.x)) - cp.outer(K, self.H_qdot)) @ self.P
 
+    def reset_if_diverged(self):
+        """
+        Reset EKF if B_q estimates diverge (become negative or too large).
+        B_q[0] should be positive - velocity approaching obstacle decreases barrier.
+        """
+        B_q = self.x[3:3+self.m]
+
+        # Check if diverged
+        if float(B_q[0]) < 0.05 or float(B_q[0]) > 5.0:
+            # Reset parameters to initial values
+            self.x[2] = 0.0  # F_q
+            self.x[3] = 0.5  # B_q,v
+            if self.m > 1:
+                self.x[4] = 0.1  # B_q,ω
+
+            # Reset covariance for parameters only (keep state estimates)
+            P_diag = [0.01, 0.01, 0.1] + [0.1] * self.m
+            self.P = cp.diag(cp.array(P_diag))
+
+            return True
+        return False
+
     def get_estimates(self):
         """
         Returns:
             q_hat, qdot_hat, F_q_hat, B_q_hat, P
         """
+        # Constrain B_q to reasonable bounds
+        B_q = self.x[3:3+self.m].copy()
+        B_q[0] = float(cp.clip(B_q[0], 0.05, 3.0))  # Velocity effect must be positive
+        if self.m > 1:
+            B_q[1] = float(cp.clip(B_q[1], -1.0, 1.0))  # Steering effect bounded
+
         return (
             float(self.x[0]),
             float(self.x[1]),
             float(self.x[2]),
-            self.x[3:3+self.m].copy(),
+            B_q,
             self.P.copy()
         )
 
@@ -392,19 +420,19 @@ class ControllerNode(Node):
         self.safety_ekf.update_q(float(q_meas), R_q=float(sigma_gp_sq))
         self.safety_ekf.update_qdot(qdot_meas, R_qdot=float(R_qdot))
 
-        # Step 5: Get estimates for control
+        # Check if EKF has diverged and reset if needed
+        if self.safety_ekf.reset_if_diverged():
+            self.get_logger().warn('EKF diverged! Resetting to initial conditions.')
+
+        # Step 5: Get estimates for control (with B_q clamped to valid range)
         q_hat, qdot_hat, F_q_hat, B_q_hat, P_safety = self.safety_ekf.get_estimates()
 
         # SANITY CHECK: Only activate CBF if actually in danger
         # If barrier is high (q > 0.95) and no close obstacles, bypass CBF
         if q_hat > 0.95 and n_obstacles == 0:
             u_safe = self.u_ref
-        elif B_q_hat[0] < 0.1:
-            # Bad dynamics estimate
-            self.get_logger().warn(f'Bad B_q estimate: {B_q_hat}, using reference command')
-            u_safe = self.u_ref
         else:
-            # Step 6: Compute safe control
+            # Step 6: Compute safe control (B_q is already clamped in get_estimates)
             try:
                 u_safe = self.cbf.compute_safe_control(
                     u_ref=self.u_ref,
@@ -416,6 +444,7 @@ class ControllerNode(Node):
                 )
             except Exception as e:
                 self.get_logger().error(f'CBF QP failed: {e}')
+                # Emergency stop
                 u_safe = [0.0, 0.0]
 
         # Step 7: Send command
@@ -435,7 +464,7 @@ class ControllerNode(Node):
                 action = "BRAKE"
 
         self.get_logger().info(
-            f'[{action}] t={total_time:.3f}s | q={q_hat:.3f} | '
+            f'[{action}] t={total_time:.3f}s | q={q_hat:.3f} | B_q=[{B_q_hat[0]:.2f},{B_q_hat[1]:.2f}] | '
             f'v: {self.u_ref[0]:.2f}→{u_safe[0]:.2f} | ω: {self.u_ref[1]:.2f}→{u_safe[1]:.2f}'
         )
 
