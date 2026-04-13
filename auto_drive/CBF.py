@@ -565,15 +565,19 @@ class CBF:
             w_max,
             -w_min
         ])
+        P = cp.asnumpy(H).astype(float)
+        q = cp.asnumpy(f).astype(float).flatten()
+        G_np = cp.asnumpy(G).astype(float)
+        h_np = cp.asnumpy(h_vec).astype(float).flatten()
 
         try:
             sol = solve_qp(
-                P = cp.asnumpy(H),
-                q = cp.asnumpy(f).flatten(),
-                G = cp.asnumpy(G),
-                h = cp.asnumpy(h_vec).flatten(),
+                P=P,
+                q=q,
+                G=G_np,
+                h=h_np,
                 solver="clarabel"
-)
+            )
 
             if sol is None:
                 raise ValueError("QP failed")
