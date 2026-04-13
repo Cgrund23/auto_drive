@@ -279,10 +279,10 @@ class ControllerNode(Node):
         self.dt = 0.002  # 20 Hz
         self.v_max = 2.0
         self.v_min = 0.0  # CRITICAL: Allow robot to stop! Was 0.5
-        self.omega_max = 0.85
-        self.omega_min = -0.85
+        self.omega_max = 1.0
+        self.omega_min = -1.0
         self.r_max = 5.0
-        self.r_min_obstacle = 0.3  # Only consider obstacles closer than this (meters)
+        self.r_min_obstacle = 0.5  # Only consider obstacles closer than this (meters)
         self.length_scale = 0.5  # Increased for smoother barrier
         self.sigma_f = 1.0
 
@@ -395,29 +395,44 @@ class ControllerNode(Node):
         # Step 5: Get estimates for control
         q_hat, qdot_hat, F_q_hat, B_q_hat, P_safety = self.safety_ekf.get_estimates()
 
-        # Step 6: Compute safe control
-        try:
-            u_safe = self.cbf.compute_safe_control(
-                u_ref=self.u_ref,
-                q_hat=q_hat,
-                qdot_hat=qdot_hat,
-                F_q_hat=F_q_hat,
-                B_q_hat=B_q_hat,
-                P=P_safety
-            )
-        except Exception as e:
-            self.get_logger().error(f'CBF QP failed: {e}')
-            u_safe = [0.0, 0.0]
+        # SANITY CHECK: B_q[0] should be positive (velocity should help safety)
+        if B_q_hat[0] < 0.1:
+            self.get_logger().warn(f'Bad B_q estimate: {B_q_hat}, using reference command')
+            u_safe = self.u_ref
+        else:
+            # Step 6: Compute safe control
+            try:
+                u_safe = self.cbf.compute_safe_control(
+                    u_ref=self.u_ref,
+                    q_hat=q_hat,
+                    qdot_hat=qdot_hat,
+                    F_q_hat=F_q_hat,
+                    B_q_hat=B_q_hat,
+                    P=P_safety
+                )
+            except Exception as e:
+                self.get_logger().error(f'CBF QP failed: {e}')
+                u_safe = [0.0, 0.0]
 
         # Step 7: Send command
         self.send_command(u_safe[0], u_safe[1])
         self.u_prev = u_safe
 
         total_time = time.time() - start_time
+
+        # Determine what action CBF took
+        dv = u_safe[0] - self.u_ref[0]
+        dw = u_safe[1] - self.u_ref[1]
+        action = "SAFE"
+        if abs(dv) > 0.1 or abs(dw) > 0.1:
+            if abs(dw) > abs(dv) * 0.5:  # Steering dominates
+                action = "STEER"
+            else:
+                action = "BRAKE"
+
         self.get_logger().info(
-            f'LiDAR callback: {total_time:.3f}s | '
-            f'q={q_hat:.3f} | q̇={qdot_hat:.3f} | '
-            f'F_q={F_q_hat:.3f} | u=[{u_safe[0]:.2f}, {u_safe[1]:.2f}]'
+            f'[{action}] t={total_time:.3f}s | q={q_hat:.3f} | '
+            f'v: {self.u_ref[0]:.2f}→{u_safe[0]:.2f} | ω: {self.u_ref[1]:.2f}→{u_safe[1]:.2f}'
         )
 
     def send_command(self, v, omega):

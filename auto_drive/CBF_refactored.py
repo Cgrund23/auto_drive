@@ -232,8 +232,12 @@ class ModelFreeCBF:
               self.lambda_0 * self.lambda_1 * q_hat + sigma_k
 
         # QP formulation - explicitly convert CuPy to NumPy for QP solver
-        # Cost: minimize ||u - u_ref||² = u^T I u - 2 u_ref^T u + const
-        P_qp = np.eye(2, dtype=np.float64)
+        # Cost: minimize (u - u_ref)^T W (u - u_ref)
+        # Higher weight = more expensive to change
+        # w_v >> w_omega means "prefer steering over braking"
+        w_v = 10.0  # High cost for changing velocity (prefer to maintain speed)
+        w_omega = 0.1  # Low cost for changing steering (prefer to steer)
+        P_qp = np.diag([w_v, w_omega])
 
         # Convert to numpy arrays explicitly
         u_ref_np = np.array(u_ref.get(), dtype=np.float64)
@@ -241,7 +245,7 @@ class ModelFreeCBF:
         u_max_np = np.array(self.u_max.get(), dtype=np.float64)
         u_min_np = np.array(self.u_min.get(), dtype=np.float64)
 
-        q_qp = -u_ref_np
+        q_qp = -P_qp @ u_ref_np  # Linear term: -W @ u_ref
 
         G_np = np.vstack([
             -B_q_np.reshape(1, 2),  # CBF constraint
