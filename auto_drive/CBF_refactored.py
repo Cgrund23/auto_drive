@@ -5,8 +5,8 @@ Based on: "Safety via Control Barrier Functions Synthesized from Ultra-Local Mod
 Implements GP-based barrier learning and HOCBF constraints using estimated ULM parameters.
 """
 import cupy as cp
-from qpsolvers import solve_qp
 import numpy as np
+from qpsolvers import solve_qp
 
 
 class ModelFreeCBF:
@@ -224,7 +224,7 @@ class ModelFreeCBF:
         r_k = -F_q_hat - (self.lambda_0 + self.lambda_1) * qdot_hat - \
               self.lambda_0 * self.lambda_1 * q_hat + sigma_k
 
-        # QP formulation - convert to NumPy immediately to avoid CuPy conversion issues
+        # QP formulation - convert CuPy to NumPy for QP solver
         # Cost: minimize ||u - u_ref||² = u^T I u - 2 u_ref^T u + const
         P_qp = np.eye(2, dtype=np.float64)
         q_qp = -cp.asnumpy(u_ref).astype(np.float64)
@@ -296,9 +296,9 @@ class ModelFreeCBF:
 
         M_k = 0.0
         for j in range(len(B_q_hat)):
-            if B_q_hat[j] >= 0:
-                M_k += B_q_hat[j] * self.u_max[j]
+            if float(B_q_hat[j]) >= 0:
+                M_k += float(B_q_hat[j]) * float(self.u_max[j])
             else:
-                M_k += B_q_hat[j] * self.u_min[j]
+                M_k += float(B_q_hat[j]) * float(self.u_min[j])
 
         return float(M_k) >= float(r_k)
