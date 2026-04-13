@@ -44,8 +44,8 @@ class SafetyULM_EKF:
         if m_inputs > 1:
             self.x[4] = 0.1  # B_q,ω
 
-        # Covariance matrix - REDUCED for faster convergence
-        P_diag = [0.1, 0.1, 1.0] + [1.0] * m_inputs
+        # Covariance matrix - HEAVILY REDUCED for faster convergence
+        P_diag = [0.01, 0.01, 0.1] + [0.1] * m_inputs
         self.P = cp.diag(cp.array(P_diag))
 
         # Process noise (parameters F_q, B_q evolve slowly)
@@ -193,8 +193,8 @@ class PositionULM_EKF:
         self.x[5] = 0.0  # B_p,x,ω
         self.x[7] = 0.1  # B_p,y,ω
 
-        # Covariance - REDUCED for faster convergence
-        P_diag = [0.1, 0.1, 1.0, 1.0] + [1.0] * (2 * m_inputs)
+        # Covariance - HEAVILY REDUCED for faster convergence
+        P_diag = [0.01, 0.01, 0.1, 0.1] + [0.1] * (2 * m_inputs)
         self.P = cp.diag(cp.array(P_diag))
 
         # Process noise
@@ -279,8 +279,8 @@ class ControllerNode(Node):
         self.dt = 0.002  # 20 Hz
         self.v_max = 2.0
         self.v_min = 0.0  # CRITICAL: Allow robot to stop! Was 0.5
-        self.omega_max = 1.0
-        self.omega_min = -1.0
+        self.omega_max = 10.0
+        self.omega_min = -10.0
         self.r_max = 5.0
         self.r_min_obstacle = 0.25  # Only consider obstacles VERY close (meters)
         self.length_scale = 0.1  # Very tight kernel - less bleed from distant obstacles
@@ -289,7 +289,7 @@ class ControllerNode(Node):
         # HOCBF parameters (from paper, Section II-C) - RELAXED FOR FEASIBILITY
         self.lambda_0 = 0.5  # Reduced from 1.0 for less aggressive constraints
         self.lambda_1 = 0.5  # Reduced from 1.0 for less aggressive constraints
-        self.c_q = 0.3  # Reduced from 2.0 for less conservative margin (0.3-sigma)
+        self.c_q = 0.05  # Very small confidence for feasibility (was 0.3)
 
         # State
         self.x = 0.0

@@ -194,7 +194,7 @@ class ModelFreeCBF:
 
         # Clamp safety margin to prevent infeasibility during EKF convergence
         sigma = float(self.c_q * sigma_bar)
-        sigma_max = 1.0  # Maximum safety margin
+        sigma_max = 0.05  # Maximum safety margin - very small to ensure feasibility
         return min(sigma, sigma_max)
 
     def compute_safe_control(self, u_ref, q_hat, qdot_hat, F_q_hat, B_q_hat, P):
@@ -275,16 +275,11 @@ class ModelFreeCBF:
                 print(f'\n=== QP INFEASIBLE ===')
                 print(f'CBF constraint: -B_q @ u <= {float(-r_k):.4f}')
                 print(f'  B_q = {B_q_np}')
-                print(f'  r_k = {float(r_k):.4f}')
+                print(f'  Breakdown: -F_q={-F_q_hat:.3f}, -(λ0+λ1)q̇={-(self.lambda_0+self.lambda_1)*qdot_hat:.3f}, -λ0λ1q={-self.lambda_0*self.lambda_1*q_hat:.3f}, σ={sigma_k:.3f}')
                 print(f'State: q={q_hat:.3f}, q̇={qdot_hat:.3f}')
                 print(f'ULM: F_q={F_q_hat:.3f}, B_q={B_q_np}')
-                print(f'Safety margin: σ={sigma_k:.3f} (clamped)')
                 print(f'Control bounds: v∈[{u_min_np[0]:.2f}, {u_max_np[0]:.2f}], ω∈[{u_min_np[1]:.2f}, {u_max_np[1]:.2f}]')
                 print(f'Max achievable: B_q @ u_max = {float(B_q_np[0]*u_max_np[0] + B_q_np[1]*u_max_np[1]):.3f}')
-
-                # Check feasibility
-                feasible = self.check_feasibility(q_hat, qdot_hat, F_q_hat, B_q_np, sigma_k)
-                print(f'Feasibility check: {feasible}')
                 print(f'=====================\n')
 
                 # Return safe fallback
