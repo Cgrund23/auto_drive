@@ -320,17 +320,9 @@ class ControllerNode(Node):
         # ROS2 subscriptions and publishers
         self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
         self.create_subscription(LaserScan, '/scan', self.lidar_callback, 10)
-        # Subscribe to reference commands (e.g., from planner or teleop)
-        self.create_subscription(AckermannDriveStamped, '/drive_ref', self.drive_ref_callback, 10)
         self.cmd_pub = self.create_publisher(AckermannDriveStamped, '/drive', 10)
 
         self.get_logger().info('Model-Free CBF Node initialized')
-        self.get_logger().info(f'  Control bounds: v∈[{self.v_min}, {self.v_max}], ω∈[{self.omega_min}, {self.omega_max}]')
-        self.get_logger().info(f'  CBF params: λ0={self.lambda_0}, λ1={self.lambda_1}, cq={self.c_q}')
-
-    def drive_ref_callback(self, msg):
-        """Update reference command from planner/teleop."""
-        self.u_ref = [float(msg.drive.speed), float(msg.drive.steering_angle)]
 
     def odom_callback(self, msg):
         """Update position from odometry."""
@@ -411,17 +403,10 @@ class ControllerNode(Node):
         self.u_prev = u_safe
 
         total_time = time.time() - start_time
-
-        # Log control status
-        u_modified = (abs(u_safe[0] - self.u_ref[0]) > 0.01) or (abs(u_safe[1] - self.u_ref[1]) > 0.01)
-        status = "CBF ACTIVE" if u_modified else "SAFE"
-
         self.get_logger().info(
-            f'[{status}] t={total_time:.3f}s | '
+            f'LiDAR callback: {total_time:.3f}s | '
             f'q={q_hat:.3f} | q̇={qdot_hat:.3f} | '
-            f'F_q={F_q_hat:.3f} | B_q={B_q_hat[0]:.3f},{B_q_hat[1]:.3f} | '
-            f'u_ref=[{self.u_ref[0]:.2f}, {self.u_ref[1]:.2f}] → '
-            f'u_safe=[{u_safe[0]:.2f}, {u_safe[1]:.2f}]'
+            f'F_q={F_q_hat:.3f} | u=[{u_safe[0]:.2f}, {u_safe[1]:.2f}]'
         )
 
     def send_command(self, v, omega):
