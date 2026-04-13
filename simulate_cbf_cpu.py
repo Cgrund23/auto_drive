@@ -86,8 +86,7 @@ class ModelFreeCBF_CPU:
         return min(sigma, sigma_max)
 
     def compute_safe_control(self, u_ref, q_hat, qdot_hat, F_q_hat, B_q_hat, P):
-        from qpsolvers import solve_qp
-
+        """Simple analytical QP solver (no dependencies needed!)"""
         u_ref = np.asarray(u_ref)
         B_q_hat = np.asarray(B_q_hat)
 
@@ -95,40 +94,75 @@ class ModelFreeCBF_CPU:
         r_k = -F_q_hat - (self.lambda_0 + self.lambda_1) * qdot_hat - \
               self.lambda_0 * self.lambda_1 * q_hat + sigma_k
 
-        w_v = 10.0
-        w_omega = 0.1
-        P_qp = np.diag([w_v, w_omega])
-
         u_ref_np = np.array(u_ref, dtype=np.float64)
         B_q_np = np.array(B_q_hat, dtype=np.float64)
         u_max_np = np.array(self.u_max, dtype=np.float64)
         u_min_np = np.array(self.u_min, dtype=np.float64)
 
-        q_qp = -P_qp @ u_ref_np
+        # Start with unconstrained solution (just clip to bounds)
+        u_safe = np.clip(u_ref_np, u_min_np, u_max_np)
 
-        G_np = np.vstack([
-            -B_q_np.reshape(1, 2),
-            np.eye(2),
-            -np.eye(2)
-        ])
+        # Check CBF constraint: B_q @ u >= r_k
+        cbf_value = B_q_np @ u_safe
 
-        h_np = np.array([
-            float(-r_k),
-            float(u_max_np[0]),
-            float(u_max_np[1]),
-            float(-u_min_np[0]),
-            float(-u_min_np[1])
-        ], dtype=np.float64)
+        if cbf_value >= r_k:
+            # Already safe!
+            return [float(u_safe[0]), float(u_safe[1])]
 
-        try:
-            sol = solve_qp(P=P_qp, q=q_qp, G=G_np, h=h_np, solver='clarabel')
-            if sol is None:
-                print(f"QP INFEASIBLE: r_k={r_k:.3f}, B_q={B_q_np}, max_achievable={B_q_np@u_max_np:.3f}")
-                return [float(u_min_np[0]), 0.0]
-            return [float(sol[0]), float(sol[1])]
-        except Exception as e:
-            print(f"QP exception: {e}")
+        # Need to project onto CBF constraint
+        # Find closest point on line B_q @ u = r_k to u_ref
+
+        # Weighted distance for QP cost
+        w_v = 10.0
+        w_omega = 0.1
+        W = np.array([w_v, w_omega])
+
+        # Project: u = u_ref + lambda * (B_q / ||B_q||_W^2)
+        # Such that B_q @ u = r_k
+        B_q_norm_sq = np.sum(B_q_np**2 / W)
+        if B_q_norm_sq < 1e-6:
+            # Degenerate case
             return [float(u_min_np[0]), 0.0]
+
+        # Lambda for projection
+        deficit = r_k - (B_q_np @ u_ref_np)
+        lam = deficit / B_q_norm_sq
+
+        # Project
+        u_proj = u_ref_np + lam * (B_q_np / W)
+
+        # Clip to bounds
+        u_safe = np.clip(u_proj, u_min_np, u_max_np)
+
+        # Final check - if still infeasible after clipping, find feasible point
+        if B_q_np @ u_safe < r_k:
+            # Find feasible point on boundary
+            # Try corners and edges
+            candidates = [
+                np.array([u_max_np[0], u_max_np[1]]),
+                np.array([u_max_np[0], u_min_np[1]]),
+                np.array([u_min_np[0], u_max_np[1]]),
+                np.array([u_min_np[0], u_min_np[1]]),
+            ]
+
+            best_u = candidates[0]
+            best_cost = float('inf')
+
+            for cand in candidates:
+                if B_q_np @ cand >= r_k:
+                    cost = w_v * (cand[0] - u_ref_np[0])**2 + w_omega * (cand[1] - u_ref_np[1])**2
+                    if cost < best_cost:
+                        best_cost = cost
+                        best_u = cand
+
+            if best_cost == float('inf'):
+                # Truly infeasible
+                print(f"QP INFEASIBLE: r_k={r_k:.3f}, B_q={B_q_np}, max={B_q_np@u_max_np:.3f}")
+                return [float(u_min_np[0]), 0.0]
+
+            u_safe = best_u
+
+        return [float(u_safe[0]), float(u_safe[1])]
 
 
 class SafetyULM_EKF_CPU:
@@ -340,57 +374,54 @@ class CBFSimulator:
 
     def tangent_controller(self, x, y, theta, goal_x=3.0, goal_y=0.0):
         """
-        Nominal controller: drives toward goal, steers to follow tangent around obstacles
+        Robot-frame tangent controller: steers away from obstacles while driving forward.
+        Simulates the hardware controller that works in robot frame (no global goal tracking).
+
+        Note: Still takes x,y,theta for simulation purposes (obstacle detection),
+        but controller logic is robot-frame only.
 
         Returns: [v_ref, omega_ref]
         """
-        # Find closest obstacle
-        min_dist = float('inf')
-        closest_obs = None
-        for obs_x, obs_y, obs_r in self.obstacles.obstacles:
-            dist = np.sqrt((x - obs_x)**2 + (y - obs_y)**2) - obs_r
-            if dist < min_dist:
-                min_dist = dist
-                closest_obs = (obs_x, obs_y, obs_r)
-
-        # Desired velocity (always try to move forward)
+        # Default: drive straight forward in robot frame
         v_ref = 1.0
+        omega_ref = 0.0
 
-        # Default: steer toward goal
-        dx_goal = goal_x - x
-        dy_goal = goal_y - y
-        angle_to_goal = np.arctan2(dy_goal, dx_goal)
-        angle_error = angle_to_goal - theta
-        angle_error = np.arctan2(np.sin(angle_error), np.cos(angle_error))  # Normalize
+        # Find closest obstacle in front sector (robot frame)
+        min_dist = float('inf')
+        closest_angle_robot_frame = 0.0
 
-        # If obstacle is close, steer to follow tangent
-        if min_dist < 0.8:  # Within 0.8m of obstacle
-            obs_x, obs_y, obs_r = closest_obs
+        for obs_x, obs_y, obs_r in self.obstacles.obstacles:
+            # Transform obstacle to robot frame
+            dx_world = obs_x - x
+            dy_world = obs_y - y
 
-            # Vector from robot to obstacle center
-            dx_obs = obs_x - x
-            dy_obs = obs_y - y
-            dist_to_center = np.sqrt(dx_obs**2 + dy_obs**2)
+            # Rotate to robot frame (robot at origin, facing +x)
+            dx_robot = dx_world * np.cos(-theta) - dy_world * np.sin(-theta)
+            dy_robot = dx_world * np.sin(-theta) + dy_world * np.cos(-theta)
 
-            # Tangent vector (perpendicular to radial direction)
-            # Choose direction based on which side obstacle is on
-            radial_angle = np.arctan2(dy_obs, dx_obs)
+            dist_to_surface = np.sqrt(dx_robot**2 + dy_robot**2) - obs_r
+            angle_in_robot_frame = np.arctan2(dy_robot, dx_robot)
 
-            # Determine which way to go around (prefer going right if straight ahead)
-            if abs(dy_obs) < 0.2:  # Obstacle is straight ahead
-                tangent_angle = radial_angle + np.pi/2  # Go right
+            # Only consider obstacles in front sector (-90° to +90°)
+            if abs(angle_in_robot_frame) < np.pi/2:
+                if 0.1 < dist_to_surface < 1.5:
+                    if dist_to_surface < min_dist:
+                        min_dist = dist_to_surface
+                        closest_angle_robot_frame = angle_in_robot_frame
+
+        # If obstacle detected, steer away from it
+        if min_dist < 1.5:
+            # Distance-based scaling: closer = more steering
+            dist_factor = max(0.0, 1.0 - (min_dist / 1.5))
+
+            # Determine steering direction in robot frame
+            # If obstacle at positive angle (left side), steer right (negative omega)
+            # If obstacle at negative angle (right side), steer left (positive omega)
+            if abs(closest_angle_robot_frame) < 0.1:  # Straight ahead
+                omega_ref = dist_factor * 1.2  # Steer left moderately
             else:
-                # Go away from obstacle in y-direction
-                tangent_angle = radial_angle + np.pi/2 * np.sign(-dy_obs)
-
-            # Steer toward tangent direction
-            angle_error = tangent_angle - theta
-            angle_error = np.arctan2(np.sin(angle_error), np.cos(angle_error))
-
-        # Simple proportional controller for steering
-        K_p = 3.0  # Proportional gain
-        omega_ref = K_p * angle_error
-        omega_ref = np.clip(omega_ref, -1.0, 1.0)  # Limit steering rate
+                # Steer away: opposite sign of obstacle angle
+                omega_ref = -np.sign(closest_angle_robot_frame) * dist_factor * 1.5
 
         return [v_ref, omega_ref]
 

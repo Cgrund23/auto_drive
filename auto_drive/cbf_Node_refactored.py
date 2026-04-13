@@ -360,46 +360,47 @@ class ControllerNode(Node):
 
     def tangent_controller(self):
         """
-        Nominal tangent controller: generates steering to navigate around obstacles
+        Robot-frame tangent controller: steers away from obstacles while driving forward.
+        Works in robot frame (no global coordinates needed).
         Returns: [v_ref, omega_ref]
         """
-        # Find closest obstacle from LiDAR (if available)
+        # Default: drive straight forward
+        v_ref = 1.0
+        omega_ref = 0.0
+
+        # Find closest obstacle in front sector (-90° to +90°)
+        if not hasattr(self, 'last_ranges'):
+            return [v_ref, omega_ref]
+
+        ranges = self.last_ranges
+        angles = self.last_angles
+
         min_dist = float('inf')
         closest_angle = 0.0
 
-        # Simple heuristic: if obstacles detected close by, steer away
-        # In practice, you'd use actual obstacle positions from mapping
-        if hasattr(self, 'last_ranges'):
-            ranges = self.last_ranges
-            angles = self.last_angles
-            for i, r in enumerate(ranges):
-                if 0.1 < r < 1.0:  # Obstacle within 1m
+        # Only look in front sector
+        for i, r in enumerate(ranges):
+            angle = float(angles[i])
+            if abs(angle) < cp.pi/2:  # Front 180° sector
+                if 0.1 < r < 1.5:  # Obstacle within detection range
                     if r < min_dist:
                         min_dist = r
-                        closest_angle = angles[i]
+                        closest_angle = angle
 
-        # Default: drive forward toward goal
-        v_ref = 1.0
+        # If obstacle detected, steer away from it
+        if min_dist < 1.5:
+            # Distance-based scaling: closer = more steering
+            dist_factor = max(0.0, 1.0 - (min_dist / 1.5))
 
-        # Compute angle to goal
-        dx_goal = self.goal_x - self.x
-        dy_goal = self.goal_y - self.y
-        angle_to_goal = float(cp.arctan2(dy_goal, dx_goal))
-        angle_error = angle_to_goal - self.theta
-        angle_error = float(cp.arctan2(cp.sin(angle_error), cp.cos(angle_error)))
-
-        # If obstacle detected close, steer to tangent
-        if min_dist < 0.8:
-            # Steer perpendicular to obstacle direction (tangent)
-            # If obstacle on right (angle > 0), steer left
-            # If obstacle on left (angle < 0), steer right
-            tangent_angle = closest_angle + float(cp.sign(-closest_angle)) * cp.pi/2
-            angle_error = tangent_angle
-
-        # Proportional steering controller
-        K_p = 3.0
-        omega_ref = float(K_p * angle_error)
-        omega_ref = float(cp.clip(omega_ref, -1.0, 1.0))
+            # Determine steering direction
+            # If obstacle at positive angle (left side), steer right (negative omega)
+            # If obstacle at negative angle (right side), steer left (positive omega)
+            # If obstacle straight ahead, pick a side (prefer left/positive)
+            if abs(closest_angle) < 0.1:  # Straight ahead
+                omega_ref = dist_factor * 1.2  # Steer left moderately
+            else:
+                # Steer away: opposite sign of obstacle angle
+                omega_ref = -float(cp.sign(closest_angle)) * dist_factor * 1.5
 
         return [v_ref, omega_ref]
 
