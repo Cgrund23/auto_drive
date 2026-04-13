@@ -411,11 +411,8 @@ class CBF:
         distance: Iterable or array of distances
         angle:    Iterable or array of angles (in radians)
         """
-        # Convert inputs to CuPy arrays (if they're not already)
-        if not isinstance(distance, cp.ndarray):
-            distance = cp.asarray(distance)
-        if not isinstance(angle, cp.ndarray):
-            angle = cp.asarray(angle)
+        distance = cp.asarray(distance)
+        angle = cp.asarray(angle)
 
         # Create a boolean mask for points within the max range
         mask_range = distance < self.params.r_max
@@ -584,7 +581,7 @@ class CBF:
 
             v_star, w_star = sol
 
-            return [v_star, w_star], self.f_full()
+            return (float(v_star), float(w_star)), None
 
         except Exception as e:
             print("QP failed:", e)

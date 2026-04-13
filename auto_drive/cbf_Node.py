@@ -137,10 +137,9 @@ class Controller_Node(Node):
         start_time = time.time()
 
         # --- Step 1: Extract LiDAR ranges and compute angles ---
-        ranges = cp.array(msg.ranges)
-        angles = cp.linspace(msg.angle_min, msg.angle_max, len(ranges))  # ensure same length
+        ranges = np.array(msg.ranges, dtype=np.float32)
+        angles = np.linspace(msg.angle_min, msg.angle_max, len(ranges), dtype=np.float32)
 
-        # --- Step 2: Update CBF object with obstacles ---
         self.CBFobj.setObjects(ranges, angles)
 
         # --- Step 3: Predict/update ULM estimates for rho and alpha ---
@@ -155,6 +154,8 @@ class Controller_Node(Node):
 
         rho_hat, _, _, _ = self.ulm_rho.get_estimates()
         alpha_hat, _, _, _ = self.ulm_alpha.get_estimates()
+        rho_hat = float(rho_hat)
+        alpha_hat = float(alpha_hat)
         self.get_logger().info(f"ULM estimates: rho={rho_hat:.3f}, alpha={alpha_hat:.3f}")
 
         # --- Step 4: Compute CBF-constrained control ---
