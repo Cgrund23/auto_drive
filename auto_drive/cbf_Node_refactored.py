@@ -304,7 +304,7 @@ class ControllerNode(Node):
         super().__init__('ModelFreeCBF_Node')
 
         # Parameters - HARDWARE TUNED
-        self.dt = 0.002  # 20 Hz
+        self.dt = 0.02  # 20 Hz
         self.v_max = 2.0
         self.v_min = 0.0  # CRITICAL: Allow robot to stop! Was 0.5
         self.omega_max = 10.0
@@ -325,9 +325,13 @@ class ControllerNode(Node):
         self.theta = 0.0
         self.v = 1.0
 
-        # Reference command
+        # Reference command - will be updated by tangent controller
         self.u_ref = [1.0, 0.0]  # [v_ref, ω_ref]
         self.u_prev = [1.0, 0.0]
+
+        # Goal for tangent controller
+        self.goal_x = 3.0  # Target x position (meters ahead)
+        self.goal_y = 0.0  # Target y position (stay centered)
 
         # Initialize EKFs
         self.safety_ekf = SafetyULM_EKF(Ts=self.dt, m_inputs=2)
@@ -353,6 +357,51 @@ class ControllerNode(Node):
         self.cmd_pub = self.create_publisher(AckermannDriveStamped, '/drive', 10)
 
         self.get_logger().info('Model-Free CBF Node initialized')
+
+    def tangent_controller(self):
+        """
+        Nominal tangent controller: generates steering to navigate around obstacles
+        Returns: [v_ref, omega_ref]
+        """
+        # Find closest obstacle from LiDAR (if available)
+        min_dist = float('inf')
+        closest_angle = 0.0
+
+        # Simple heuristic: if obstacles detected close by, steer away
+        # In practice, you'd use actual obstacle positions from mapping
+        if hasattr(self, 'last_ranges'):
+            ranges = self.last_ranges
+            angles = self.last_angles
+            for i, r in enumerate(ranges):
+                if 0.1 < r < 1.0:  # Obstacle within 1m
+                    if r < min_dist:
+                        min_dist = r
+                        closest_angle = angles[i]
+
+        # Default: drive forward toward goal
+        v_ref = 1.0
+
+        # Compute angle to goal
+        dx_goal = self.goal_x - self.x
+        dy_goal = self.goal_y - self.y
+        angle_to_goal = float(cp.arctan2(dy_goal, dx_goal))
+        angle_error = angle_to_goal - self.theta
+        angle_error = float(cp.arctan2(cp.sin(angle_error), cp.cos(angle_error)))
+
+        # If obstacle detected close, steer to tangent
+        if min_dist < 0.8:
+            # Steer perpendicular to obstacle direction (tangent)
+            # If obstacle on right (angle > 0), steer left
+            # If obstacle on left (angle < 0), steer right
+            tangent_angle = closest_angle + float(cp.sign(-closest_angle)) * cp.pi/2
+            angle_error = tangent_angle
+
+        # Proportional steering controller
+        K_p = 3.0
+        omega_ref = float(K_p * angle_error)
+        omega_ref = float(cp.clip(omega_ref, -1.0, 1.0))
+
+        return [v_ref, omega_ref]
 
     def odom_callback(self, msg):
         """Update position from odometry."""
@@ -380,8 +429,15 @@ class ControllerNode(Node):
         ranges = cp.array(msg.ranges, dtype=cp.float32)
         angles = cp.linspace(msg.angle_min, msg.angle_max, len(ranges), dtype=cp.float32)
 
+        # Store for tangent controller
+        self.last_ranges = ranges
+        self.last_angles = angles
+
         # Update CBF with obstacle points
         self.cbf.set_obstacles(ranges, angles)
+
+        # TANGENT CONTROLLER: Update reference command to steer around obstacles
+        self.u_ref = self.tangent_controller()
 
         # Debug: log obstacle count
         n_obstacles = self.cbf.N

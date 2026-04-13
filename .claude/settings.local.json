@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls -la auto_drive/*.py)"
+      "Bash(ls -la auto_drive/*.py)",
+      "Bash(python simulate_cbf_cpu.py)"
     ]
   }
 }
