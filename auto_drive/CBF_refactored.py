@@ -270,10 +270,10 @@ class ModelFreeCBF:
         except Exception as e:
             print(f'QP solve failed: {e}')
             print(f'  q_hat={q_hat:.3f}, qdot_hat={qdot_hat:.3f}')
-            print(f'  F_q_hat={F_q_hat:.3f}, B_q_hat={B_q_hat}')
-            print(f'  r_k={r_k:.3f}, sigma_k={sigma_k:.3f}')
+            print(f'  F_q_hat={F_q_hat:.3f}, B_q_hat={cp.asnumpy(B_q_hat)}')
+            print(f'  r_k={float(r_k):.3f}, sigma_k={sigma_k:.3f}')
             # Return safe fallback
-            return [float(self.u_min[0]), 0.0]
+            return [float(cp.asnumpy(self.u_min)[0]), 0.0]
 
     def check_feasibility(self, q_hat, qdot_hat, F_q_hat, B_q_hat, sigma_k):
         """
