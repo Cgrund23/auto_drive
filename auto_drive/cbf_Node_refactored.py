@@ -330,7 +330,7 @@ class ControllerNode(Node):
         self.u_prev = [1.0, 0.0]
 
         # Goal for tangent controller
-        self.goal_x = 3.0  # Target x position (meters ahead)
+        self.goal_x = 10.0  # Target x position (meters ahead)
         self.goal_y = 0.0  # Target y position (stay centered)
 
         # Initialize EKFs
