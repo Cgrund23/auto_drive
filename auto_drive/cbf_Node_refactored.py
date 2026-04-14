@@ -306,7 +306,7 @@ class ControllerNode(Node):
         # Parameters - HARDWARE TUNED
         self.dt = 0.02  # 20 Hz
         self.v_max = 1.5
-        self.v_min = 0.5  # CRITICAL: Allow robot to stop! Was 0.5
+        self.v_min = 0.0  # CRITICAL: Allow robot to stop! Was 0.5
         self.omega_max = 0.5
         self.omega_min = -0.5
         self.r_max = 5.0
