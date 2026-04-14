@@ -360,7 +360,7 @@ class ControllerNode(Node):
 
     def tangent_controller(self):
         """
-        Robot-frame tangent controller: steers away from obstacles while driving forward.
+        Gap-following controller: finds largest gap in LiDAR and steers toward it.
         Works in robot frame (no global coordinates needed).
         Returns: [v_ref, omega_ref]
         """
@@ -368,39 +368,59 @@ class ControllerNode(Node):
         v_ref = 1.0
         omega_ref = 0.0
 
-        # Find closest obstacle in front sector (-90° to +90°)
         if not hasattr(self, 'last_ranges'):
             return [v_ref, omega_ref]
 
         ranges = self.last_ranges
         angles = self.last_angles
 
-        min_dist = float('inf')
-        closest_angle = 0.0
+        # Only consider front sector (-90° to +90°)
+        front_mask = cp.abs(angles) < cp.pi/2
+        front_ranges = ranges[front_mask]
+        front_angles = angles[front_mask]
 
-        # Only look in front sector
-        for i, r in enumerate(ranges):
-            angle = float(angles[i])
-            if abs(angle) < cp.pi/2:  # Front 180° sector
-                if 0.1 < r < 1.5:  # Obstacle within detection range
-                    if r < min_dist:
-                        min_dist = r
-                        closest_angle = angle
+        if len(front_ranges) == 0:
+            return [v_ref, omega_ref]
 
-        # If obstacle detected, steer away from it
-        if min_dist < 1.5:
-            # Distance-based scaling: closer = more steering
-            dist_factor = max(0.0, 1.0 - (min_dist / 1.5))
+        # Find gaps (continuous sectors with range > threshold)
+        gap_threshold = 1.5  # Minimum distance to be considered "free"
+        is_free = front_ranges > gap_threshold
 
-            # Determine steering direction
-            # If obstacle at positive angle (left side), steer right (negative omega)
-            # If obstacle at negative angle (right side), steer left (positive omega)
-            # If obstacle straight ahead, pick a side (prefer left/positive)
-            if abs(closest_angle) < 0.1:  # Straight ahead
-                omega_ref = dist_factor * 1.2  # Steer left moderately
+        # Find largest gap
+        max_gap_size = 0
+        max_gap_center_angle = 0.0
+        current_gap_size = 0
+        current_gap_start_idx = 0
+
+        for i in range(len(is_free)):
+            if is_free[i]:
+                if current_gap_size == 0:
+                    current_gap_start_idx = i
+                current_gap_size += 1
             else:
-                # Steer away: opposite sign of obstacle angle
-                omega_ref = -float(cp.sign(closest_angle)) * dist_factor * 1.5
+                if current_gap_size > max_gap_size:
+                    max_gap_size = current_gap_size
+                    # Gap center angle
+                    gap_center_idx = current_gap_start_idx + current_gap_size // 2
+                    max_gap_center_angle = float(front_angles[gap_center_idx])
+                current_gap_size = 0
+
+        # Check last gap
+        if current_gap_size > max_gap_size:
+            max_gap_size = current_gap_size
+            gap_center_idx = current_gap_start_idx + current_gap_size // 2
+            max_gap_center_angle = float(front_angles[gap_center_idx])
+
+        # If no gap found, find direction with maximum range
+        if max_gap_size == 0:
+            max_range_idx = int(cp.argmax(front_ranges))
+            max_gap_center_angle = float(front_angles[max_range_idx])
+
+        # Steer toward gap center with proportional control
+        # Prefer forward-facing gaps (weight by cos)
+        K_p = 2.0
+        omega_ref = float(K_p * max_gap_center_angle)
+        omega_ref = float(cp.clip(omega_ref, -1.0, 1.0))
 
         return [v_ref, omega_ref]
 

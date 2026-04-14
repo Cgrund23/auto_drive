@@ -313,11 +313,30 @@ class F1TenthSim:
 
 
 class ObstacleField:
-    def __init__(self):
-        # Single obstacle in center of path
-        self.obstacles = [
-            [1.5, 0.0, 0.3],  # Center obstacle at x=1.5m
-        ]
+    def __init__(self, n_obstacles=5, seed=None):
+        """
+        Generate random obstacles along the path
+
+        Args:
+            n_obstacles: Number of random obstacles
+            seed: Random seed for reproducibility (None for random)
+        """
+        if seed is not None:
+            np.random.seed(seed)
+
+        self.obstacles = []
+
+        # Generate random obstacles scattered along the path
+        # Path is roughly x: [0, 4], y: [-1, 1]
+        for i in range(n_obstacles):
+            x = np.random.uniform(0.5, 3.5)  # Along path
+            y = np.random.uniform(-0.8, 0.8)  # Lateral spread
+            r = np.random.uniform(0.2, 0.4)  # Radius variation
+            self.obstacles.append([x, y, r])
+
+        print(f"Generated {n_obstacles} random obstacles:")
+        for i, (x, y, r) in enumerate(self.obstacles):
+            print(f"  Obstacle {i+1}: x={x:.2f}m, y={y:.2f}m, r={r:.2f}m")
 
     def get_lidar_scan(self, robot_x, robot_y, robot_theta, n_rays=360, max_range=5.0):
         angles = np.linspace(-np.pi, np.pi, n_rays)
@@ -340,10 +359,10 @@ class ObstacleField:
 
 
 class CBFSimulator:
-    def __init__(self):
+    def __init__(self, n_obstacles=5, seed=42):
         self.dt = 0.05
         self.robot = F1TenthSim(x=0.0, y=0.0, theta=0.0)
-        self.obstacles = ObstacleField()
+        self.obstacles = ObstacleField(n_obstacles=n_obstacles, seed=seed)
         self.v_max = 2.0
         self.v_min = 0.0
         self.omega_max = 10.0
@@ -374,54 +393,67 @@ class CBFSimulator:
 
     def tangent_controller(self, x, y, theta, goal_x=3.0, goal_y=0.0):
         """
-        Robot-frame tangent controller: steers away from obstacles while driving forward.
-        Simulates the hardware controller that works in robot frame (no global goal tracking).
+        Gap-following controller: finds largest gap in LiDAR and steers toward it.
+        Works in robot frame (no global goal tracking).
 
-        Note: Still takes x,y,theta for simulation purposes (obstacle detection),
+        Note: Still takes x,y,theta for simulation purposes (get lidar scan),
         but controller logic is robot-frame only.
 
         Returns: [v_ref, omega_ref]
         """
-        # Default: drive straight forward in robot frame
+        # Default: drive straight forward
         v_ref = 1.0
         omega_ref = 0.0
 
-        # Find closest obstacle in front sector (robot frame)
-        min_dist = float('inf')
-        closest_angle_robot_frame = 0.0
+        # Get simulated LiDAR scan in robot frame
+        ranges, angles = self.obstacles.get_lidar_scan(x, y, theta)
 
-        for obs_x, obs_y, obs_r in self.obstacles.obstacles:
-            # Transform obstacle to robot frame
-            dx_world = obs_x - x
-            dy_world = obs_y - y
+        # Only consider front sector (-90° to +90°)
+        front_mask = np.abs(angles) < np.pi/2
+        front_ranges = ranges[front_mask]
+        front_angles = angles[front_mask]
 
-            # Rotate to robot frame (robot at origin, facing +x)
-            dx_robot = dx_world * np.cos(-theta) - dy_world * np.sin(-theta)
-            dy_robot = dx_world * np.sin(-theta) + dy_world * np.cos(-theta)
+        if len(front_ranges) == 0:
+            return [v_ref, omega_ref]
 
-            dist_to_surface = np.sqrt(dx_robot**2 + dy_robot**2) - obs_r
-            angle_in_robot_frame = np.arctan2(dy_robot, dx_robot)
+        # Find gaps (continuous sectors with range > threshold)
+        gap_threshold = 1.5  # Minimum distance to be considered "free"
+        is_free = front_ranges > gap_threshold
 
-            # Only consider obstacles in front sector (-90° to +90°)
-            if abs(angle_in_robot_frame) < np.pi/2:
-                if 0.1 < dist_to_surface < 1.5:
-                    if dist_to_surface < min_dist:
-                        min_dist = dist_to_surface
-                        closest_angle_robot_frame = angle_in_robot_frame
+        # Find largest gap
+        max_gap_size = 0
+        max_gap_center_angle = 0.0
+        current_gap_size = 0
+        current_gap_start_idx = 0
 
-        # If obstacle detected, steer away from it
-        if min_dist < 1.5:
-            # Distance-based scaling: closer = more steering
-            dist_factor = max(0.0, 1.0 - (min_dist / 1.5))
-
-            # Determine steering direction in robot frame
-            # If obstacle at positive angle (left side), steer right (negative omega)
-            # If obstacle at negative angle (right side), steer left (positive omega)
-            if abs(closest_angle_robot_frame) < 0.1:  # Straight ahead
-                omega_ref = dist_factor * 1.2  # Steer left moderately
+        for i in range(len(is_free)):
+            if is_free[i]:
+                if current_gap_size == 0:
+                    current_gap_start_idx = i
+                current_gap_size += 1
             else:
-                # Steer away: opposite sign of obstacle angle
-                omega_ref = -np.sign(closest_angle_robot_frame) * dist_factor * 1.5
+                if current_gap_size > max_gap_size:
+                    max_gap_size = current_gap_size
+                    # Gap center angle
+                    gap_center_idx = current_gap_start_idx + current_gap_size // 2
+                    max_gap_center_angle = float(front_angles[gap_center_idx])
+                current_gap_size = 0
+
+        # Check last gap
+        if current_gap_size > max_gap_size:
+            max_gap_size = current_gap_size
+            gap_center_idx = current_gap_start_idx + current_gap_size // 2
+            max_gap_center_angle = float(front_angles[gap_center_idx])
+
+        # If no gap found, find direction with maximum range
+        if max_gap_size == 0:
+            max_range_idx = int(np.argmax(front_ranges))
+            max_gap_center_angle = float(front_angles[max_range_idx])
+
+        # Steer toward gap center with proportional control
+        K_p = 2.0
+        omega_ref = float(K_p * max_gap_center_angle)
+        omega_ref = np.clip(omega_ref, -1.0, 1.0)
 
         return [v_ref, omega_ref]
 
@@ -574,5 +606,8 @@ class CBFSimulator:
 
 
 if __name__ == '__main__':
-    sim = CBFSimulator()
-    sim.run(max_steps=200)
+    # Create simulator with random obstacles
+    # n_obstacles: number of obstacles (default 5)
+    # seed: random seed for reproducibility (None for different obstacles each run)
+    sim = CBFSimulator(n_obstacles=8, seed=123)  # More obstacles for harder test
+    sim.run(max_steps=400)
