@@ -313,30 +313,54 @@ class F1TenthSim:
 
 
 class ObstacleField:
-    def __init__(self, n_obstacles=5, seed=None):
+    def __init__(self, track_type='oval'):
         """
-        Generate random obstacles along the path
+        Generate racetrack walls
 
         Args:
-            n_obstacles: Number of random obstacles
-            seed: Random seed for reproducibility (None for random)
+            track_type: 'oval' or 'random' obstacles
         """
-        if seed is not None:
-            np.random.seed(seed)
-
         self.obstacles = []
 
-        # Generate random obstacles scattered along the path
-        # Path is roughly x: [0, 4], y: [-1, 1]
-        for i in range(n_obstacles):
-            x = np.random.uniform(0.5, 3.5)  # Along path
-            y = np.random.uniform(-0.8, 0.8)  # Lateral spread
-            r = np.random.uniform(0.2, 0.4)  # Radius variation
-            self.obstacles.append([x, y, r])
+        if track_type == 'oval':
+            # Oval track parameters
+            # Track center at origin, major axis along x, minor axis along y
+            major_radius = 4.0  # Half-length along x
+            minor_radius = 2.5  # Half-width along y
+            track_width = 1.2   # Width of drivable track
+            wall_thickness = 0.15  # Wall thickness for LiDAR detection
 
-        print(f"Generated {n_obstacles} random obstacles:")
-        for i, (x, y, r) in enumerate(self.obstacles):
-            print(f"  Obstacle {i+1}: x={x:.2f}m, y={y:.2f}m, r={r:.2f}m")
+            # Generate walls as small circular obstacles along track perimeter
+            n_points = 80  # Number of wall segments
+
+            # Outer wall
+            for i in range(n_points):
+                theta = 2 * np.pi * i / n_points
+                x = (major_radius + track_width/2) * np.cos(theta)
+                y = (minor_radius + track_width/2) * np.sin(theta)
+                self.obstacles.append([x, y, wall_thickness])
+
+            # Inner wall
+            for i in range(n_points):
+                theta = 2 * np.pi * i / n_points
+                x = (major_radius - track_width/2) * np.cos(theta)
+                y = (minor_radius - track_width/2) * np.sin(theta)
+                self.obstacles.append([x, y, wall_thickness])
+
+            print(f"Generated oval racetrack:")
+            print(f"  Major radius: {major_radius}m")
+            print(f"  Minor radius: {minor_radius}m")
+            print(f"  Track width: {track_width}m")
+            print(f"  Wall segments: {2*n_points}")
+        else:
+            # Random obstacles (old behavior)
+            n_obstacles = 5
+            for i in range(n_obstacles):
+                x = np.random.uniform(0.5, 3.5)
+                y = np.random.uniform(-0.8, 0.8)
+                r = np.random.uniform(0.2, 0.4)
+                self.obstacles.append([x, y, r])
+            print(f"Generated {n_obstacles} random obstacles")
 
     def get_lidar_scan(self, robot_x, robot_y, robot_theta, n_rays=360, max_range=5.0):
         angles = np.linspace(-np.pi, np.pi, n_rays)
@@ -359,10 +383,16 @@ class ObstacleField:
 
 
 class CBFSimulator:
-    def __init__(self, n_obstacles=5, seed=42):
+    def __init__(self, track_type='oval'):
         self.dt = 0.05
-        self.robot = F1TenthSim(x=0.0, y=0.0, theta=0.0)
-        self.obstacles = ObstacleField(n_obstacles=n_obstacles, seed=seed)
+        # Start robot on the track (in the middle of the drivable surface)
+        if track_type == 'oval':
+            # Track: major_radius=4.0, minor_radius=2.5, track_width=1.2
+            # Start on right side, facing tangent to track (90° = north)
+            self.robot = F1TenthSim(x=4.0, y=0.0, theta=np.pi/2)
+        else:
+            self.robot = F1TenthSim(x=0.0, y=0.0, theta=0.0)
+        self.obstacles = ObstacleField(track_type=track_type)
         self.v_max = 2.0
         self.v_min = 0.0
         self.omega_max = 10.0
@@ -525,19 +555,20 @@ class CBFSimulator:
                   f"x={x:.2f}m y={y:.2f}m | q={q_hat:.3f} | "
                   f"B_q=[{B_q_hat[0]:.2f},{B_q_hat[1]:.2f}] | "
                   f"v={v_cmd:.2f} w={u_safe[1]:.2f}")
+        # Check for collision with any obstacle/wall
         for obs_x, obs_y, obs_r in self.obstacles.obstacles:
             dist = np.sqrt((x - obs_x)**2 + (y - obs_y)**2)
-            if dist < obs_r + 0.15:
+            if dist < obs_r + 0.15:  # Robot radius ~0.15m
                 print(f"\n*** COLLISION at t={len(self.history['x'])*self.dt:.2f}s ***")
+                print(f"Hit wall at ({obs_x:.2f}, {obs_y:.2f})")
                 return False
-        if x > 3.0:
-            print(f"\n*** SUCCESS! Reached goal at t={len(self.history['x'])*self.dt:.2f}s ***")
-            return False
+
+        # For oval track, no specific goal - just keep driving
         return True
 
     def run(self, max_steps=200):
         print("Starting CBF simulation...")
-        print(f"Goal: Drive from (0,0) to (3,0) avoiding obstacles\n")
+        print(f"Robot will drive around the track using gap-following controller")
         for i in range(max_steps):
             if not self.step():
                 break
@@ -549,15 +580,28 @@ class CBFSimulator:
         fig, axes = plt.subplots(2, 3, figsize=(15, 8))
         t = np.arange(len(self.history['x'])) * self.dt
         ax = axes[0, 0]
-        ax.plot(self.history['x'], self.history['y'], 'b-', linewidth=2, label='Robot path')
+
+        # Draw track walls/obstacles
         for obs_x, obs_y, obs_r in self.obstacles.obstacles:
-            circle = plt.Circle((obs_x, obs_y), obs_r, color='r', alpha=0.5)
+            circle = plt.Circle((obs_x, obs_y), obs_r, color='gray', alpha=0.3)
             ax.add_patch(circle)
-        ax.plot(0, 0, 'go', markersize=10, label='Start')
-        ax.plot(3, 0, 'r*', markersize=15, label='Goal')
+
+        # Plot robot trajectory
+        ax.plot(self.history['x'], self.history['y'], 'b-', linewidth=2, label='Robot path')
+
+        # Mark start position
+        start_x = self.history['x'][0]
+        start_y = self.history['y'][0]
+        ax.plot(start_x, start_y, 'go', markersize=10, label='Start')
+
+        # Mark end position
+        end_x = self.history['x'][-1]
+        end_y = self.history['y'][-1]
+        ax.plot(end_x, end_y, 'ro', markersize=10, label='End')
+
         ax.set_xlabel('X (m)')
         ax.set_ylabel('Y (m)')
-        ax.set_title('Trajectory')
+        ax.set_title('Racetrack Trajectory')
         ax.legend()
         ax.grid(True)
         ax.axis('equal')
@@ -606,8 +650,7 @@ class CBFSimulator:
 
 
 if __name__ == '__main__':
-    # Create simulator with random obstacles
-    # n_obstacles: number of obstacles (default 5)
-    # seed: random seed for reproducibility (None for different obstacles each run)
-    sim = CBFSimulator(n_obstacles=8, seed=123)  # More obstacles for harder test
-    sim.run(max_steps=400)
+    # Create simulator with oval racetrack
+    # track_type: 'oval' for racetrack, 'random' for random obstacles
+    sim = CBFSimulator(track_type='oval')
+    sim.run(max_steps=600)  # Run for ~30 seconds (about 2-3 laps)

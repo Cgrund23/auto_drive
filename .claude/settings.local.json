@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(ls -la auto_drive/*.py)",
-      "Bash(python simulate_cbf_cpu.py)"
+      "Bash(python simulate_cbf_cpu.py)",
+      "Bash(pkill -f \"python simulate_cbf_cpu.py\")"
     ]
   }
 }
