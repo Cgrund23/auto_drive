@@ -420,7 +420,7 @@ class ControllerNode(Node):
         # Prefer forward-facing gaps (weight by cos)
         K_p = 2.0
         omega_ref = K_p * max_gap_center_angle
-        omega_ref = max(-1.0, min(1.0, omega_ref))  # Clip using Python built-ins
+        omega_ref = max(-0.5, min(0.5, omega_ref))  # Clip using Python built-ins
 
         return [v_ref, omega_ref]
 
