@@ -305,13 +305,13 @@ class ControllerNode(Node):
 
         # Parameters - HARDWARE TUNED
         self.dt = 0.02  # 20 Hz
-        self.v_max = 2.0
-        self.v_min = -1.0  # CRITICAL: Allow robot to stop! Was 0.5
+        self.v_max = 1.5
+        self.v_min = 0.5  # CRITICAL: Allow robot to stop! Was 0.5
         self.omega_max = 3.0
         self.omega_min = -3.0
         self.r_max = 5.0
         self.r_min_obstacle = 0.75  # Only consider obstacles VERY close (meters)
-        self.length_scale = 0.1  # Very tight kernel - less bleed from distant obstacles
+        self.length_scale = 0.05  # Very tight kernel - less bleed from distant obstacles
         self.sigma_f = 1.0
 
         # HOCBF parameters (from paper, Section II-C) - RELAXED FOR FEASIBILITY
