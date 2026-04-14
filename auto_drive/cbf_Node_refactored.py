@@ -549,7 +549,7 @@ class ControllerNode(Node):
         """Publish Ackermann drive command."""
         msg = AckermannDriveStamped()
         msg.drive.speed = float(v)
-        msg.drive.steering_angle = -float(omega)
+        msg.drive.steering_angle = float(omega)
         self.cmd_pub.publish(msg)
 
 
