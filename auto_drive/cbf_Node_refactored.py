@@ -184,11 +184,11 @@ class SafetyULM_EKF:
         Returns:
             q_hat, qdot_hat, F_q_hat, B_q_hat, P
         """
-        # Constrain B_q to reasonable bounds
+        # Constrain B_q to reasonable bounds (clip before converting to float)
         B_q = self.x[3:3+self.m].copy()
-        B_q[0] = float(cp.clip(B_q[0], 0.05, 3.0))  # Velocity effect must be positive
+        B_q[0] = cp.clip(B_q[0], 0.05, 3.0)  # Velocity effect must be positive
         if self.m > 1:
-            B_q[1] = float(cp.clip(B_q[1], -1.0, 1.0))  # Steering effect bounded
+            B_q[1] = cp.clip(B_q[1], -1.0, 1.0)  # Steering effect bounded
 
         return (
             float(self.x[0]),
@@ -419,7 +419,7 @@ class ControllerNode(Node):
         # Steer toward gap center with proportional control
         # Prefer forward-facing gaps (weight by cos)
         K_p = 2.0
-        omega_ref = float(K_p * max_gap_center_angle)
+        omega_ref = K_p * max_gap_center_angle
         omega_ref = float(cp.clip(omega_ref, -1.0, 1.0))
 
         return [v_ref, omega_ref]
