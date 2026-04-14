@@ -307,11 +307,11 @@ class ControllerNode(Node):
         self.dt = 0.02  # 20 Hz
         self.v_max = 1.5
         self.v_min = 0.5  # CRITICAL: Allow robot to stop! Was 0.5
-        self.omega_max = 1.0
-        self.omega_min = -1.0
+        self.omega_max = 0.5
+        self.omega_min = -0.5
         self.r_max = 5.0
-        self.r_min_obstacle = 0.75  # Only consider obstacles VERY close (meters)
-        self.length_scale = 0.05  # Very tight kernel - less bleed from distant obstacles
+        self.r_min_obstacle = 0.5  # Only consider obstacles VERY close (meters)
+        self.length_scale = 0.025  # Very tight kernel - less bleed from distant obstacles
         self.sigma_f = 1.0
 
         # HOCBF parameters (from paper, Section II-C) - RELAXED FOR FEASIBILITY
@@ -489,7 +489,7 @@ class ControllerNode(Node):
 
         # Compute measurement noise for q̇ (Eq. in Section III-B)
         grad_norm = float(cp.linalg.norm(grad_h))
-        sigma_pdot = 0.1  # Position velocity uncertainty (tune this)
+        sigma_pdot = 0.01  # Position velocity uncertainty (tune this)
         epsilon = 1e-6
         R_qdot = grad_norm**2 * sigma_pdot**2 + sigma_gp_sq / (self.length_scale**2 * (grad_norm**2 + epsilon))
 
