@@ -104,7 +104,7 @@ class CBFSimulator:
         self.omega_min = -10.0
         self.r_max = 5.0
         self.r_min_obstacle = 0.25
-        self.length_scale = 0.1
+        self.length_scale = 0.5
         self.sigma_f = 1.0
         self.lambda_0 = 0.5
         self.lambda_1 = 0.5

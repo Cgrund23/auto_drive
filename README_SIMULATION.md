@@ -38,7 +38,7 @@ Edit at top of `simulate_cbf_cpu.py`:
 
 ```python
 self.r_min_obstacle = 0.25  # Detection distance (m)
-self.length_scale = 0.1     # GP kernel width
+self.length_scale = 0.5     # GP kernel width
 self.lambda_0 = 0.5         # CBF aggressiveness
 self.lambda_1 = 0.5         # CBF aggressiveness  
 self.c_q = 0.05             # Safety margin (smaller = less conservative)
