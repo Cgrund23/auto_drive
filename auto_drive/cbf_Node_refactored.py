@@ -49,8 +49,9 @@ class SafetyULM_EKF:
         self.P = cp.diag(cp.array(P_diag))
 
         # Process noise (parameters F_q, B_q evolve slowly but need correction ability)
+        # REDUCED for hardware stability - high process noise causes drift
         if Q is None:
-            Q_diag = [1e-6, 1e-5, 1e-2] + [1e-2] * m_inputs  # Increased for B_q parameters
+            Q_diag = [1e-6, 1e-5, 1e-3] + [1e-3] * m_inputs  # Reduced from 1e-2 to 1e-3
             self.Q = cp.diag(cp.array(Q_diag))
         else:
             self.Q = Q
@@ -165,14 +166,20 @@ class SafetyULM_EKF:
         B_q = self.x[3:3+self.m]
 
         # Check if diverged
-        if float(B_q[0]) < 0.05 or float(B_q[0]) > 5.0:
-            # Reset parameters to initial values
+        B_q_v = float(B_q[0])
+        if B_q_v < 0.05 or B_q_v > 5.0:
+            # Log the divergence for debugging
+            reason = "too small" if B_q_v < 0.05 else "too large"
+            print(f"EKF DIVERGENCE: B_q,v = {B_q_v:.4f} ({reason})")
+
+            # Reset parameters to SAME initial values as __init__ for consistency
             self.x[2] = 0.0  # F_q
-            self.x[3] = 0.5  # B_q,v
+            self.x[3] = 1.0  # B_q,v (MATCH line 43!)
             if self.m > 1:
                 self.x[4] = 0.1  # B_q,ω
 
             # Reset covariance for parameters only (keep state estimates)
+            # Use SAME values as __init__ line 48
             P_diag = [0.01, 0.01, 0.1] + [0.1] * self.m
             self.P = cp.diag(cp.array(P_diag))
 
@@ -309,8 +316,7 @@ class ControllerNode(Node):
         self.v_min = 0.0  # CRITICAL: Allow robot to stop! Was 0.5
         self.omega_max = 0.5
         self.omega_min = -0.5
-        self.r_max = 5.0
-        self.r_min_obstacle = 1.0  # Only consider obstacles VERY close (meters)
+        self.r_max = 5.0  # Max range for LiDAR and obstacle detection (meters)
         self.length_scale = 0.1  # Very tight kernel - less bleed from distant obstacles
         self.sigma_f = 1.0
 
@@ -343,7 +349,7 @@ class ControllerNode(Node):
             u_min=[self.v_min, self.omega_min],
             u_max=[self.v_max, self.omega_max],
             r_max=self.r_max,
-            r_min_obstacle=self.r_min_obstacle,
+            r_min_obstacle=self.r_max,  # Use same value - obstacles within r_max affect barrier
             length_scale=self.length_scale,
             sigma_f=self.sigma_f,
             lambda_0=self.lambda_0,
@@ -465,7 +471,7 @@ class ControllerNode(Node):
         valid_ranges = ranges[(ranges > 0.1) & (ranges < self.r_max)]
         if len(valid_ranges) > 0:
             min_range = float(cp.min(valid_ranges))
-            self.get_logger().info(f'LiDAR: {n_obstacles} close obstacles (<{self.r_min_obstacle}m), closest scan at {min_range:.2f}m')
+            self.get_logger().info(f'LiDAR: {n_obstacles} obstacles (<{self.r_max}m), closest scan at {min_range:.2f}m')
         else:
             self.get_logger().info(f'LiDAR: No valid scans')
 
@@ -494,15 +500,32 @@ class ControllerNode(Node):
         R_qdot = grad_norm**2 * sigma_pdot**2 + sigma_gp_sq / (self.length_scale**2 * (grad_norm**2 + epsilon))
 
         # Step 4: Update safety EKF with measurements
-        self.safety_ekf.update_q(float(q_meas), R_q=float(sigma_gp_sq))
-        self.safety_ekf.update_qdot(qdot_meas, R_qdot=float(R_qdot))
+        # Add sanity checks to prevent bad measurements from causing divergence
+        if not cp.isnan(q_meas) and not cp.isinf(q_meas):
+            self.safety_ekf.update_q(float(q_meas), R_q=max(float(sigma_gp_sq), 1e-4))
+        else:
+            self.get_logger().warn(f'Invalid q_meas={q_meas}, skipping update')
+
+        if not cp.isnan(qdot_meas) and not cp.isinf(qdot_meas) and abs(qdot_meas) < 10.0:
+            self.safety_ekf.update_qdot(qdot_meas, R_qdot=max(float(R_qdot), 1e-4))
+        else:
+            self.get_logger().warn(f'Invalid qdot_meas={qdot_meas}, skipping update')
 
         # Check if EKF has diverged and reset if needed
+        ekf_just_reset = False
         if self.safety_ekf.reset_if_diverged():
-            self.get_logger().warn('EKF diverged! Resetting to initial conditions.')
+            ekf_just_reset = True
+            self.get_logger().warn(
+                f'EKF diverged! Resetting to initial conditions. '
+                f'Recent: q={q_meas:.3f}, qdot={qdot_meas:.3f}, n_obs={n_obstacles}'
+            )
 
         # Step 5: Get estimates for control (with B_q clamped to valid range)
         q_hat, qdot_hat, F_q_hat, B_q_hat, P_safety = self.safety_ekf.get_estimates()
+
+        # If EKF just reset, be extra conservative - don't bypass CBF
+        if ekf_just_reset:
+            q_hat = min(q_hat, 0.5)  # Force conservative estimate
 
         # SANITY CHECK: Only activate CBF if actually in danger
         # If barrier is high (q > 0.95) and no close obstacles, bypass CBF
