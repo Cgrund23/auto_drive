@@ -317,7 +317,7 @@ class ControllerNode(Node):
         self.omega_max = 0.5
         self.omega_min = -0.5
         self.r_max = 5.0  # Max range for LiDAR and obstacle detection (meters)
-        self.length_scale = 0.5  # Very tight kernel - less bleed from distant obstacles
+        self.length_scale = 1.0  # Very tight kernel - less bleed from distant obstacles
         self.sigma_f = 1.0
 
         # HOCBF parameters (from paper, Section II-C) - RELAXED FOR FEASIBILITY
