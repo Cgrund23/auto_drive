@@ -165,11 +165,11 @@ class SafetyULM_EKF:
         """
         B_q = self.x[3:3+self.m]
 
-        # Check if diverged
+        # Check if diverged (more aggressive bounds to catch problems early)
         B_q_v = float(B_q[0])
-        if B_q_v < 0.05 or B_q_v > 5.0:
+        if B_q_v < 0.4 or B_q_v > 5.0:
             # Log the divergence for debugging
-            reason = "too small" if B_q_v < 0.05 else "too large"
+            reason = "too small" if B_q_v < 0.4 else "too large"
             print(f"EKF DIVERGENCE: B_q,v = {B_q_v:.4f} ({reason})")
 
             # Reset parameters to SAME initial values as __init__ for consistency
@@ -192,8 +192,9 @@ class SafetyULM_EKF:
             q_hat, qdot_hat, F_q_hat, B_q_hat, P
         """
         # Constrain B_q to reasonable bounds (clip before converting to float)
+        # CRITICAL: B_q[0] must be large enough to make QP feasible!
         B_q = self.x[3:3+self.m].copy()
-        B_q[0] = cp.clip(B_q[0], 0.05, 3.0)  # Velocity effect must be positive
+        B_q[0] = cp.clip(B_q[0], 0.5, 3.0)  # Velocity effect MUST be >= 0.5 for feasibility
         if self.m > 1:
             B_q[1] = cp.clip(B_q[1], -1.0, 1.0)  # Steering effect bounded
 
@@ -530,25 +531,33 @@ class ControllerNode(Node):
             q_hat = max(0.0, q_hat)  # Don't let it think it's unsafe during recovery
             self.u_ref[0] = min(self.u_ref[0], 0.3)  # Force slow speed during recovery
 
-        # SANITY CHECK: Only activate CBF if actually in danger
-        # If barrier is high (q > 0.95) and no close obstacles, bypass CBF
-        if q_hat > 0.95 and n_obstacles == 0:
-            u_safe = self.u_ref
+        # Emergency brake if too close to obstacle
+        if len(valid_ranges) > 0:
+            min_range = float(cp.min(valid_ranges))
+            if min_range < 0.4:  # Emergency threshold
+                self.get_logger().warn(f'EMERGENCY: Obstacle at {min_range:.2f}m! Stopping.')
+                u_safe = [0.0, 0.0]  # Full stop
+            elif q_hat > 0.5 and n_obstacles == 0:
+                # Safe - use reference command
+                u_safe = self.u_ref
+            else:
+                # Step 6: Compute safe control (B_q is already clamped in get_estimates)
+                try:
+                    u_safe = self.cbf.compute_safe_control(
+                        u_ref=self.u_ref,
+                        q_hat=q_hat,
+                        qdot_hat=qdot_hat,
+                        F_q_hat=F_q_hat,
+                        B_q_hat=B_q_hat,
+                        P=P_safety
+                    )
+                except Exception as e:
+                    self.get_logger().error(f'CBF QP failed: {e}')
+                    # Emergency stop
+                    u_safe = [0.0, 0.0]
         else:
-            # Step 6: Compute safe control (B_q is already clamped in get_estimates)
-            try:
-                u_safe = self.cbf.compute_safe_control(
-                    u_ref=self.u_ref,
-                    q_hat=q_hat,
-                    qdot_hat=qdot_hat,
-                    F_q_hat=F_q_hat,
-                    B_q_hat=B_q_hat,
-                    P=P_safety
-                )
-            except Exception as e:
-                self.get_logger().error(f'CBF QP failed: {e}')
-                # Emergency stop
-                u_safe = [0.0, 0.0]
+            # No valid ranges - default to safe behavior
+            u_safe = self.u_ref
 
         # Step 7: Send command
         self.send_command(u_safe[0], u_safe[1])
