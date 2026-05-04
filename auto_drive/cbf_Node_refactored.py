@@ -318,7 +318,7 @@ class ControllerNode(Node):
         self.omega_max = 0.5
         self.omega_min = -0.5
         self.r_max = 5.0  # Max range for LiDAR and obstacle detection (meters)
-        self.length_scale = 0.75  # Very tight kernel - less bleed from distant obstacles
+        self.length_scale = 0.9  # Very tight kernel - less bleed from distant obstacles
         self.sigma_f = 1.0
 
         # HOCBF parameters (from paper, Section II-C) - RELAXED FOR FEASIBILITY
@@ -469,14 +469,9 @@ class ControllerNode(Node):
         # TANGENT CONTROLLER: Update reference command to steer around obstacles
         self.u_ref = self.tangent_controller()
 
-        # Debug: log obstacle count
+        # Get obstacle count and min range (needed for control logic)
         n_obstacles = self.cbf.N
         valid_ranges = ranges[(ranges > 0.1) & (ranges < self.r_max)]
-        if len(valid_ranges) > 0:
-            min_range = float(cp.min(valid_ranges))
-            self.get_logger().info(f'LiDAR: {n_obstacles} obstacles (<{self.r_max}m), closest scan at {min_range:.2f}m')
-        else:
-            self.get_logger().info(f'LiDAR: No valid scans')
 
         # Step 2: Predict EKFs
         self.safety_ekf.predict(self.u_prev)
@@ -531,63 +526,52 @@ class ControllerNode(Node):
             q_hat = max(0.0, q_hat)  # Don't let it think it's unsafe during recovery
             self.u_ref[0] = min(self.u_ref[0], 0.3)  # Force slow speed during recovery
 
-        # Emergency brake if too close to obstacle
-        if len(valid_ranges) > 0:
-            min_range = float(cp.min(valid_ranges))
-            if min_range < 0.4:  # Emergency threshold
-                self.get_logger().warn(f'EMERGENCY: Obstacle at {min_range:.2f}m! Stopping.')
-                u_safe = [0.0, 0.0]  # Full stop
-            elif q_hat > 0.5 and n_obstacles == 0:
-                # Safe - use reference command
-                u_safe = self.u_ref
-            else:
-                # Step 6: Compute safe control (B_q is already clamped in get_estimates)
-                try:
-                    u_safe = self.cbf.compute_safe_control(
-                        u_ref=self.u_ref,
-                        q_hat=q_hat,
-                        qdot_hat=qdot_hat,
-                        F_q_hat=F_q_hat,
-                        B_q_hat=B_q_hat,
-                        P=P_safety
-                    )
-                except Exception as e:
-                    self.get_logger().error(f'CBF QP failed: {e}')
-                    # Emergency stop
-                    u_safe = [0.0, 0.0]
-        else:
-            # No valid ranges - default to safe behavior
+        # Step 6: Compute safe control
+        # Check if dangerously close first
+        min_range = float(cp.min(valid_ranges)) if len(valid_ranges) > 0 else 999.0
+
+        if min_range < 0.35:
+            # Emergency stop
+            u_safe = [0.0, 0.0]
+        elif q_hat > 0.5 and n_obstacles == 0:
+            # Safe - use reference
             u_safe = self.u_ref
+        else:
+            # Use CBF
+            try:
+                u_safe = self.cbf.compute_safe_control(
+                    u_ref=self.u_ref,
+                    q_hat=q_hat,
+                    qdot_hat=qdot_hat,
+                    F_q_hat=F_q_hat,
+                    B_q_hat=B_q_hat,
+                    P=P_safety
+                )
+            except Exception as e:
+                self.get_logger().error(f'CBF QP failed: {e}')
+                u_safe = [0.0, 0.0]
 
         # Step 7: Send command
         self.send_command(u_safe[0], u_safe[1])
         self.u_prev = u_safe
 
-        total_time = time.time() - start_time
+        # Lightweight logging every 5th iteration (reduces overhead)
+        if not hasattr(self, '_log_counter'):
+            self._log_counter = 0
+        self._log_counter += 1
 
-        # Determine what action CBF took
-        dv = u_safe[0] - self.u_ref[0]
-        dw = u_safe[1] - self.u_ref[1]
-        action = "SAFE"
-        if abs(dv) > 0.1 or abs(dw) > 0.1:
-            if abs(dw) > abs(dv) * 0.5:  # Steering dominates
-                action = "STEER"
-            else:
-                action = "BRAKE"
+        if self._log_counter % 5 == 0:
+            total_time = time.time() - start_time
+            dv = abs(u_safe[0] - self.u_ref[0])
+            dw = abs(u_safe[1] - self.u_ref[1])
+            action = "SAFE"
+            if dv > 0.1 or dw > 0.1:
+                action = "STEER" if dw > dv * 0.5 else "BRAKE"
 
-        # Calculate steering angle for logging
-        L = 0.33
-        if abs(u_safe[0]) > 0.1:
-            steer_angle = float(cp.arctan(L * u_safe[1] / u_safe[0]))
-        else:
-            steer_angle = float(u_safe[1]) * 0.33
-        steer_angle = max(-0.4, min(0.4, steer_angle))  # Clip using Python min/max
-
-        self.get_logger().info(
-            f'[{action}] t={total_time:.3f}s | q={q_hat:.3f} | B_q=[{B_q_hat[0]:.2f},{B_q_hat[1]:.2f}] | '
-            f'v: {self.u_ref[0]:.2f}→{u_safe[0]:.2f} | ω: {self.u_ref[1]:.2f}→{u_safe[1]:.2f} | '
-            f'δ: {steer_angle:.3f}rad'
-        )
+            self.get_logger().info(
+                f'[{action}] {total_time*1000:.0f}ms | q={q_hat:.2f} | B_q=[{B_q_hat[0]:.2f},{B_q_hat[1]:.2f}] | '
+                f'v={u_safe[0]:.2f} ω={u_safe[1]:.2f}'
+            )
 
     def send_command(self, v, omega):
         """
@@ -600,11 +584,8 @@ class ControllerNode(Node):
         # CRITICAL: F1Tenth VESC needs acceleration field for braking!
         # If commanding lower speed than previous, set negative acceleration
         if v < self.v_prev - 0.1:
-            # Braking - need aggressive deceleration
             msg.drive.acceleration = -5.0
-            self.get_logger().debug(f'BRAKE: {self.v_prev:.2f}→{v:.2f} m/s, accel=-5.0')
         else:
-            # Normal driving - moderate acceleration
             msg.drive.acceleration = 3.0
 
         # Store previous velocity for next iteration
