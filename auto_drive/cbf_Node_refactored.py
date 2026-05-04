@@ -390,7 +390,7 @@ class ControllerNode(Node):
             return [v_ref, omega_ref]
 
         # Find gaps (continuous sectors with range > threshold)
-        gap_threshold = 1.5  # Minimum distance to be considered "free"
+        gap_threshold = 0.5  # Minimum distance to be considered "free"
         is_free = front_ranges > gap_threshold
 
         # Find largest gap
