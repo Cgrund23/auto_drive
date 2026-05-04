@@ -315,9 +315,9 @@ class ControllerNode(Node):
         self.sigma_f = 1.0
 
         # HOCBF parameters (from paper, Section II-C) - RELAXED FOR FEASIBILITY
-        self.lambda_0 = 0.5  # Reduced from 1.0 for less aggressive constraints
-        self.lambda_1 = 0.5  # Reduced from 1.0 for less aggressive constraints
-        self.c_q = 0.05  # Very small confidence for feasibility (was 0.3)
+        self.lambda_0 = 0.25  # Reduced from 1.0 for less aggressive constraints
+        self.lambda_1 = 0.25  # Reduced from 1.0 for less aggressive constraints
+        self.c_q = 0.08  # Very small confidence for feasibility (was 0.3)
 
         # State
         self.x = 0.0
