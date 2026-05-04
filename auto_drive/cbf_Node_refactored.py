@@ -167,7 +167,7 @@ class SafetyULM_EKF:
 
         # Check if diverged (more aggressive bounds to catch problems early)
         B_q_v = float(B_q[0])
-        if B_q_v < 0.4 or B_q_v > 5.0:
+        if B_q_v < 0.6 or B_q_v > 5.0:
             # Log the divergence for debugging
             reason = "too small" if B_q_v < 0.4 else "too large"
             print(f"EKF DIVERGENCE: B_q,v = {B_q_v:.4f} ({reason})")
@@ -193,10 +193,16 @@ class SafetyULM_EKF:
         """
         # Constrain B_q to reasonable bounds (clip before converting to float)
         # CRITICAL: B_q[0] must be large enough to make QP feasible!
+        # Also clip the actual state to prevent drift below threshold
         B_q = self.x[3:3+self.m].copy()
-        B_q[0] = cp.clip(B_q[0], 0.5, 3.0)  # Velocity effect MUST be >= 0.5 for feasibility
+        B_q[0] = cp.clip(B_q[0], 0.7, 3.0)  # Increased from 0.5 to 0.7 for more margin
         if self.m > 1:
             B_q[1] = cp.clip(B_q[1], -1.0, 1.0)  # Steering effect bounded
+
+        # Also enforce bounds on the internal state to prevent drift
+        self.x[3] = cp.clip(self.x[3], 0.7, 3.0)
+        if self.m > 1:
+            self.x[4] = cp.clip(self.x[4], -1.0, 1.0)
 
         return (
             float(self.x[0]),
@@ -321,10 +327,10 @@ class ControllerNode(Node):
         self.length_scale = 0.9  # Very tight kernel - less bleed from distant obstacles
         self.sigma_f = 1.0
 
-        # HOCBF parameters (from paper, Section II-C) - RELAXED FOR FEASIBILITY
-        self.lambda_0 = 0.25  # Reduced from 1.0 for less aggressive constraints
-        self.lambda_1 = 0.25  # Reduced from 1.0 for less aggressive constraints
-        self.c_q = 0.08  # Very small confidence for feasibility (was 0.3)
+        # HOCBF parameters (from paper, Section II-C) - HEAVILY RELAXED FOR FEASIBILITY
+        self.lambda_0 = 0.15  # Further reduced to prevent infeasibility
+        self.lambda_1 = 0.15  # Further reduced to prevent infeasibility
+        self.c_q = 0.05  # Minimal confidence to maximize feasibility
 
         # State
         self.x = 0.0
@@ -546,8 +552,13 @@ class ControllerNode(Node):
                     P=P_safety
                 )
             except Exception as e:
-                self.get_logger().error(f'CBF QP failed: {e}')
-                u_safe = [0.0, 0.0]
+                # QP failed - be cautious but don't just stop
+                # Allow slow movement to try to escape
+                if min_range > 0.5:
+                    u_safe = [0.3, self.u_ref[1]]  # Slow forward
+                else:
+                    u_safe = [0.0, 0.0]  # Too close, stop
+                self.get_logger().warn(f'CBF QP failed, min_range={min_range:.2f}m')
 
         # Step 7: Send command
         self.send_command(u_safe[0], u_safe[1])

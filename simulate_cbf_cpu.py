@@ -177,7 +177,8 @@ class SafetyULM_EKF_CPU:
             self.x[4] = 0.1
         P_diag = [0.01, 0.01, 0.1] + [0.1] * m_inputs
         self.P = np.diag(np.array(P_diag))
-        Q_diag = [1e-6, 1e-5, 1e-2] + [1e-2] * m_inputs
+        # REDUCED process noise for stability (match hardware)
+        Q_diag = [1e-6, 1e-5, 1e-3] + [1e-3] * m_inputs
         self.Q = np.diag(np.array(Q_diag))
         self.R_q = 1e-3
         self.R_qdot = 1e-2
@@ -227,10 +228,15 @@ class SafetyULM_EKF_CPU:
         self.P = (np.eye(len(self.x)) - np.outer(K, self.H_qdot)) @ self.P
 
     def reset_if_diverged(self):
+        """Reset EKF if B_q diverges - match hardware thresholds"""
         B_q = self.x[3:3+self.m]
-        if float(B_q[0]) < 0.05 or float(B_q[0]) > 5.0:
+        B_q_v = float(B_q[0])
+        # More aggressive bounds to catch problems early (match hardware)
+        if B_q_v < 0.6 or B_q_v > 5.0:
+            reason = "too small" if B_q_v < 0.4 else "too large"
+            print(f"EKF DIVERGENCE: B_q,v = {B_q_v:.4f} ({reason})")
             self.x[2] = 0.0
-            self.x[3] = 0.5
+            self.x[3] = 1.0  # Match hardware initial value
             if self.m > 1:
                 self.x[4] = 0.1
             P_diag = [0.01, 0.01, 0.1] + [0.1] * self.m
@@ -239,10 +245,18 @@ class SafetyULM_EKF_CPU:
         return False
 
     def get_estimates(self):
+        """Get estimates with B_q bounds enforced for QP feasibility"""
         B_q = self.x[3:3+self.m].copy()
-        B_q[0] = float(np.clip(B_q[0], 0.05, 3.0))
+        # CRITICAL: B_q[0] must be large enough to make QP feasible (match hardware)
+        B_q[0] = float(np.clip(B_q[0], 0.7, 3.0))  # Minimum 0.7 for more margin
         if self.m > 1:
             B_q[1] = float(np.clip(B_q[1], -1.0, 1.0))
+
+        # Also enforce bounds on internal state to prevent drift
+        self.x[3] = np.clip(self.x[3], 0.7, 3.0)
+        if self.m > 1:
+            self.x[4] = np.clip(self.x[4], -1.0, 1.0)
+
         return (float(self.x[0]), float(self.x[1]), float(self.x[2]), B_q, self.P.copy())
 
 
@@ -384,7 +398,7 @@ class ObstacleField:
 
 class CBFSimulator:
     def __init__(self, track_type='oval'):
-        self.dt = 0.05
+        self.dt = 0.02  # Match hardware: 20Hz = 50ms
         # Start robot on the track (in the middle of the drivable surface)
         if track_type == 'oval':
             # Track: major_radius=4.0, minor_radius=2.5, track_width=1.2
@@ -393,28 +407,34 @@ class CBFSimulator:
         else:
             self.robot = F1TenthSim(x=0.0, y=0.0, theta=0.0)
         self.obstacles = ObstacleField(track_type=track_type)
-        self.v_max = 2.0
+
+        # HARDWARE TUNED PARAMETERS
+        self.v_max = 1.5  # Match hardware
         self.v_min = 0.0
-        self.omega_max = 10.0
-        self.omega_min = -10.0
+        self.omega_max = 0.5  # Match hardware limits
+        self.omega_min = -0.5
         self.r_max = 5.0
-        self.r_min_obstacle = 0.25
-        self.length_scale = .75
+        self.length_scale = 0.5  # Match hardware
         self.sigma_f = 1.0
-        self.lambda_0 = 0.5
-        self.lambda_1 = 0.5
+
+        # HEAVILY RELAXED HOCBF parameters to match hardware
+        self.lambda_0 = 0.15
+        self.lambda_1 = 0.15
         self.c_q = 0.05
+
         self.safety_ekf = SafetyULM_EKF_CPU(Ts=self.dt, m_inputs=2)
         self.position_ekf = PositionULM_EKF_CPU(Ts=self.dt, m_inputs=2)
         self.cbf = ModelFreeCBF_CPU(
             dt=self.dt, u_min=[self.v_min, self.omega_min],
             u_max=[self.v_max, self.omega_max], r_max=self.r_max,
-            r_min_obstacle=self.r_min_obstacle, length_scale=self.length_scale,
+            r_min_obstacle=self.r_max,  # Use same value as hardware
+            length_scale=self.length_scale,
             sigma_f=self.sigma_f, lambda_0=self.lambda_0,
             lambda_1=self.lambda_1, c_q=self.c_q
         )
         self.u_ref = [1.0, 0.0]
-        self.u_prev = [0.0, 0.0]
+        self.u_prev = [1.0, 0.0]
+        self.ekf_reset_counter = 0  # Track EKF resets
         self.history = {
             'x': [], 'y': [], 'theta': [], 'v': [],
             'q': [], 'B_q_v': [], 'B_q_omega': [],
@@ -431,7 +451,7 @@ class CBFSimulator:
 
         Returns: [v_ref, omega_ref]
         """
-        # Default: drive straight forward
+        # Default: drive at moderate speed for safety (match hardware)
         v_ref = 1.0
         omega_ref = 0.0
 
@@ -505,16 +525,44 @@ class CBFSimulator:
         p_dot = F_p + B_p @ np.array(self.u_prev)
         qdot_meas = float(grad_h @ p_dot)
         grad_norm = float(np.linalg.norm(grad_h))
-        sigma_pdot = 0.1
+        sigma_pdot = 0.01  # Match hardware
         epsilon = 1e-6
         R_qdot = grad_norm**2 * sigma_pdot**2 + sigma_gp_sq / (self.length_scale**2 * (grad_norm**2 + epsilon))
-        self.safety_ekf.update_q(float(q_meas), R_q=float(sigma_gp_sq))
-        self.safety_ekf.update_qdot(qdot_meas, R_qdot=float(R_qdot))
+
+        # Measurement validation (match hardware)
+        if not np.isnan(q_meas) and not np.isinf(q_meas):
+            self.safety_ekf.update_q(float(q_meas), R_q=max(float(sigma_gp_sq), 1e-4))
+        else:
+            print(f'Invalid q_meas={q_meas}, skipping update')
+
+        if not np.isnan(qdot_meas) and not np.isinf(qdot_meas) and abs(qdot_meas) < 10.0:
+            self.safety_ekf.update_qdot(qdot_meas, R_qdot=max(float(R_qdot), 1e-4))
+        else:
+            print(f'Invalid qdot_meas={qdot_meas}, skipping update')
+
+        # EKF reset handling (match hardware)
         if self.safety_ekf.reset_if_diverged():
-            print(f"[t={len(self.history['x'])*self.dt:.2f}s] EKF RESET!")
+            self.ekf_reset_counter = 20
+            print(f"[t={len(self.history['x'])*self.dt:.2f}s] EKF RESET! q={q_meas:.3f}, qdot={qdot_meas:.3f}")
+
         q_hat, qdot_hat, F_q_hat, B_q_hat, P_safety = self.safety_ekf.get_estimates()
+
+        # Conservative behavior after reset (match hardware)
+        if self.ekf_reset_counter > 0:
+            self.ekf_reset_counter -= 1
+            q_hat = max(0.0, q_hat)
+            self.u_ref[0] = min(self.u_ref[0], 0.3)
+
+        # Get valid ranges for emergency check
+        valid_ranges = ranges[(ranges > 0.1) & (ranges < self.r_max)]
+        min_range = float(np.min(valid_ranges)) if len(valid_ranges) > 0 else 999.0
+
         try:
-            if q_hat > 0.95 and n_obstacles == 0:
+            # Emergency stop if too close (match hardware)
+            if min_range < 0.35:
+                u_safe = [0.0, 0.0]
+                status = "EMERGENCY"
+            elif q_hat > 0.5 and n_obstacles == 0:
                 u_safe = self.u_ref
                 status = "NOMINAL"
             else:
@@ -532,9 +580,14 @@ class CBFSimulator:
                 else:
                     status = "CBF_BRAKE"  # CBF braking
         except Exception as e:
-            print(f"CBF QP failed: {e}")
-            u_safe = [0.0, 0.0]
-            status = "STOP"
+            # QP failed - be cautious but don't just stop (match hardware)
+            if min_range > 0.5:
+                u_safe = [0.3, self.u_ref[1]]  # Slow forward to try to escape
+                status = "RECOVERY"
+            else:
+                u_safe = [0.0, 0.0]  # Too close, stop
+                status = "STOP"
+            print(f"CBF QP failed, min_range={min_range:.2f}m")
         v_cmd = u_safe[0]
         delta_cmd = np.arctan(self.robot.L * u_safe[1] / max(v_cmd, 0.1))
         delta_cmd = np.clip(delta_cmd, -0.5, 0.5)
