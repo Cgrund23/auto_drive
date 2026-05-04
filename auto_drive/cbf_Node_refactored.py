@@ -567,9 +567,9 @@ class ControllerNode(Node):
         # Calculate steering angle for logging
         L = 0.33
         if abs(u_safe[0]) > 0.1:
-            steer_angle = float(cp.arctan(L * u_safe[1] / u_safe[0]))
+            steer_angle = cp.arctan(L * u_safe[1] / u_safe[0])
         else:
-            steer_angle = float(u_safe[1] * 0.33)
+            steer_angle = u_safe[1] * 0.33
         steer_angle = float(cp.clip(steer_angle, -0.4, 0.4))
 
         self.get_logger().info(
@@ -604,15 +604,15 @@ class ControllerNode(Node):
         # where L is wheelbase (F1Tenth ~0.33m)
         L = 0.33  # wheelbase in meters
         if abs(v) > 0.1:  # Avoid division by zero
-            steering_angle = float(cp.arctan(L * omega / v))
+            steering_angle = cp.arctan(L * omega / v)
         else:
             # At very low speeds, use direct proportional mapping
-            steering_angle = float(omega * 0.33)  # Scale omega to reasonable steering
+            steering_angle = omega * 0.33  # Scale omega to reasonable steering
 
         # Clip to reasonable steering limits (F1Tenth: ±0.4 radians ≈ ±23°)
-        steering_angle = float(cp.clip(steering_angle, -0.4, 0.4))
+        steering_angle = cp.clip(steering_angle, -0.4, 0.4)
 
-        msg.drive.steering_angle = steering_angle
+        msg.drive.steering_angle = float(steering_angle)
         self.cmd_pub.publish(msg)
 
 
