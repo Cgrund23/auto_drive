@@ -399,7 +399,7 @@ class CBFSimulator:
         self.omega_min = -10.0
         self.r_max = 5.0
         self.r_min_obstacle = 0.25
-        self.length_scale = 0.1
+        self.length_scale = .75
         self.sigma_f = 1.0
         self.lambda_0 = 0.5
         self.lambda_1 = 0.5
@@ -447,7 +447,7 @@ class CBFSimulator:
             return [v_ref, omega_ref]
 
         # Find gaps (continuous sectors with range > threshold)
-        gap_threshold = 1.5  # Minimum distance to be considered "free"
+        gap_threshold = 1.75  # Minimum distance to be considered "free"
         is_free = front_ranges > gap_threshold
 
         # Find largest gap

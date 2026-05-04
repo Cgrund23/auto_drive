@@ -4,12 +4,11 @@ Fast simulation for debugging Model-Free CBF
 Runs the exact same CBF code but in a simulated environment
 """
 import numpy as np
-import cupy as cp
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import sys
 sys.path.append('auto_drive')
-from CBF_refactored import ModelFreeCBF
+# from CBF_refactored import ModelFreeCBF
 from cbf_Node_refactored import SafetyULM_EKF, PositionULM_EKF
 
 
@@ -104,7 +103,7 @@ class CBFSimulator:
         self.omega_min = -10.0
         self.r_max = 5.0
         self.r_min_obstacle = 0.25
-        self.length_scale = 0.1
+        self.length_scale = 0.5
         self.sigma_f = 1.0
         self.lambda_0 = 0.5
         self.lambda_1 = 0.5
