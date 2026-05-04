@@ -334,6 +334,7 @@ class ControllerNode(Node):
         # Reference command - will be updated by tangent controller
         self.u_ref = [1.0, 0.0]  # [v_ref, ω_ref]
         self.u_prev = [1.0, 0.0]
+        self.v_prev = 1.0  # Track previous velocity for acceleration control
 
         # Goal for tangent controller
         self.goal_x = 10.0  # Target x position (meters ahead)
@@ -563,16 +564,55 @@ class ControllerNode(Node):
             else:
                 action = "BRAKE"
 
+        # Calculate steering angle for logging
+        L = 0.33
+        if abs(u_safe[0]) > 0.1:
+            steer_angle = float(cp.arctan(L * u_safe[1] / u_safe[0]))
+        else:
+            steer_angle = float(u_safe[1] * 0.33)
+        steer_angle = float(cp.clip(steer_angle, -0.4, 0.4))
+
         self.get_logger().info(
             f'[{action}] t={total_time:.3f}s | q={q_hat:.3f} | B_q=[{B_q_hat[0]:.2f},{B_q_hat[1]:.2f}] | '
-            f'v: {self.u_ref[0]:.2f}→{u_safe[0]:.2f} | ω: {self.u_ref[1]:.2f}→{u_safe[1]:.2f}'
+            f'v: {self.u_ref[0]:.2f}→{u_safe[0]:.2f} | ω: {self.u_ref[1]:.2f}→{u_safe[1]:.2f} | '
+            f'δ: {steer_angle:.3f}rad'
         )
 
     def send_command(self, v, omega):
-        """Publish Ackermann drive command."""
+        """
+        Publish Ackermann drive command.
+        Converts angular velocity (omega) to steering angle.
+        """
         msg = AckermannDriveStamped()
         msg.drive.speed = float(v)
-        msg.drive.steering_angle = float(omega)
+
+        # CRITICAL: F1Tenth VESC needs acceleration field for braking!
+        # If commanding lower speed than previous, set negative acceleration
+        if v < self.v_prev - 0.1:
+            # Braking - need aggressive deceleration
+            msg.drive.acceleration = -5.0
+            self.get_logger().debug(f'BRAKE: {self.v_prev:.2f}→{v:.2f} m/s, accel=-5.0')
+        else:
+            # Normal driving - moderate acceleration
+            msg.drive.acceleration = 3.0
+
+        # Store previous velocity for next iteration
+        self.v_prev = v
+
+        # Convert angular velocity to steering angle using Ackermann geometry
+        # steering_angle = arctan(L * omega / v)
+        # where L is wheelbase (F1Tenth ~0.33m)
+        L = 0.33  # wheelbase in meters
+        if abs(v) > 0.1:  # Avoid division by zero
+            steering_angle = float(cp.arctan(L * omega / v))
+        else:
+            # At very low speeds, use direct proportional mapping
+            steering_angle = float(omega * 0.33)  # Scale omega to reasonable steering
+
+        # Clip to reasonable steering limits (F1Tenth: ±0.4 radians ≈ ±23°)
+        steering_angle = float(cp.clip(steering_angle, -0.4, 0.4))
+
+        msg.drive.steering_angle = steering_angle
         self.cmd_pub.publish(msg)
 
 
