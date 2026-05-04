@@ -321,9 +321,9 @@ class ControllerNode(Node):
         self.sigma_f = 1.0
 
         # HOCBF parameters (from paper, Section II-C) - RELAXED FOR FEASIBILITY
-        self.lambda_0 = 0.25  # Reduced from 1.0 for less aggressive constraints
-        self.lambda_1 = 0.25  # Reduced from 1.0 for less aggressive constraints
-        self.c_q = 0.08  # Very small confidence for feasibility (was 0.3)
+        self.lambda_0 = 0.1  # VERY relaxed to prevent infeasibility
+        self.lambda_1 = 0.1  # VERY relaxed to prevent infeasibility
+        self.c_q = 0.02  # Minimal confidence to maximize feasibility
 
         # State
         self.x = 0.0
@@ -332,9 +332,10 @@ class ControllerNode(Node):
         self.v = 1.0
 
         # Reference command - will be updated by tangent controller
-        self.u_ref = [1.0, 0.0]  # [v_ref, ω_ref]
-        self.u_prev = [1.0, 0.0]
-        self.v_prev = 1.0  # Track previous velocity for acceleration control
+        self.u_ref = [0.5, 0.0]  # [v_ref, ω_ref] - START SLOWER for safety
+        self.u_prev = [0.5, 0.0]
+        self.v_prev = 0.5  # Track previous velocity for acceleration control
+        self.ekf_reset_counter = 0  # Track steps since EKF reset
 
         # Goal for tangent controller
         self.goal_x = 10.0  # Target x position (meters ahead)
@@ -371,8 +372,8 @@ class ControllerNode(Node):
         Works in robot frame (no global coordinates needed).
         Returns: [v_ref, omega_ref]
         """
-        # Default: drive straight forward
-        v_ref = 1.0
+        # Default: drive at moderate speed for safety
+        v_ref = 0.75  # Reduced from 1.0 to give CBF more margin
         omega_ref = 0.0
 
         if not hasattr(self, 'last_ranges'):
@@ -390,7 +391,7 @@ class ControllerNode(Node):
             return [v_ref, omega_ref]
 
         # Find gaps (continuous sectors with range > threshold)
-        gap_threshold = 0.5  # Minimum distance to be considered "free"
+        gap_threshold = 1.5  # Minimum distance to be considered "free" (increased for safety)
         is_free = front_ranges > gap_threshold
 
         # Find largest gap
@@ -513,9 +514,8 @@ class ControllerNode(Node):
             self.get_logger().warn(f'Invalid qdot_meas={qdot_meas}, skipping update')
 
         # Check if EKF has diverged and reset if needed
-        ekf_just_reset = False
         if self.safety_ekf.reset_if_diverged():
-            ekf_just_reset = True
+            self.ekf_reset_counter = 20  # Pause updates for 20 steps (~0.4s)
             self.get_logger().warn(
                 f'EKF diverged! Resetting to initial conditions. '
                 f'Recent: q={q_meas:.3f}, qdot={qdot_meas:.3f}, n_obs={n_obstacles}'
@@ -524,9 +524,11 @@ class ControllerNode(Node):
         # Step 5: Get estimates for control (with B_q clamped to valid range)
         q_hat, qdot_hat, F_q_hat, B_q_hat, P_safety = self.safety_ekf.get_estimates()
 
-        # If EKF just reset, be extra conservative - don't bypass CBF
-        if ekf_just_reset:
-            q_hat = min(q_hat, 0.5)  # Force conservative estimate
+        # After reset, wait before trusting estimates and slow down
+        if self.ekf_reset_counter > 0:
+            self.ekf_reset_counter -= 1
+            q_hat = max(0.0, q_hat)  # Don't let it think it's unsafe during recovery
+            self.u_ref[0] = min(self.u_ref[0], 0.3)  # Force slow speed during recovery
 
         # SANITY CHECK: Only activate CBF if actually in danger
         # If barrier is high (q > 0.95) and no close obstacles, bypass CBF
