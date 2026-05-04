@@ -339,7 +339,7 @@ class ObstacleField:
         if track_type == 'oval':
             # Oval track parameters
             # Track center at origin, major axis along x, minor axis along y
-            major_radius = 4.0  # Half-length along x
+            major_radius = 8.0  # Half-length along x
             minor_radius = 2.5  # Half-width along y
             track_width = 1.2   # Width of drivable track
             wall_thickness = 0.15  # Wall thickness for LiDAR detection
@@ -414,7 +414,7 @@ class CBFSimulator:
         self.omega_max = 0.5  # Match hardware limits
         self.omega_min = -0.5
         self.r_max = 5.0
-        self.length_scale = 0.5  # Match hardware
+        self.length_scale = 0.25  # Match hardware
         self.sigma_f = 1.0
 
         # HEAVILY RELAXED HOCBF parameters to match hardware
