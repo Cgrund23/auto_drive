@@ -42,6 +42,10 @@ class ModelFreeCBF:
         self.obstacle_points = None
         self.N = 0
 
+        # Cache for GP computations (speeds up repeated queries)
+        self._K_inv_cache = None
+        self._alpha_cache = None
+
     def set_obstacles(self, ranges, angles):
         """
         Process LiDAR data to extract obstacle points in robot frame.
@@ -69,6 +73,16 @@ class ModelFreeCBF:
 
         self.obstacle_points = cp.column_stack((x, -y))  # Adjust y sign if needed
         self.N = len(self.obstacle_points)
+
+        # Precompute and cache K_inv for this obstacle set (major speedup!)
+        if self.N > 0:
+            Y = -cp.ones((self.N, 1))
+            K = self.rbf_kernel(self.obstacle_points, self.obstacle_points)
+            self._K_inv_cache = cp.linalg.inv(K + 1e-6 * cp.eye(self.N))
+            self._alpha_cache = self._K_inv_cache @ (Y - 1.0)
+        else:
+            self._K_inv_cache = None
+            self._alpha_cache = None
 
     def rbf_kernel(self, X1, X2):
         """
@@ -106,21 +120,15 @@ class ModelFreeCBF:
 
         p = cp.array(p).reshape(1, 2)
 
-        # Training labels (obstacles are -1)
-        Y = -cp.ones((self.N, 1))
-
-        # Kernel matrices
-        K = self.rbf_kernel(self.obstacle_points, self.obstacle_points)
-        K_inv = cp.linalg.inv(K + 1e-6 * cp.eye(self.N))  # Add jitter for numerical stability
-
+        # Use cached K_inv and alpha (huge speedup!)
         k_star = self.rbf_kernel(p, self.obstacle_points)  # (1, N)
 
-        # GP posterior mean (shifted)
-        h = 1.0 + float(k_star @ K_inv @ (Y - 1.0))
+        # GP posterior mean (shifted) using cached alpha
+        h = 1.0 + float(k_star @ self._alpha_cache)
 
         # GP posterior variance (Eq. 6 in paper)
         k_ss = self.rbf_kernel(p, p)[0, 0]
-        sigma_sq = float(k_ss - k_star @ K_inv @ k_star.T)
+        sigma_sq = float(k_ss - k_star @ self._K_inv_cache @ k_star.T)
 
         return h, sigma_sq
 
@@ -144,12 +152,7 @@ class ModelFreeCBF:
 
         p = cp.array(p).reshape(1, 2)
 
-        Y = -cp.ones((self.N, 1))
-        K = self.rbf_kernel(self.obstacle_points, self.obstacle_points)
-        K_inv = cp.linalg.inv(K + 1e-6 * cp.eye(self.N))
-
-        alpha = K_inv @ (Y - 1.0)  # (N, 1)
-
+        # Use cached alpha (huge speedup!)
         # k(p, p_j) for all j
         k_star = self.rbf_kernel(p, self.obstacle_points)  # (1, N)
 
@@ -157,7 +160,7 @@ class ModelFreeCBF:
         diff = self.obstacle_points - p  # (N, 2)
 
         # Gradient: Σ_j α_j k(p, p_j) (p_j - p) / ℓ²
-        grad_h = (k_star.T * alpha).T @ diff / self.length_scale**2  # (1, 2)
+        grad_h = (k_star.T * self._alpha_cache).T @ diff / self.length_scale**2  # (1, 2)
 
         return grad_h.flatten()
 

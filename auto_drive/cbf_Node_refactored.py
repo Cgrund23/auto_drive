@@ -468,8 +468,11 @@ class ControllerNode(Node):
         self.last_ranges = ranges
         self.last_angles = angles
 
-        # Update CBF with obstacle points
-        self.cbf.set_obstacles(ranges, angles)
+        # Update CBF with obstacle points (downsample to reduce GP computation)
+        # Take every 10th LiDAR point to speed up GP (360 rays -> 36 points)
+        ranges_sparse = ranges[::10]
+        angles_sparse = angles[::10]
+        self.cbf.set_obstacles(ranges_sparse, angles_sparse)
 
         # TANGENT CONTROLLER: Update reference command to steer around obstacles
         self.u_ref = self.tangent_controller()
