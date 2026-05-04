@@ -310,14 +310,14 @@ class ControllerNode(Node):
         self.omega_max = 0.5
         self.omega_min = -0.5
         self.r_max = 5.0
-        self.r_min_obstacle = 0.5  # Only consider obstacles VERY close (meters)
-        self.length_scale = 0.025  # Very tight kernel - less bleed from distant obstacles
+        self.r_min_obstacle = 1.0  # Only consider obstacles VERY close (meters)
+        self.length_scale = 0.1  # Very tight kernel - less bleed from distant obstacles
         self.sigma_f = 1.0
 
         # HOCBF parameters (from paper, Section II-C) - RELAXED FOR FEASIBILITY
-        self.lambda_0 = 0.5  # Reduced from 1.0 for less aggressive constraints
-        self.lambda_1 = 0.5  # Reduced from 1.0 for less aggressive constraints
-        self.c_q = 0.05  # Very small confidence for feasibility (was 0.3)
+        self.lambda_0 = 0.25  # Reduced from 1.0 for less aggressive constraints
+        self.lambda_1 = 0.25  # Reduced from 1.0 for less aggressive constraints
+        self.c_q = 0.08  # Very small confidence for feasibility (was 0.3)
 
         # State
         self.x = 0.0

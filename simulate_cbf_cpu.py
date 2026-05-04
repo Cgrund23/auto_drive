@@ -398,8 +398,8 @@ class CBFSimulator:
         self.omega_max = 10.0
         self.omega_min = -10.0
         self.r_max = 5.0
-        self.r_min_obstacle = 2
-        self.length_scale = .05
+        self.r_min_obstacle = 0.25
+        self.length_scale = .75
         self.sigma_f = 1.0
         self.lambda_0 = 0.5
         self.lambda_1 = 0.5
@@ -447,7 +447,7 @@ class CBFSimulator:
             return [v_ref, omega_ref]
 
         # Find gaps (continuous sectors with range > threshold)
-        gap_threshold = 1.5  # Minimum distance to be considered "free"
+        gap_threshold = 1.75  # Minimum distance to be considered "free"
         is_free = front_ranges > gap_threshold
 
         # Find largest gap
@@ -569,14 +569,6 @@ class CBFSimulator:
     def run(self, max_steps=200):
         print("Starting CBF simulation...")
         print(f"Robot will drive around the track using gap-following controller")
-        print(f"\nCBF Parameters:")
-        print(f"  length_scale = {self.length_scale:.3f}m (GP kernel width)")
-        print(f"  r_min_obstacle = {self.r_min_obstacle:.3f}m (only obstacles closer than this are used)")
-        print(f"  sigma_f = {self.sigma_f:.3f} (GP signal variance)")
-        print(f"  λ0={self.lambda_0:.2f}, λ1={self.lambda_1:.2f}, c_q={self.c_q:.3f}\n")
-        print(f"NOTE: If r_min_obstacle >> length_scale, the GP barrier will be very localized!")
-        print(f"      Try increasing length_scale or r_min_obstacle to see wider barrier influence.\n")
-
         for i in range(max_steps):
             if not self.step():
                 break
@@ -585,41 +577,35 @@ class CBFSimulator:
         self.plot_results()
 
     def plot_results(self):
-        fig = plt.figure(figsize=(18, 10))
-        gs = fig.add_gridspec(3, 3)
-
-        # Create axes - trajectory gets larger subplot
-        ax_traj = fig.add_subplot(gs[0:2, 0])
-        ax_barrier_time = fig.add_subplot(gs[0, 1])
-        ax_bq = fig.add_subplot(gs[0, 2])
-        ax_vel = fig.add_subplot(gs[1, 1])
-        ax_omega = fig.add_subplot(gs[1, 2])
-        ax_gp_field = fig.add_subplot(gs[2, 0])
-        ax_obstacles = fig.add_subplot(gs[2, 1:])
-
+        fig, axes = plt.subplots(2, 3, figsize=(15, 8))
         t = np.arange(len(self.history['x'])) * self.dt
+        ax = axes[0, 0]
 
-        # 1. Trajectory plot
-        ax = ax_traj
+        # Draw track walls/obstacles
         for obs_x, obs_y, obs_r in self.obstacles.obstacles:
             circle = plt.Circle((obs_x, obs_y), obs_r, color='gray', alpha=0.3)
             ax.add_patch(circle)
+
+        # Plot robot trajectory
         ax.plot(self.history['x'], self.history['y'], 'b-', linewidth=2, label='Robot path')
+
+        # Mark start position
         start_x = self.history['x'][0]
         start_y = self.history['y'][0]
         ax.plot(start_x, start_y, 'go', markersize=10, label='Start')
+
+        # Mark end position
         end_x = self.history['x'][-1]
         end_y = self.history['y'][-1]
         ax.plot(end_x, end_y, 'ro', markersize=10, label='End')
+
         ax.set_xlabel('X (m)')
         ax.set_ylabel('Y (m)')
         ax.set_title('Racetrack Trajectory')
         ax.legend()
         ax.grid(True)
         ax.axis('equal')
-
-        # 2. Barrier value over time
-        ax = ax_barrier_time
+        ax = axes[0, 1]
         ax.plot(t, self.history['q'], 'b-', linewidth=2)
         ax.axhline(y=0, color='r', linestyle='--', label='Unsafe (q<0)')
         ax.set_xlabel('Time (s)')
@@ -627,9 +613,7 @@ class CBFSimulator:
         ax.set_title('Safety Barrier Value')
         ax.legend()
         ax.grid(True)
-
-        # 3. B_q estimates
-        ax = ax_bq
+        ax = axes[0, 2]
         ax.plot(t, self.history['B_q_v'], 'b-', linewidth=2, label='B_q,v')
         ax.plot(t, self.history['B_q_omega'], 'r-', linewidth=2, label='B_q,ω')
         ax.axhline(y=0, color='k', linestyle='--', alpha=0.3)
@@ -638,9 +622,7 @@ class CBFSimulator:
         ax.set_title('ULM Parameter Estimates (EKF)')
         ax.legend()
         ax.grid(True)
-
-        # 4. Velocity control
-        ax = ax_vel
+        ax = axes[1, 0]
         ax.plot(t, self.history['u_v'], 'b-', linewidth=2, label='Velocity')
         ax.axhline(y=self.u_ref[0], color='b', linestyle='--', alpha=0.3, label='v_ref')
         ax.set_xlabel('Time (s)')
@@ -648,9 +630,7 @@ class CBFSimulator:
         ax.set_title('Control: Velocity')
         ax.legend()
         ax.grid(True)
-
-        # 5. Steering control
-        ax = ax_omega
+        ax = axes[1, 1]
         ax.plot(t, self.history['u_omega'], 'r-', linewidth=2, label='Steering rate')
         ax.axhline(y=0, color='k', linestyle='--', alpha=0.3)
         ax.set_xlabel('Time (s)')
@@ -658,102 +638,15 @@ class CBFSimulator:
         ax.set_title('Control: Steering Rate')
         ax.legend()
         ax.grid(True)
-
-        # 6. GP Barrier Field Visualization (robot frame at a snapshot)
-        # Find a moment when there ARE obstacles nearby (q < 0.9)
-        snapshot_idx = len(self.history['x']) // 2
-        for idx in range(len(self.history['q'])):
-            if self.history['q'][idx] < 0.9 and self.history['n_obstacles'][idx] > 0:
-                snapshot_idx = idx
-                break
-
-        x_snap = self.history['x'][snapshot_idx]
-        y_snap = self.history['y'][snapshot_idx]
-        theta_snap = self.history['theta'][snapshot_idx]
-
-        # Get LiDAR scan at this moment
-        ranges, angles = self.obstacles.get_lidar_scan(x_snap, y_snap, theta_snap)
-
-        # Set obstacles in CBF (this updates the GP)
-        self.cbf.set_obstacles(ranges, angles)
-
-        # Get min range for diagnostics
-        close_ranges = ranges[(ranges < self.r_min_obstacle) & (ranges > 0.1)]
-        min_range = np.min(close_ranges) if len(close_ranges) > 0 else np.inf
-
-        # Create grid in robot frame
-        grid_range = 1.5  # meters (reduced to focus on close obstacles)
-        grid_res = 0.03
-        x_grid = np.arange(-grid_range, grid_range, grid_res)
-        y_grid = np.arange(-grid_range, grid_range, grid_res)
-        X_grid, Y_grid = np.meshgrid(x_grid, y_grid)
-
-        # Evaluate barrier at each grid point
-        Z_grid = np.zeros_like(X_grid)
-        for i in range(X_grid.shape[0]):
-            for j in range(X_grid.shape[1]):
-                h, _ = self.cbf.get_barrier_and_variance([X_grid[i, j], Y_grid[i, j]])
-                Z_grid[i, j] = h
-
-        ax = ax_gp_field
-
-        # Plot barrier field with better color scale
-        h_min, h_max = np.min(Z_grid), np.max(Z_grid)
-        if h_max - h_min < 0.01:
-            # All values the same (no obstacles)
-            ax.text(0.5, 0.5, f'No obstacles within {self.r_min_obstacle}m\nh ≈ {h_min:.2f} everywhere',
-                   ha='center', va='center', transform=ax.transAxes, fontsize=12,
-                   bbox=dict(boxstyle='round', facecolor='yellow', alpha=0.8))
-        else:
-            # Actual barrier field
-            contour = ax.contourf(X_grid, Y_grid, Z_grid, levels=20, cmap='RdYlGn', alpha=0.8,
-                                 vmin=min(-1, h_min), vmax=max(1, h_max))
-            ax.contour(X_grid, Y_grid, Z_grid, levels=[0], colors='red', linewidths=3,
-                      linestyles='--', label='h=0 (unsafe)')
-            plt.colorbar(contour, ax=ax, label='Barrier h(x)')
-
-        # Plot obstacle points used by GP
-        if self.cbf.N > 0:
-            ax.scatter(self.cbf.obstacle_points[:, 0], self.cbf.obstacle_points[:, 1],
-                      c='red', s=50, marker='x', linewidths=2, label=f'{self.cbf.N} GP points', zorder=10)
-
-        # Plot all LiDAR returns (even those not used by GP) for context
-        all_x = ranges * np.cos(angles)
-        all_y = -ranges * np.sin(angles)
-        valid = (ranges > 0.1) & (ranges < grid_range)
-        ax.scatter(all_x[valid], all_y[valid], c='gray', s=1, alpha=0.3, label='All LiDAR')
-
-        # Mark robot position
-        ax.plot(0, 0, 'bo', markersize=10, label='Robot', zorder=10)
-        ax.arrow(0, 0, 0.3, 0, head_width=0.1, head_length=0.1, fc='blue', ec='blue', zorder=10)
-
-        ax.set_xlabel('X (robot frame, m)')
-        ax.set_ylabel('Y (robot frame, m)')
-        title = f'GP Barrier Field (t={snapshot_idx*self.dt:.1f}s)\n'
-        title += f'ℓ={self.length_scale:.2f}m, {self.cbf.N} training pts'
-        if self.cbf.N > 0:
-            title += f', min dist={min_range:.2f}m'
-        ax.set_title(title)
-        ax.legend(loc='upper right', fontsize=8)
-        ax.axis('equal')
-        ax.set_xlim(-grid_range, grid_range)
-        ax.set_ylim(-grid_range, grid_range)
-        ax.grid(True, alpha=0.3)
-
-        # 7. Obstacle count
-        ax = ax_obstacles
+        ax = axes[1, 2]
         ax.plot(t, self.history['n_obstacles'], 'g-', linewidth=2)
-        ax.axvline(x=snapshot_idx*self.dt, color='r', linestyle='--', alpha=0.5, label='GP snapshot')
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Count')
-        ax.set_title(f'Close Obstacles (< {self.r_min_obstacle}m)')
-        ax.legend()
+        ax.set_title('Number of Close Obstacles')
         ax.grid(True)
-
         plt.tight_layout()
         plt.savefig('cbf_simulation_results.png', dpi=150)
         print(f"\nResults saved to cbf_simulation_results.png")
-        print(f"GP snapshot taken at t={snapshot_idx*self.dt:.1f}s with {self.cbf.N} obstacles")
 
 
 if __name__ == '__main__':

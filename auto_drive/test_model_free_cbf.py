@@ -3,7 +3,7 @@
 Test script for Model-Free CBF implementation
 Verifies EKF dynamics, GP computations, and QP feasibility
 """
-import cupy as cp
+
 import numpy as np
 import matplotlib.pyplot as plt
 from CBF_refactored import ModelFreeCBF
@@ -126,7 +126,7 @@ def test_hocbf_constraint():
 
     cbf = ModelFreeCBF(
         dt=0.05, u_min=[0.5, -0.85], u_max=[2.0, 0.85],
-        r_max=5.0, length_scale=0.4, sigma_f=1.0,
+        r_max=5.0, length_scale=1.4, sigma_f=1.0,
         lambda_0=1.0, lambda_1=1.0, c_q=2.0
     )
 

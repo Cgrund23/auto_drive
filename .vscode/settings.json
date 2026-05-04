@@ -15,5 +15,6 @@
         "/opt/ros/foxy/lib/python3.8/site-packages"
     ],
     "python.pythonPath": "/bin/python3",
-    "ros.distro": "foxy"
+    "ros.distro": "foxy",
+    "python-envs.defaultEnvManager": "ms-python.python:system"
 }
