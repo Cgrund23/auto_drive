@@ -22,7 +22,8 @@ setup(
         'console_scripts': [
             'Model_Free_Node = auto_drive.Model_Free_Node:main',
             'cbf_Node = auto_drive.cbf_Node:main',
-            'cbf_Node_refactored = auto_drive.cbf_Node_refactored:main'
+            'cbf_Node_refactored = auto_drive.cbf_Node_refactored:main',
+            'cbf_visualizer = auto_drive.cbf_visualizer:main'
         ],
     },
 )
