@@ -662,13 +662,6 @@ class ControllerNode(Node):
         msg = AckermannDriveStamped()
         msg.drive.speed = float(v)
 
-        # CRITICAL: F1Tenth VESC needs acceleration field for braking!
-        # If commanding lower speed than previous, set negative acceleration
-        if v < self.v_prev - 0.1:
-            msg.drive.acceleration = -5.0
-        else:
-            msg.drive.acceleration = 3.0
-
         # Store previous velocity for next iteration
         self.v_prev = v
 
