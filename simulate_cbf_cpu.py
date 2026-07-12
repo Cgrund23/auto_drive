@@ -339,9 +339,9 @@ class ObstacleField:
         if track_type == 'oval':
             # Oval track parameters
             # Track center at origin, major axis along x, minor axis along y
-            major_radius = 8.0  # Half-length along x
-            minor_radius = 2.5  # Half-width along y
-            track_width = 1.2   # Width of drivable track
+            major_radius = 5.0  # Half-length along x (increased from 4.0)
+            minor_radius = 3.0  # Half-width along y (increased from 2.5)
+            track_width = 1.5   # Width of drivable track (wider for easier driving)
             wall_thickness = 0.15  # Wall thickness for LiDAR detection
 
             # Generate walls as small circular obstacles along track perimeter
@@ -362,9 +362,10 @@ class ObstacleField:
                 self.obstacles.append([x, y, wall_thickness])
 
             print(f"Generated oval racetrack:")
-            print(f"  Major radius: {major_radius}m")
-            print(f"  Minor radius: {minor_radius}m")
+            print(f"  Major radius (x): {major_radius}m")
+            print(f"  Minor radius (y): {minor_radius}m")
             print(f"  Track width: {track_width}m")
+            print(f"  Track length: ~{2*np.pi*np.sqrt((major_radius**2 + minor_radius**2)/2):.1f}m")
             print(f"  Wall segments: {2*n_points}")
         else:
             # Random obstacles (old behavior)
@@ -401,9 +402,9 @@ class CBFSimulator:
         self.dt = 0.02  # Match hardware: 20Hz = 50ms
         # Start robot on the track (in the middle of the drivable surface)
         if track_type == 'oval':
-            # Track: major_radius=4.0, minor_radius=2.5, track_width=1.2
+            # Track: major_radius=5.0, minor_radius=3.0, track_width=1.5
             # Start on right side, facing tangent to track (90° = north)
-            self.robot = F1TenthSim(x=4.0, y=0.0, theta=np.pi/2)
+            self.robot = F1TenthSim(x=5.0, y=0.0, theta=np.pi/2)
         else:
             self.robot = F1TenthSim(x=0.0, y=0.0, theta=0.0)
         self.obstacles = ObstacleField(track_type=track_type)
@@ -451,7 +452,7 @@ class CBFSimulator:
 
         Returns: [v_ref, omega_ref]
         """
-        # Default: drive at moderate speed for safety (match hardware)
+        # Default: always try to go forward (racing mentality!)
         v_ref = 1.0
         omega_ref = 0.0
 
@@ -467,7 +468,7 @@ class CBFSimulator:
             return [v_ref, omega_ref]
 
         # Find gaps (continuous sectors with range > threshold)
-        gap_threshold = 1.75  # Minimum distance to be considered "free"
+        gap_threshold = 1.0  # Reduced from 1.75 - be less picky about "free space"
         is_free = front_ranges > gap_threshold
 
         # Find largest gap
@@ -501,8 +502,14 @@ class CBFSimulator:
             max_gap_center_angle = float(front_angles[max_range_idx])
 
         # Steer toward gap center with proportional control
-        K_p = 2.0
+        # Add forward bias - prefer to keep going forward
+        K_p = 3.0  # Increased from 2.0 for more responsive steering
         omega_ref = float(K_p * max_gap_center_angle)
+
+        # If gap is roughly forward (within 20 degrees), go straight
+        if abs(max_gap_center_angle) < 0.35:  # ~20 degrees
+            omega_ref = 0.0  # Drive straight
+
         omega_ref = np.clip(omega_ref, -1.0, 1.0)
 
         return [v_ref, omega_ref]
@@ -706,4 +713,4 @@ if __name__ == '__main__':
     # Create simulator with oval racetrack
     # track_type: 'oval' for racetrack, 'random' for random obstacles
     sim = CBFSimulator(track_type='oval')
-    sim.run(max_steps=600)  # Run for ~30 seconds (about 2-3 laps)
+    sim.run(max_steps=1000)  # Run for ~20 seconds at 50Hz (larger track = more time needed)

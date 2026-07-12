@@ -46,6 +46,14 @@ class ModelFreeCBF:
         self._K_inv_cache = None
         self._alpha_cache = None
 
+        # Pre-allocate arrays for QP to avoid repeated numpy conversions
+        self._P_qp = np.diag([10.0, 0.1])
+        self._G_template = np.zeros((5, 2), dtype=np.float64)
+        self._G_template[1:3, :] = np.eye(2)
+        self._G_template[3:5, :] = -np.eye(2)
+        self._h_qp = np.zeros(5, dtype=np.float64)
+        self._q_qp = np.zeros(2, dtype=np.float64)
+
     def set_obstacles(self, ranges, angles):
         """
         Process LiDAR data to extract obstacle points in robot frame.
@@ -67,10 +75,7 @@ class ModelFreeCBF:
         x = filtered_ranges * cp.cos(filtered_angles)
         y = filtered_ranges * cp.sin(filtered_angles)
 
-        # Downsample for efficiency (every 5th point)
-        x = x[::5]
-        y = y[::5]
-
+        # No additional downsampling here - already sparse from node
         self.obstacle_points = cp.column_stack((x, -y))  # Adjust y sign if needed
         self.N = len(self.obstacle_points)
 
@@ -200,9 +205,9 @@ class ModelFreeCBF:
         sigma_max = 0.05  # Maximum safety margin - very small to ensure feasibility
         return min(sigma, sigma_max)
 
-    def compute_safe_control(self, u_ref, q_hat, qdot_hat, F_q_hat, B_q_hat, P):
+    def compute_safe_control(self, u_ref, q_hat, qdot_hat, F_q_hat, B_q_hat, P, v_current=1.0):
         """
-        Solve CLF-CBF QP to compute safe control.
+        Solve CLF-CBF QP to compute safe control with velocity-dependent safety.
 
         From Eq. (9) in paper:
         B̂_q,k u ≥ -F̂_q,k - (λ_0 + λ_1)q̇̂_k - λ_0 λ_1 q̂_k + σ_k
@@ -219,6 +224,7 @@ class ModelFreeCBF:
             F_q_hat: Estimated lumped disturbance
             B_q_hat: Estimated input sensitivity [B_v, B_ω]
             P: EKF covariance matrix
+            v_current: Current velocity (for velocity-dependent scaling)
 
         Returns:
             u_safe: Safe control input [v, ω]
@@ -227,51 +233,48 @@ class ModelFreeCBF:
         u_ref = cp.asarray(u_ref)
         B_q_hat = cp.asarray(B_q_hat)
 
-        # Compute safety margin
-        sigma_k = self.compute_safety_margin(P, self.u_max)
+        # Compute safety margin with velocity scaling
+        # Higher velocity → larger safety margin (stopping distance ∝ v²)
+        v_scale = 1.0 + 0.5 * (v_current / float(self.u_max[0]))
+        sigma_k = self.compute_safety_margin(P, self.u_max) * v_scale
 
         # HOCBF RHS (Eq. 10 in paper)
         r_k = -F_q_hat - (self.lambda_0 + self.lambda_1) * qdot_hat - \
               self.lambda_0 * self.lambda_1 * q_hat + sigma_k
 
-        # QP formulation - explicitly convert CuPy to NumPy for QP solver
-        # Cost: minimize (u - u_ref)^T W (u - u_ref)
-        # Higher weight = more expensive to change
-        # w_v >> w_omega means "prefer steering over braking"
-        w_v = 10.0  # High cost for changing velocity (prefer to maintain speed)
-        w_omega = 0.1  # Low cost for changing steering (prefer to steer)
-        P_qp = np.diag([w_v, w_omega])
+        # QP formulation - use pre-allocated arrays for speed
+        # Convert CuPy to NumPy once using .get()
+        u_ref_np = u_ref.get() if hasattr(u_ref, 'get') else np.asarray(u_ref, dtype=np.float64)
+        B_q_np = B_q_hat.get() if hasattr(B_q_hat, 'get') else np.asarray(B_q_hat, dtype=np.float64)
+        u_max_np = self.u_max.get() if hasattr(self.u_max, 'get') else np.asarray(self.u_max, dtype=np.float64)
+        u_min_np = self.u_min.get() if hasattr(self.u_min, 'get') else np.asarray(self.u_min, dtype=np.float64)
 
-        # Convert to numpy arrays explicitly
-        u_ref_np = np.array(u_ref.get(), dtype=np.float64)
-        B_q_np = np.array(B_q_hat.get(), dtype=np.float64)
-        u_max_np = np.array(self.u_max.get(), dtype=np.float64)
-        u_min_np = np.array(self.u_min.get(), dtype=np.float64)
+        # Reuse pre-allocated arrays
+        np.dot(self._P_qp, -u_ref_np, out=self._q_qp)  # Linear term: -W @ u_ref
 
-        q_qp = -P_qp @ u_ref_np  # Linear term: -W @ u_ref
+        # Update G matrix (only first row changes)
+        self._G_template[0, :] = -B_q_np
 
-        G_np = np.vstack([
-            -B_q_np.reshape(1, 2),  # CBF constraint
-            np.eye(2),              # u ≤ u_max
-            -np.eye(2)              # -u ≤ -u_min
-        ])
+        # Update h vector
+        self._h_qp[0] = -r_k
+        self._h_qp[1] = u_max_np[0]
+        self._h_qp[2] = u_max_np[1]
+        self._h_qp[3] = -u_min_np[0]
+        self._h_qp[4] = -u_min_np[1]
 
-        h_np = np.array([
-            float(-r_k),
-            float(u_max_np[0]),
-            float(u_max_np[1]),
-            float(-u_min_np[0]),
-            float(-u_min_np[1])
-        ], dtype=np.float64)
-
-        # Solve QP
+        # Solve QP - use OSQP for speed (much faster than clarabel for small problems)
         try:
             sol = solve_qp(
-                P=P_qp,
-                q=q_qp,
-                G=G_np,
-                h=h_np,
-                solver='clarabel'
+                P=self._P_qp,
+                q=self._q_qp,
+                G=self._G_template,
+                h=self._h_qp,
+                solver='osqp',
+                eps_abs=1e-4,  # Relaxed tolerance for speed
+                eps_rel=1e-4,
+                max_iter=100,  # Limit iterations
+                polish=False,  # Skip polishing step for speed
+                verbose=False
             )
 
             if sol is None:

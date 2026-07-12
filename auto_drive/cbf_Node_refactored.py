@@ -162,14 +162,26 @@ class SafetyULM_EKF:
         """
         Reset EKF if B_q estimates diverge (become negative or too large).
         B_q[0] should be positive - velocity approaching obstacle decreases barrier.
+        Includes hysteresis to prevent reset oscillations.
         """
+        # Track time since last reset to prevent rapid cycling
+        if not hasattr(self, '_last_reset_time'):
+            self._last_reset_time = 0.0
+            self._reset_count = 0
+
         B_q = self.x[3:3+self.m]
 
-        # Check if diverged (more aggressive bounds to catch problems early)
+        # Check if diverged (updated bounds for wider B_q range)
         B_q_v = float(B_q[0])
-        if B_q_v < 0.6 or B_q_v > 5.0:
+        if B_q_v < 0.2 or B_q_v > 5.0:
+            # Prevent reset spam - require 1 second gap
+            import time
+            current_time = time.time()
+            if current_time - self._last_reset_time < 1.0:
+                return False  # Too soon, skip reset
+
             # Log the divergence for debugging
-            reason = "too small" if B_q_v < 0.4 else "too large"
+            reason = "too small" if B_q_v < 0.2 else "too large"
             print(f"EKF DIVERGENCE: B_q,v = {B_q_v:.4f} ({reason})")
 
             # Reset parameters to SAME initial values as __init__ for consistency
@@ -183,6 +195,9 @@ class SafetyULM_EKF:
             P_diag = [0.01, 0.01, 0.1] + [0.1] * self.m
             self.P = cp.diag(cp.array(P_diag))
 
+            self._last_reset_time = current_time
+            self._reset_count += 1
+
             return True
         return False
 
@@ -192,15 +207,15 @@ class SafetyULM_EKF:
             q_hat, qdot_hat, F_q_hat, B_q_hat, P
         """
         # Constrain B_q to reasonable bounds (clip before converting to float)
-        # CRITICAL: B_q[0] must be large enough to make QP feasible!
-        # Also clip the actual state to prevent drift below threshold
+        # CRITICAL: B_q[0] must be positive but allow wider adaptation range
+        # Relaxed lower bound to prevent infeasibility when dynamics are weak
         B_q = self.x[3:3+self.m].copy()
-        B_q[0] = cp.clip(B_q[0], 0.7, 3.0)  # Increased from 0.5 to 0.7 for more margin
+        B_q[0] = cp.clip(B_q[0], 0.3, 3.0)  # Wider range: 0.3 to 3.0
         if self.m > 1:
             B_q[1] = cp.clip(B_q[1], -1.0, 1.0)  # Steering effect bounded
 
         # Also enforce bounds on the internal state to prevent drift
-        self.x[3] = cp.clip(self.x[3], 0.7, 3.0)
+        self.x[3] = cp.clip(self.x[3], 0.3, 3.0)
         if self.m > 1:
             self.x[4] = cp.clip(self.x[4], -1.0, 1.0)
 
@@ -317,19 +332,23 @@ class ControllerNode(Node):
     def __init__(self):
         super().__init__('ModelFreeCBF_Node')
 
-        # Parameters - HARDWARE TUNED
-        self.dt = 0.02  # 20 Hz
+        # Enable CuPy memory pooling for faster allocations
+        cp.cuda.set_allocator(cp.cuda.MemoryPool().malloc)
+
+        # Parameters - HARDWARE TUNED for 100Hz
+        self.dt = 0.01  # Target 100 Hz
         self.v_max = 1.5
         self.v_min = 0.0  # CRITICAL: Allow robot to stop! Was 0.5
         self.omega_max = 0.5
         self.omega_min = -0.5
-        self.r_max = 5.0  # Max range for LiDAR and obstacle detection (meters)
+        self.r_max = 3.0  # Reduced from 5.0 - less processing
         self.length_scale = 0.25  # Very tight kernel - less bleed from distant obstacles
         self.sigma_f = 1.0
 
-        # HOCBF parameters (from paper, Section II-C) - HEAVILY RELAXED FOR FEASIBILITY
-        self.lambda_0 = 0.15  # Further reduced to prevent infeasibility
-        self.lambda_1 = 0.15  # Further reduced to prevent infeasibility
+        # HOCBF parameters (from paper, Section II-C) - TUNED FOR 100Hz
+        # Higher update rate allows more aggressive response
+        self.lambda_0 = 0.3  # Increased for 100Hz - faster response
+        self.lambda_1 = 0.3  # Increased for 100Hz - faster response
         self.c_q = 0.05  # Minimal confidence to maximize feasibility
 
         # State
@@ -460,28 +479,35 @@ class ControllerNode(Node):
         """
         start_time = time.time()
 
-        # Step 1: Extract LiDAR data
-        ranges = cp.array(msg.ranges, dtype=cp.float32)
-        angles = cp.linspace(msg.angle_min, msg.angle_max, len(ranges), dtype=cp.float32)
+        # Step 1: Extract LiDAR data - AGGRESSIVE DOWNSAMPLING
+        # Pre-filter to reduce memory allocation and processing
+        ranges_raw = msg.ranges[::20]  # Downsample immediately: 360 -> 18 points
+        angles_raw = cp.linspace(msg.angle_min, msg.angle_max, len(msg.ranges), dtype=cp.float32)[::20]
 
-        # Store for tangent controller
+        ranges = cp.asarray(ranges_raw, dtype=cp.float32)
+        angles = angles_raw
+
+        # Store for tangent controller (use sparse data)
         self.last_ranges = ranges
         self.last_angles = angles
 
-        # Update CBF with obstacle points (downsample to reduce GP computation)
-        # Take every 10th LiDAR point to speed up GP (360 rays -> 36 points)
-        ranges_sparse = ranges[::10]
-        angles_sparse = angles[::10]
-        self.cbf.set_obstacles(ranges_sparse, angles_sparse)
+        # Update CBF with obstacle points (already heavily downsampled)
+        self.cbf.set_obstacles(ranges, angles)
 
         # TANGENT CONTROLLER: Update reference command to steer around obstacles
-        self.u_ref = self.tangent_controller()
+        # Only run every 3rd iteration to save time
+        if not hasattr(self, '_tangent_counter'):
+            self._tangent_counter = 0
+        self._tangent_counter += 1
+
+        if self._tangent_counter % 3 == 0:
+            self.u_ref = self.tangent_controller()
 
         # Get obstacle count and min range (needed for control logic)
         n_obstacles = self.cbf.N
         valid_ranges = ranges[(ranges > 0.1) & (ranges < self.r_max)]
 
-        # Step 2: Predict EKFs
+        # Step 2: Predict EKFs - run every iteration
         self.safety_ekf.predict(self.u_prev)
         self.position_ekf.predict(self.u_prev)
 
@@ -504,6 +530,7 @@ class ControllerNode(Node):
         sigma_pdot = 0.01  # Position velocity uncertainty (tune this)
         epsilon = 1e-6
         R_qdot = grad_norm**2 * sigma_pdot**2 + sigma_gp_sq / (self.length_scale**2 * (grad_norm**2 + epsilon))
+        R_qdot = min(R_qdot, 1.0)  # Cap uncertainty when gradient is small
 
         # Step 4: Update safety EKF with measurements
         # Add sanity checks to prevent bad measurements from causing divergence
@@ -544,7 +571,7 @@ class ControllerNode(Node):
             # Safe - use reference
             u_safe = self.u_ref
         else:
-            # Use CBF
+            # Use CBF with velocity-dependent safety
             try:
                 u_safe = self.cbf.compute_safe_control(
                     u_ref=self.u_ref,
@@ -552,7 +579,8 @@ class ControllerNode(Node):
                     qdot_hat=qdot_hat,
                     F_q_hat=F_q_hat,
                     B_q_hat=B_q_hat,
-                    P=P_safety
+                    P=P_safety,
+                    v_current=self.v
                 )
             except Exception as e:
                 # QP failed - be cautious but don't just stop
@@ -567,12 +595,12 @@ class ControllerNode(Node):
         self.send_command(u_safe[0], u_safe[1])
         self.u_prev = u_safe
 
-        # Lightweight logging every 5th iteration (reduces overhead)
+        # Minimal logging every 50th iteration (reduces overhead for 100Hz)
         if not hasattr(self, '_log_counter'):
             self._log_counter = 0
         self._log_counter += 1
 
-        if self._log_counter % 5 == 0:
+        if self._log_counter % 50 == 0:
             total_time = time.time() - start_time
             dv = abs(u_safe[0] - self.u_ref[0])
             dw = abs(u_safe[1] - self.u_ref[1])
