@@ -624,7 +624,7 @@ class ControllerNode(Node):
                 # full stop when not critically close: keep the reference's
                 # omega and only cut velocity, rather than zeroing both.
                 if min_range > 0.1:
-                    u_safe = [0.75, u_ref_eff[1]]  # Slow forward, keep steering
+                    u_safe = [0.8, u_ref_eff[1]]  # Slow forward, keep steering
                 else:
                     u_safe = [0.0, 0.0]  # Too close, stop
                 step_feasible = False
