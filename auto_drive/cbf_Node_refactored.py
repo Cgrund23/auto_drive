@@ -592,7 +592,7 @@ class ControllerNode(Node):
             cap = max(0.2, 1.0 - 0.1 * (self.infeasible_streak - 4))
             u_ref_eff[0] = min(u_ref_eff[0], cap)
 
-        if min_range < 0.35:
+        if min_range < 0.1:
             # Emergency stop
             u_safe = [0.0, 0.0]
             step_feasible = True
