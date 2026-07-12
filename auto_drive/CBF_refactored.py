@@ -47,7 +47,7 @@ class ModelFreeCBF:
         self._alpha_cache = None
 
         # Pre-allocate arrays for QP to avoid repeated numpy conversions
-        self._P_qp = np.diag([10.0, 0.1])
+        self._P_qp = np.diag([10.0, 0.01])
         self._G_template = np.zeros((5, 2), dtype=np.float64)
         self._G_template[1:3, :] = np.eye(2)
         self._G_template[3:5, :] = -np.eye(2)
@@ -66,7 +66,7 @@ class ModelFreeCBF:
         angles = cp.asarray(angles)
 
         # Filter by range - only consider close obstacles!
-        mask = (ranges < self.r_min_obstacle) & (ranges > 0.1)
+        mask = (ranges < self.r_min_obstacle) & (ranges > 0.05)
         filtered_ranges = ranges[mask]
         filtered_angles = angles[mask]
 

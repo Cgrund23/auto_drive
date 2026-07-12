@@ -515,7 +515,7 @@ class ControllerNode(Node):
             self._tangent_counter = 0
         self._tangent_counter += 1
 
-        if self._tangent_counter % 3 == 0:
+        if self._tangent_counter % 10 == 0:
             self.u_ref = self.tangent_controller()
 
         # Get obstacle count and min range (needed for control logic)
@@ -623,8 +623,8 @@ class ControllerNode(Node):
                 # exception). Be cautious but still favor steering over a
                 # full stop when not critically close: keep the reference's
                 # omega and only cut velocity, rather than zeroing both.
-                if min_range > 0.5:
-                    u_safe = [0.3, u_ref_eff[1]]  # Slow forward, keep steering
+                if min_range > 0.1:
+                    u_safe = [0.75, u_ref_eff[1]]  # Slow forward, keep steering
                 else:
                     u_safe = [0.0, 0.0]  # Too close, stop
                 step_feasible = False
