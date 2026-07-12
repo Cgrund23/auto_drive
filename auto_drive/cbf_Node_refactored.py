@@ -343,13 +343,13 @@ class ControllerNode(Node):
         cp.cuda.set_allocator(cp.cuda.MemoryPool().malloc)
 
         # Parameters - HARDWARE TUNED for 100Hz
-        self.dt = 0.01  # Target 100 Hz
-        self.v_max = 1.5
+        self.dt = 0.05  # Target 100 Hz
+        self.v_max = 1.25
         self.v_min = 0.0  # CRITICAL: Allow robot to stop! Was 0.5
         self.omega_max = 0.5
         self.omega_min = -0.5
         self.r_max = 3.0  # Reduced from 5.0 - less processing
-        self.length_scale = 0.25  # Very tight kernel - less bleed from distant obstacles
+        self.length_scale = 0.5  # Very tight kernel - less bleed from distant obstacles
         self.sigma_f = 1.0
 
         # HOCBF parameters (from paper, Section II-C) - TUNED FOR 100Hz
@@ -362,12 +362,12 @@ class ControllerNode(Node):
         self.x = 0.0
         self.y = 0.0
         self.theta = 0.0
-        self.v = 1.0
+        self.v = 0.8
 
         # Reference command - will be updated by tangent controller
-        self.u_ref = [1.0, 0.0]  # [v_ref, ω_ref]
-        self.u_prev = [1.0, 0.0]
-        self.v_prev = 1.0  # Track previous velocity for acceleration control
+        self.u_ref = [0.8, 0.0]  # [v_ref, ω_ref]
+        self.u_prev = [0.8, 0.0]
+        self.v_prev = 0.8  # Track previous velocity for acceleration control
 
         # Tracks consecutive CBF-QP infeasible/relaxed solves. Used to
         # pre-emptively cap the reference velocity when infeasibility
@@ -592,7 +592,7 @@ class ControllerNode(Node):
             cap = max(0.2, 1.0 - 0.1 * (self.infeasible_streak - 4))
             u_ref_eff[0] = min(u_ref_eff[0], cap)
 
-        if min_range < 0.1:
+        if min_range < 0.15:
             # Emergency stop
             u_safe = [0.0, 0.0]
             step_feasible = True
