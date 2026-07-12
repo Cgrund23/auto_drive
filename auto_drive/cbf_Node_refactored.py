@@ -158,11 +158,18 @@ class SafetyULM_EKF:
         # Covariance update
         self.P = (cp.eye(len(self.x)) - cp.outer(K, self.H_qdot)) @ self.P
 
-    def reset_if_diverged(self):
+    def reset_if_diverged(self, min_threshold=0.35):
         """
         Reset EKF if B_q estimates diverge (become negative or too large).
         B_q[0] should be positive - velocity approaching obstacle decreases barrier.
         Includes hysteresis to prevent reset oscillations.
+
+        min_threshold was raised from 0.2 to 0.35 (default): with the old
+        threshold, B_q,v could sit at its clamped floor of 0.3 (see
+        get_estimates) for many cycles without ever triggering a reset, which
+        let the QP-infeasibility cascade run for seconds before the EKF
+        finally corrected itself. Catching the drift earlier, before it
+        starves control authority, shortens the infeasible streak.
         """
         # Track time since last reset to prevent rapid cycling
         if not hasattr(self, '_last_reset_time'):
@@ -173,7 +180,7 @@ class SafetyULM_EKF:
 
         # Check if diverged (updated bounds for wider B_q range)
         B_q_v = float(B_q[0])
-        if B_q_v < 0.2 or B_q_v > 5.0:
+        if B_q_v < min_threshold or B_q_v > 5.0:
             # Prevent reset spam - require 1 second gap
             import time
             current_time = time.time()
@@ -181,7 +188,7 @@ class SafetyULM_EKF:
                 return False  # Too soon, skip reset
 
             # Log the divergence for debugging
-            reason = "too small" if B_q_v < 0.2 else "too large"
+            reason = "too small" if B_q_v < min_threshold else "too large"
             print(f"EKF DIVERGENCE: B_q,v = {B_q_v:.4f} ({reason})")
 
             # Reset parameters to SAME initial values as __init__ for consistency
@@ -361,6 +368,14 @@ class ControllerNode(Node):
         self.u_ref = [1.0, 0.0]  # [v_ref, ω_ref]
         self.u_prev = [1.0, 0.0]
         self.v_prev = 1.0  # Track previous velocity for acceleration control
+
+        # Tracks consecutive CBF-QP infeasible/relaxed solves. Used to
+        # pre-emptively cap the reference velocity when infeasibility
+        # persists across multiple cycles, rather than treating each
+        # occurrence independently (see lidar_callback). Steering (ω) is
+        # never touched by this cap -- only forward velocity -- so avoidance
+        # authority is preserved even while slowing down.
+        self.infeasible_streak = 0
 
         # Goal for tangent controller
         self.goal_x = 10.0  # Target x position (meters ahead)
@@ -564,17 +579,35 @@ class ControllerNode(Node):
         # Check if dangerously close first
         min_range = float(cp.min(valid_ranges)) if len(valid_ranges) > 0 else 999.0
 
+        # FIX: sustained-infeasibility velocity cap. If the CBF QP has needed
+        # slack/relaxation for several consecutive cycles, treat that streak
+        # itself as a signal to slow the reference down, independent of what
+        # q_hat currently says. This targets the failure mode where repeated
+        # infeasibility drains B_q,v toward its floor before q_hat or
+        # min_range individually cross their thresholds. Only the velocity
+        # component is capped -- omega (steering) is left untouched so
+        # avoidance authority is preserved (favor steering over stopping).
+        u_ref_eff = list(self.u_ref)
+        if self.infeasible_streak >= 5:
+            cap = max(0.2, 1.0 - 0.1 * (self.infeasible_streak - 4))
+            u_ref_eff[0] = min(u_ref_eff[0], cap)
+
         if min_range < 0.35:
             # Emergency stop
             u_safe = [0.0, 0.0]
+            step_feasible = True
         elif q_hat > 0.5 and n_obstacles == 0:
             # Safe - use reference
-            u_safe = self.u_ref
+            u_safe = u_ref_eff
+            step_feasible = True
         else:
-            # Use CBF with velocity-dependent safety
+            # Use CBF with velocity-dependent safety. compute_safe_control now
+            # runs a feasibility precheck internally and falls back to a
+            # slack-relaxed solve (instead of a hard brake) if still
+            # infeasible after that; it returns (u_safe, feasible, slack).
             try:
-                u_safe = self.cbf.compute_safe_control(
-                    u_ref=self.u_ref,
+                u_safe, step_feasible, slack = self.cbf.compute_safe_control(
+                    u_ref=u_ref_eff,
                     q_hat=q_hat,
                     qdot_hat=qdot_hat,
                     F_q_hat=F_q_hat,
@@ -582,14 +615,22 @@ class ControllerNode(Node):
                     P=P_safety,
                     v_current=self.v
                 )
+                if not step_feasible and self.infeasible_streak % 20 == 0:
+                    self.get_logger().warn(
+                        f'CBF QP relaxed (slack={slack:.3f}), streak={self.infeasible_streak}')
             except Exception as e:
-                # QP failed - be cautious but don't just stop
-                # Allow slow movement to try to escape
+                # QP failed entirely (not just infeasible -- an actual solver
+                # exception). Be cautious but still favor steering over a
+                # full stop when not critically close: keep the reference's
+                # omega and only cut velocity, rather than zeroing both.
                 if min_range > 0.5:
-                    u_safe = [0.3, self.u_ref[1]]  # Slow forward
+                    u_safe = [0.3, u_ref_eff[1]]  # Slow forward, keep steering
                 else:
                     u_safe = [0.0, 0.0]  # Too close, stop
+                step_feasible = False
                 self.get_logger().warn(f'CBF QP failed, min_range={min_range:.2f}m')
+
+        self.infeasible_streak = 0 if step_feasible else self.infeasible_streak + 1
 
         # Step 7: Send command
         self.send_command(u_safe[0], u_safe[1])

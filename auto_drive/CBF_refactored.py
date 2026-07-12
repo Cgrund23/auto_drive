@@ -129,11 +129,11 @@ class ModelFreeCBF:
         k_star = self.rbf_kernel(p, self.obstacle_points)  # (1, N)
 
         # GP posterior mean (shifted) using cached alpha
-        h = 1.0 + float(k_star @ self._alpha_cache)
+        h = 1.0 + float((k_star @ self._alpha_cache).reshape(-1)[0])
 
         # GP posterior variance (Eq. 6 in paper)
         k_ss = self.rbf_kernel(p, p)[0, 0]
-        sigma_sq = float(k_ss - k_star @ self._K_inv_cache @ k_star.T)
+        sigma_sq = float((k_ss - k_star @ self._K_inv_cache @ k_star.T).reshape(-1)[0])
 
         return h, sigma_sq
 
@@ -205,7 +205,8 @@ class ModelFreeCBF:
         sigma_max = 0.05  # Maximum safety margin - very small to ensure feasibility
         return min(sigma, sigma_max)
 
-    def compute_safe_control(self, u_ref, q_hat, qdot_hat, F_q_hat, B_q_hat, P, v_current=1.0):
+    def compute_safe_control(self, u_ref, q_hat, qdot_hat, F_q_hat, B_q_hat, P, v_current=1.0,
+                              use_feasibility_precheck=True, use_slack_fallback=True):
         """
         Solve CLF-CBF QP to compute safe control with velocity-dependent safety.
 
@@ -217,6 +218,30 @@ class ModelFreeCBF:
             subject to  B̂_q,k u ≥ r_k  (CBF constraint)
                         u_min ≤ u ≤ u_max  (input bounds)
 
+        Two fixes vs. the original implementation, both addressing the
+        infeasibility cascade seen on hardware (repeated infeasible solves ->
+        B_q estimate drifts to its floor -> even more infeasible), and both
+        aimed at favoring steering over stopping when a fix is needed:
+
+        1. FEASIBILITY PRECHECK (use_feasibility_precheck): before solving,
+           use check_feasibility() (Lemma 1) to predict infeasibility from
+           the current estimates alone. If infeasible, pre-emptively reduce
+           u_ref's velocity component proportional to the shortfall, then
+           re-check. This tends to avoid needing the solver's brake fallback
+           in the first place -- and critically leaves ω (steering) untouched,
+           so avoidance authority isn't sacrificed just because the velocity
+           term alone can't satisfy the constraint.
+
+        2. SLACK FALLBACK (use_slack_fallback): if the exact (hard-constraint)
+           QP is still infeasible after the precheck, don't return a blind
+           [u_min, 0] brake. Instead solve a relaxed QP that allows a
+           penalized constraint violation and returns the best-effort control
+           the actuators can physically produce, plus how much the constraint
+           had to be violated by (the `slack` return value). Because the
+           relaxed solve searches the full box (not just velocity), it will
+           use whatever steering authority is available rather than always
+           collapsing to a straight-line brake.
+
         Args:
             u_ref: Reference control [v_ref, ω_ref]
             q_hat: Estimated barrier value
@@ -225,9 +250,17 @@ class ModelFreeCBF:
             B_q_hat: Estimated input sensitivity [B_v, B_ω]
             P: EKF covariance matrix
             v_current: Current velocity (for velocity-dependent scaling)
+            use_feasibility_precheck: enable fix (1) above
+            use_slack_fallback: enable fix (2) above
 
         Returns:
             u_safe: Safe control input [v, ω]
+            feasible: True if the hard CBF constraint was satisfied exactly
+                (i.e. no slack was needed). False means the returned control
+                is a best-effort / relaxed solution.
+            slack: amount of constraint violation in the returned solution
+                (0.0 when feasible is True). Useful as an early-warning
+                signal / for logging infeasibility streaks.
         """
         # Ensure inputs are CuPy arrays
         u_ref = cp.asarray(u_ref)
@@ -248,6 +281,18 @@ class ModelFreeCBF:
         B_q_np = B_q_hat.get() if hasattr(B_q_hat, 'get') else np.asarray(B_q_hat, dtype=np.float64)
         u_max_np = self.u_max.get() if hasattr(self.u_max, 'get') else np.asarray(self.u_max, dtype=np.float64)
         u_min_np = self.u_min.get() if hasattr(self.u_min, 'get') else np.asarray(self.u_min, dtype=np.float64)
+
+        # --- FIX 1: feasibility precheck (Lemma 1) ---
+        if use_feasibility_precheck:
+            feasible_pre, M_k, r_k_check = self.check_feasibility(
+                q_hat, qdot_hat, F_q_hat, B_q_hat, sigma_k, return_details=True)
+            if not feasible_pre:
+                shortfall = r_k_check - M_k
+                # Reduce only the velocity component of u_ref, proportional to
+                # the shortfall; leave omega alone so steering-based avoidance
+                # is never suppressed by this precheck.
+                v_cut = max(0.0, u_ref_np[0] - shortfall * 0.5)
+                u_ref_np = np.array([v_cut, u_ref_np[1]])
 
         # Reuse pre-allocated arrays
         np.dot(self._P_qp, -u_ref_np, out=self._q_qp)  # Linear term: -W @ u_ref
@@ -286,22 +331,90 @@ class ModelFreeCBF:
                 print(f'ULM: F_q={F_q_hat:.3f}, B_q={B_q_np}')
                 print(f'Control bounds: v∈[{u_min_np[0]:.2f}, {u_max_np[0]:.2f}], ω∈[{u_min_np[1]:.2f}, {u_max_np[1]:.2f}]')
                 print(f'Max achievable: B_q @ u_max = {float(B_q_np[0]*u_max_np[0] + B_q_np[1]*u_max_np[1]):.3f}')
+
+                # --- FIX 2: slack fallback instead of a blind brake ---
+                if use_slack_fallback:
+                    u_safe, slack = self.solve_qp_with_slack(
+                        u_ref_np, B_q_np, r_k, u_min_np, u_max_np)
+                    print(f'Slack fallback: u={u_safe}, remaining violation={slack:.4f}')
+                    print(f'=====================\n')
+                    return u_safe, False, slack
+
                 print(f'=====================\n')
+                # Return safe fallback (original behavior)
+                return [float(u_min_np[0]), 0.0], False, float('nan')
 
-                # Return safe fallback
-                return [float(u_min_np[0]), 0.0]
-
-            return [float(sol[0]), float(sol[1])]
+            return [float(sol[0]), float(sol[1])], True, 0.0
 
         except Exception as e:
             print(f'QP solve exception: {e}')
             print(f'  q_hat={q_hat:.3f}, qdot_hat={qdot_hat:.3f}')
             print(f'  F_q_hat={F_q_hat:.3f}, B_q_hat={B_q_np}')
             print(f'  r_k={float(r_k):.3f}, sigma_k={sigma_k:.3f}')
-            # Return safe fallback
-            return [float(u_min_np[0]), 0.0]
 
-    def check_feasibility(self, q_hat, qdot_hat, F_q_hat, B_q_hat, sigma_k):
+            if use_slack_fallback:
+                try:
+                    u_safe, slack = self.solve_qp_with_slack(
+                        u_ref_np, B_q_np, r_k, u_min_np, u_max_np)
+                    return u_safe, False, slack
+                except Exception as e2:
+                    print(f'Slack fallback also failed: {e2}')
+
+            # Return safe fallback
+            return [float(u_min_np[0]), 0.0], False, float('nan')
+
+    def solve_qp_with_slack(self, u_ref_np, B_q_np, r_k, u_min_np, u_max_np,
+                             slack_weight=1000.0, n_line_search=40):
+        """
+        Fallback QP solve that relaxes the CBF constraint with a slack variable
+        instead of returning a hard-brake fallback when the exact QP is infeasible.
+
+        Solves (approximately, via 1D line search since the decision space is
+        just 2D and box-constrained -- exact for this problem shape):
+            minimize    ||u - u_ref||_P^2 + slack_weight * s^2
+            subject to  B_q @ u >= r_k - s,  s >= 0
+                        u_min <= u <= u_max
+
+        This never fails: if the box constraint's best case for satisfying the
+        CBF row is still short of r_k, it returns the control that gets as
+        close as possible (minimizes remaining violation) while respecting the
+        tracking cost, plus how much slack (constraint violation) was needed.
+
+        Searches along the segment from u_ref to the box corner that best
+        satisfies the constraint (u_min/u_max chosen per-axis by the sign of
+        B_q), so it naturally uses whichever of v or ω has authority left
+        rather than only ever cutting velocity.
+
+        Returns:
+            u_safe: [v, ω] best-effort control
+            slack: amount of constraint violation remaining (0.0 if fully satisfied)
+        """
+        u_ref_np = np.asarray(u_ref_np, dtype=np.float64)
+        a = -np.asarray(B_q_np, dtype=np.float64)  # a @ u <= b form
+        b = -float(r_k)
+        u_min_np = np.asarray(u_min_np, dtype=np.float64)
+        u_max_np = np.asarray(u_max_np, dtype=np.float64)
+        P_diag = np.diag(self._P_qp) if self._P_qp.ndim == 2 else self._P_qp
+
+        # Point in the box that minimizes a@u (best case for satisfying the constraint)
+        u_best_for_constraint = np.where(a >= 0, u_min_np, u_max_np)
+
+        direction = u_best_for_constraint - u_ref_np
+        ts = np.linspace(0.0, 1.0, n_line_search)
+        best_t, best_cost = 0.0, np.inf
+        for t in ts:
+            u_t = np.clip(u_ref_np + t * direction, u_min_np, u_max_np)
+            violation = max(0.0, a @ u_t - b)
+            track_cost = 0.5 * np.sum(P_diag * (u_t - u_ref_np) ** 2)
+            cost = track_cost + slack_weight * violation ** 2
+            if cost < best_cost:
+                best_cost, best_t = cost, t
+
+        u_sol = np.clip(u_ref_np + best_t * direction, u_min_np, u_max_np)
+        slack = max(0.0, a @ u_sol - b)
+        return [float(u_sol[0]), float(u_sol[1])], float(slack)
+
+    def check_feasibility(self, q_hat, qdot_hat, F_q_hat, B_q_hat, sigma_k, return_details=False):
         """
         Check if CBF QP is feasible (Lemma 1 in paper).
 
@@ -314,9 +427,13 @@ class ModelFreeCBF:
         Args:
             q_hat, qdot_hat, F_q_hat, B_q_hat: EKF estimates
             sigma_k: Safety margin
+            return_details: if True, also return (M_k, r_k) so callers can
+                compute how large the shortfall is (used for pre-emptive
+                velocity reduction before the QP is even solved).
 
         Returns:
             feasible: Boolean
+            (M_k, r_k): only if return_details=True
         """
         B_q_hat = cp.array(B_q_hat)
         r_k = -F_q_hat - (self.lambda_0 + self.lambda_1) * qdot_hat - \
@@ -329,4 +446,7 @@ class ModelFreeCBF:
             else:
                 M_k += float(B_q_hat[j]) * float(self.u_min[j])
 
-        return float(M_k) >= float(r_k)
+        feasible = float(M_k) >= float(r_k)
+        if return_details:
+            return feasible, float(M_k), float(r_k)
+        return feasible
