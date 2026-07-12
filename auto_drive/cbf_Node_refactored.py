@@ -362,12 +362,12 @@ class ControllerNode(Node):
         self.x = 0.0
         self.y = 0.0
         self.theta = 0.0
-        self.v = 0.8
+        self.v = 1.0
 
         # Reference command - will be updated by tangent controller
-        self.u_ref = [0.8, 0.0]  # [v_ref, ω_ref]
-        self.u_prev = [0.8, 0.0]
-        self.v_prev = 0.8  # Track previous velocity for acceleration control
+        self.u_ref = [1.0, 0.0]  # [v_ref, ω_ref]
+        self.u_prev = [1.0, 0.0]
+        self.v_prev = 1.0  # Track previous velocity for acceleration control
 
         # Tracks consecutive CBF-QP infeasible/relaxed solves. Used to
         # pre-emptively cap the reference velocity when infeasibility
