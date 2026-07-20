@@ -1,694 +1,470 @@
 #!/usr/bin/env python3
 """
-Model-Free Control Barrier Function Node for F1Tenth
-Implements the MIMO ULM-based CBF synthesis from:
-"Safety via Control Barrier Functions Synthesized from Ultra-Local Models"
+cbf_Node_refactored_ackermann.py
+
+Ackermann-native replacement for cbf_Node_refactored.py.
+
+GROUND TRUTH: L.A. Duffaut Espinosa & C. Grund, "Safety via Control Barrier
+Functions Synthesized from Ultra-Local Models" ("the paper"). Every equation
+cited in comments below refers to that paper. This node, and
+CBF_refactored_ackermann.py that it imports, were derived from (and are
+validated against) ackermann_cbf_core.py / run_ackermann_sim.py in this same
+delivery, which reproduce the paper's Section V numerical-illustration
+methodology on true Ackermann kinematics before anything was ported to ROS.
+
+WHAT CHANGED FROM THE ORIGINAL cbf_Node_refactored.py, AND WHY
+----------------------------------------------------------------------------
+1. u = [v, phi] (steering angle) everywhere, not u = [v, omega].
+   The original node ran the entire ULM/EKF/CBF pipeline on a differential-
+   drive-style [v, omega] command, then converted to steering angle only at
+   send_command() via steering_angle = atan(L*omega/v) -- singular at v~0,
+   dependent on the wheelbase L exactly where the paper's approach is
+   designed to need no kinematic constants, and lossy (the EKF was learning
+   sensitivity to a quantity -- omega -- the car cannot actually command).
+   Here, B_q's second column IS the barrier's sensitivity to the actual
+   steering command, and send_command() publishes it directly.
+
+2. Per-obstacle GP barriers aggregated via the soft-min, Eq. (3), instead of
+   a single GP fit fresh from every scan. Section II-E: "a separate GP h_i is
+   maintained for each obstacle... each range return is attributed to the
+   obstacle whose boundary generated the reflection." CBF_refactored_
+   ackermann.ModelFreeCBF.set_obstacles() does a simple angular-gap
+   clustering step to route points to per-obstacle GPs, which persist (with a
+   bounded point buffer) across scans in the WORLD frame using odometry,
+   rather than being rebuilt from scratch every callback.
+
+3. B_q is no longer clamped to be strictly positive. For a position-
+   dependent barrier, B_q,v is genuinely sign-indefinite (driving TOWARD an
+   obstacle makes the barrier's second derivative more negative as speed
+   increases; driving away makes it more positive) -- see
+   ackermann_cbf_core.SafetyULM_EKF.get_estimates() for the full derivation.
+   The original clamp (inherited from earlier differential-drive tuning)
+   silently told the QP "more speed always helps," which is false in exactly
+   the head-on case the filter exists for, and was found during validation
+   to cause chronic QP infeasibility.
+
+4. Persistent excitation is now CONTINUOUS, not just a one-shot burst.
+   Section II-B: [F_q, B_q] identifiable iff inputs are persistently
+   exciting. A one-shot startup burst leaves B_q,phi unidentified again by
+   the time an obstacle is actually encountered if the burst finished before
+   contact. During validation this produced a near-zero, noise-dominated
+   B_q,phi estimate exactly when the safety filter needed it, which twice
+   picked the WRONG avoidance side around an obstacle (confirmed by an
+   explicit "does it turn correctly both left and right" test) before this
+   fix. A small continuous steering dither (small enough not to visibly
+   perturb the path) is now always superimposed on the reference so B_q,phi
+   stays identifiable throughout the run, not just after startup.
+
+5. When the CBF-QP is infeasible (Lemma 1), the fallback now ALWAYS drives
+   v toward v_min (brakes) while still steering toward the model's best
+   current guess -- rather than picking whichever box corner the (possibly
+   still-unidentified) sign of B_q,phi happens to favor at full speed. See
+   CBF_refactored_ackermann.ModelFreeCBF.compute_safe_control()'s comment for
+   the failure mode this fixes.
+
+6. No CuPy. The linear algebra here is all sub-10x10 dense matrices (EKF
+   state/covariance, GP kernel matrices with <=30 points); GPU kernel-launch
+   overhead dominates actual compute at this size, and CuPy-on-Jetson has
+   been a recurring source of friction in this project (see project memory).
+   Plain NumPy is simpler, is what was validated in simulation, and is very
+   likely faster here too. If profiling on hardware shows the per-obstacle
+   GP kernel matrices are a bottleneck, they are the one part of this file
+   that could benefit from batched GPU evaluation -- everything else is too
+   small to matter.
 """
+import time
+
+import numpy as np
 import rclpy
-import cupy as cp
-from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
+from rclpy.node import Node
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
 from ackermann_msgs.msg import AckermannDriveStamped
-from auto_drive.CBF_refactored import ModelFreeCBF
-import time
+
+from auto_drive.CBF_refactored_ackermann import ModelFreeCBF
 
 
 class SafetyULM_EKF:
     """
-    Extended Kalman Filter for the safety output second-order MIMO ULM:
-    q̈ = F_q + B_q @ u
-
-    State: ξ = [q, q̇, F_q, B_q,v, B_q,ω]^T  (for 2 inputs: v, ω)
+    Second-order MIMO ULM EKF for the safety output, Eq. (8)-(10):
+        q_ddot = F_q + B_q @ u,   u = [v, phi]
+    State xi^q_k = [q_k, qdot_k, F_q,k, B_q,v,k, B_q,phi,k]^T.
     """
-    def __init__(self, Ts, m_inputs=2, Q=None, R_q=None, R_qdot=None):
-        """
-        Args:
-            Ts: Sampling period
-            m_inputs: Number of control inputs (2 for [v, ω])
-            Q: Process noise covariance (default provided)
-            R_q: Measurement noise for q (can be updated with GP variance)
-            R_qdot: Measurement noise for q̇
-        """
+
+    def __init__(self, Ts, m_inputs=2):
         self.Ts = Ts
         self.m = m_inputs
-
-        # State: [q, q̇, F_q, B_q,v, B_q,ω]
         state_dim = 3 + m_inputs
-        self.x = cp.zeros(state_dim)
-
-        # Initialize parameters
-        self.x[2] = 0.0  # F_q
-        self.x[3] = 1.0  # B_q,v
+        self.x = np.zeros(state_dim)
+        self.x[2] = 0.0     # F_q
+        self.x[3] = 1.0     # B_q,v  (prior: more speed away from an obstacle helps)
         if m_inputs > 1:
-            self.x[4] = 0.1  # B_q,ω
+            self.x[4] = 0.0  # B_q,phi (no prior belief about steering's effect)
 
-        # Covariance matrix - HEAVILY REDUCED for faster convergence
-        P_diag = [0.01, 0.01, 0.1] + [0.1] * m_inputs
-        self.P = cp.diag(cp.array(P_diag))
+        P_diag = [0.01, 0.01, 0.05] + [0.05] * m_inputs
+        self.P = np.diag(P_diag)
+        Q_diag = [1e-6, 1e-5, 2e-4] + [2e-4] * m_inputs
+        self.Q = np.diag(Q_diag)
 
-        # Process noise (parameters F_q, B_q evolve slowly but need correction ability)
-        # REDUCED for hardware stability - high process noise causes drift
-        if Q is None:
-            Q_diag = [1e-6, 1e-5, 1e-3] + [1e-3] * m_inputs  # Reduced from 1e-2 to 1e-3
-            self.Q = cp.diag(cp.array(Q_diag))
-        else:
-            self.Q = Q
+        self.H_q = np.zeros((1, state_dim)); self.H_q[0, 0] = 1.0
+        self.H_qdot = np.zeros((1, state_dim)); self.H_qdot[0, 1] = 1.0
 
-        # Measurement noise
-        self.R_q = 1e-3 if R_q is None else R_q
-        self.R_qdot = 1e-2 if R_qdot is None else R_qdot
-
-        # Measurement matrices
-        self.H_q = cp.zeros((1, state_dim))
-        self.H_q[0, 0] = 1.0  # Measure q
-
-        self.H_qdot = cp.zeros((1, state_dim))
-        self.H_qdot[0, 1] = 1.0  # Measure q̇
+        self._last_reset_time = -1e9
+        self.reset_count = 0
 
     def predict(self, u):
-        """
-        Predict step using the ULM dynamics with Euler discretization.
-
-        Args:
-            u: Control input [v, ω]
-        """
         Ts = self.Ts
-        u = cp.array(u)
+        u = np.asarray(u, dtype=float)
+        q, qdot, F_q = self.x[0], self.x[1], self.x[2]
+        B_q = self.x[3:3 + self.m]
 
-        # Extract state
-        q = self.x[0]
-        qdot = self.x[1]
-        F_q = self.x[2]
-        B_q = self.x[3:3+self.m]
+        qddot = F_q + B_q @ u
+        self.x[0] = q + Ts * qdot + (Ts**2 / 2) * qddot
+        self.x[1] = qdot + Ts * qddot
 
-        # Dynamics: q̈ = F_q + B_q @ u
-        qddot = F_q + cp.dot(B_q, u)
-
-        # Euler integration
-        q_new = q + Ts * qdot + (Ts**2 / 2) * qddot
-        qdot_new = qdot + Ts * qddot
-
-        # Parameters remain constant (random walk model)
-        self.x[0] = q_new
-        self.x[1] = qdot_new
-        # self.x[2:] unchanged in prediction
-
-        # Linearized state transition matrix A
-        A = cp.eye(3 + self.m)
+        A = np.eye(3 + self.m)
         A[0, 1] = Ts
         A[0, 2] = Ts**2 / 2
-        A[0, 3:3+self.m] = (Ts**2 / 2) * u
+        A[0, 3:3 + self.m] = (Ts**2 / 2) * u
         A[1, 2] = Ts
-        A[1, 3:3+self.m] = Ts * u
-
-        # Covariance prediction
+        A[1, 3:3 + self.m] = Ts * u
         self.P = A @ self.P @ A.T + self.Q
 
-    def update_q(self, q_meas, R_q=None):
-        """
-        Update with q measurement (from GP).
-
-        Args:
-            q_meas: Measured barrier value
-            R_q: Measurement noise (e.g., GP posterior variance)
-        """
-        if R_q is not None:
-            self.R_q = R_q
-
-        R = cp.array([[self.R_q]])
-
-        # Innovation
+    def update_q(self, q_meas, R_q):
+        """Measurement 1: q_k from the GP posterior mean, Eq. (4)."""
+        R = np.array([[max(R_q, 1e-6)]])
         y = q_meas - self.H_q @ self.x
         S = self.H_q @ self.P @ self.H_q.T + R
-
-        # Kalman gain
         K = self.P @ self.H_q.T / S[0, 0]
-
-        # State update
         self.x = self.x + K.flatten() * y
+        self.P = (np.eye(len(self.x)) - np.outer(K, self.H_q)) @ self.P
 
-        # Covariance update
-        self.P = (cp.eye(len(self.x)) - cp.outer(K, self.H_q)) @ self.P
-
-    def update_qdot(self, qdot_meas, R_qdot=None):
-        """
-        Update with q̇ measurement (from GP gradient and position ULM).
-
-        Args:
-            qdot_meas: Measured barrier derivative
-            R_qdot: Measurement noise
-        """
-        if R_qdot is not None:
-            self.R_qdot = R_qdot
-
-        R = cp.array([[self.R_qdot]])
-
-        # Innovation
+    def update_qdot(self, qdot_meas, R_qdot):
+        """Measurement 2: qdot_meas = grad(h)^T p_dot_hat, Section III-B."""
+        R = np.array([[max(R_qdot, 1e-6)]])
         y = qdot_meas - self.H_qdot @ self.x
         S = self.H_qdot @ self.P @ self.H_qdot.T + R
-
-        # Kalman gain
         K = self.P @ self.H_qdot.T / S[0, 0]
-
-        # State update
         self.x = self.x + K.flatten() * y
+        self.P = (np.eye(len(self.x)) - np.outer(K, self.H_qdot)) @ self.P
 
-        # Covariance update
-        self.P = (cp.eye(len(self.x)) - cp.outer(K, self.H_qdot)) @ self.P
-
-    def reset_if_diverged(self, min_threshold=0.35):
-        """
-        Reset EKF if B_q estimates diverge (become negative or too large).
-        B_q[0] should be positive - velocity approaching obstacle decreases barrier.
-        Includes hysteresis to prevent reset oscillations.
-
-        min_threshold was raised from 0.2 to 0.35 (default): with the old
-        threshold, B_q,v could sit at its clamped floor of 0.3 (see
-        get_estimates) for many cycles without ever triggering a reset, which
-        let the QP-infeasibility cascade run for seconds before the EKF
-        finally corrected itself. Catching the drift earlier, before it
-        starves control authority, shortens the infeasible streak.
-        """
-        # Track time since last reset to prevent rapid cycling
-        if not hasattr(self, '_last_reset_time'):
-            self._last_reset_time = 0.0
-            self._reset_count = 0
-
-        B_q = self.x[3:3+self.m]
-
-        # Check if diverged (updated bounds for wider B_q range)
-        B_q_v = float(B_q[0])
-        if B_q_v < min_threshold or B_q_v > 5.0:
-            # Prevent reset spam - require 1 second gap
-            import time
-            current_time = time.time()
-            if current_time - self._last_reset_time < 1.0:
-                return False  # Too soon, skip reset
-
-            # Log the divergence for debugging
-            reason = "too small" if B_q_v < min_threshold else "too large"
-            print(f"EKF DIVERGENCE: B_q,v = {B_q_v:.4f} ({reason})")
-
-            # Reset parameters to SAME initial values as __init__ for consistency
-            self.x[2] = 0.0  # F_q
-            self.x[3] = 1.0  # B_q,v (MATCH line 43!)
+    def reset_if_diverged(self, t):
+        # B_q,v is sign-indefinite by design (see module docstring point 3),
+        # so divergence is judged on magnitude / numerical sanity only.
+        B_qv = float(self.x[3])
+        if (abs(B_qv) > 6.0 or not np.isfinite(B_qv)) and (t - self._last_reset_time) > 1.0:
+            self.x[2] = 0.0
+            self.x[3] = 1.0
             if self.m > 1:
-                self.x[4] = 0.1  # B_q,ω
-
-            # Reset covariance for parameters only (keep state estimates)
-            # Use SAME values as __init__ line 48
-            P_diag = [0.01, 0.01, 0.1] + [0.1] * self.m
-            self.P = cp.diag(cp.array(P_diag))
-
-            self._last_reset_time = current_time
-            self._reset_count += 1
-
+                self.x[4] = 0.0
+            self.P = np.diag([0.01, 0.01, 0.05] + [0.05] * self.m)
+            self._last_reset_time = t
+            self.reset_count += 1
             return True
         return False
 
     def get_estimates(self):
-        """
-        Returns:
-            q_hat, qdot_hat, F_q_hat, B_q_hat, P
-        """
-        # Constrain B_q to reasonable bounds (clip before converting to float)
-        # CRITICAL: B_q[0] must be positive but allow wider adaptation range
-        # Relaxed lower bound to prevent infeasibility when dynamics are weak
-        B_q = self.x[3:3+self.m].copy()
-        B_q[0] = cp.clip(B_q[0], 0.3, 3.0)  # Wider range: 0.3 to 3.0
-        if self.m > 1:
-            B_q[1] = cp.clip(B_q[1], -1.0, 1.0)  # Steering effect bounded
-
-        # Also enforce bounds on the internal state to prevent drift
-        self.x[3] = cp.clip(self.x[3], 0.3, 3.0)
-        if self.m > 1:
-            self.x[4] = cp.clip(self.x[4], -1.0, 1.0)
-
-        return (
-            float(self.x[0]),
-            float(self.x[1]),
-            float(self.x[2]),
-            B_q,
-            self.P.copy()
-        )
+        B_q = np.clip(self.x[3:3 + self.m].copy(), -6.0, 6.0)
+        return float(self.x[0]), float(self.x[1]), float(self.x[2]), B_q, self.P.copy()
 
 
 class PositionULM_EKF:
-    """
-    First-order MIMO ULM for position dynamics:
-    ṗ = F_p + B_p @ u
+    """First-order MIMO ULM for position, p_dot = F_p + B_p @ u, u = [v, phi]."""
 
-    State: [p_x, p_y, F_p,x, F_p,y, B_p,x,v, B_p,x,ω, B_p,y,v, B_p,y,ω]^T
-    """
-    def __init__(self, Ts, m_inputs=2, Q=None, R=None):
+    def __init__(self, Ts, m_inputs=2):
         self.Ts = Ts
         self.m = m_inputs
-
-        # State: [p_x, p_y, F_p (2), B_p (2x2 flattened)]
-        # For 2D position and 2 inputs: 2 + 2 + 4 = 8
         state_dim = 2 + 2 + 2 * m_inputs
-        self.x = cp.zeros(state_dim)
+        self.x = np.zeros(state_dim)
+        self.x[4] = 1.0   # B_p,x,v
+        self.x[6] = 0.0   # B_p,y,v
+        self.x[5] = 0.0   # B_p,x,phi
+        self.x[7] = 0.0   # B_p,y,phi
 
-        # Initialize B_p to reasonable values (forward velocity affects p_x, etc.)
-        self.x[4] = 1.0  # B_p,x,v
-        self.x[6] = 0.0  # B_p,y,v
-        self.x[5] = 0.0  # B_p,x,ω
-        self.x[7] = 0.1  # B_p,y,ω
-
-        # Covariance - HEAVILY REDUCED for faster convergence
-        P_diag = [0.01, 0.01, 0.1, 0.1] + [0.1] * (2 * m_inputs)
-        self.P = cp.diag(cp.array(P_diag))
-
-        # Process noise
-        if Q is None:
-            Q_diag = [1e-6, 1e-6, 1e-3, 1e-3] + [1e-3] * (2 * m_inputs)
-            self.Q = cp.diag(cp.array(Q_diag))
-        else:
-            self.Q = Q
-
-        # Measurement noise (position measurements from odometry)
-        self.R = cp.diag([1e-3, 1e-3]) if R is None else R
-
-        # Measurement matrix (we measure position)
-        self.H = cp.zeros((2, state_dim))
-        self.H[0, 0] = 1.0
-        self.H[1, 1] = 1.0
+        self.P = np.diag([0.01, 0.01, 0.1, 0.1] + [0.1] * (2 * m_inputs))
+        self.Q = np.diag([1e-6, 1e-6, 1e-3, 1e-3] + [1e-3] * (2 * m_inputs))
+        self.R = np.diag([1e-3, 1e-3])
+        self.H = np.zeros((2, state_dim)); self.H[0, 0] = 1.0; self.H[1, 1] = 1.0
 
     def predict(self, u):
-        """Predict step for position ULM."""
         Ts = self.Ts
-        u = cp.array(u)
-
-        # Extract state
+        u = np.asarray(u, dtype=float)
         p = self.x[0:2]
         F_p = self.x[2:4]
-        B_p = self.x[4:4+2*self.m].reshape(2, self.m)
-
-        # Dynamics: ṗ = F_p + B_p @ u
+        B_p = self.x[4:4 + 2 * self.m].reshape(2, self.m)
         pdot = F_p + B_p @ u
+        self.x[0:2] = p + Ts * pdot
 
-        # Euler integration
-        p_new = p + Ts * pdot
-        self.x[0:2] = p_new
-
-        # Linearized transition
-        A = cp.eye(len(self.x))
-        A[0, 2] = Ts
-        A[0, 4:4+self.m] = Ts * u
-        A[1, 3] = Ts
-        A[1, 4+self.m:4+2*self.m] = Ts * u
-
-        # Covariance prediction
+        A = np.eye(len(self.x))
+        A[0, 2] = Ts; A[0, 4:4 + self.m] = Ts * u
+        A[1, 3] = Ts; A[1, 4 + self.m:4 + 2 * self.m] = Ts * u
         self.P = A @ self.P @ A.T + self.Q
 
     def update(self, p_meas):
-        """Update with position measurement."""
-        p_meas = cp.array(p_meas).reshape(2, 1)
-
-        # Innovation
+        p_meas = np.asarray(p_meas, dtype=float).reshape(2, 1)
         y = p_meas - (self.H @ self.x).reshape(2, 1)
         S = self.H @ self.P @ self.H.T + self.R
-
-        # Kalman gain
-        K = self.P @ self.H.T @ cp.linalg.inv(S)
-
-        # Update
+        K = self.P @ self.H.T @ np.linalg.inv(S)
         self.x = self.x + (K @ y).flatten()
-        self.P = (cp.eye(len(self.x)) - K @ self.H) @ self.P
-
-    def get_velocity_estimate(self):
-        """
-        Returns estimated velocity: F_p + B_p @ u_prev
-        (You need to store u_prev for this to be accurate)
-        """
-        F_p = self.x[2:4]
-        return F_p.copy()
+        self.P = (np.eye(len(self.x)) - K @ self.H) @ self.P
 
     def get_estimates(self):
-        """Returns p, F_p, B_p"""
-        return (
-            self.x[0:2].copy(),
-            self.x[2:4].copy(),
-            self.x[4:4+2*self.m].reshape(2, self.m).copy()
-        )
+        return (self.x[0:2].copy(), self.x[2:4].copy(),
+                self.x[4:4 + 2 * self.m].reshape(2, self.m).copy())
 
 
 class ControllerNode(Node):
     def __init__(self):
-        super().__init__('ModelFreeCBF_Node')
+        super().__init__('ModelFreeCBF_Node_Ackermann')
 
-        # Enable CuPy memory pooling for faster allocations
-        cp.cuda.set_allocator(cp.cuda.MemoryPool().malloc)
-
-        # Parameters - HARDWARE TUNED for 100Hz
-        self.dt = 0.05  # Target 100 Hz
-        self.v_max = 1.25
-        self.v_min = 0.0  # CRITICAL: Allow robot to stop! Was 0.5
-        self.omega_max = 0.5
-        self.omega_min = -0.5
-        self.r_max = 3.0  # Reduced from 5.0 - less processing
-        self.length_scale = 0.5  # Very tight kernel - less bleed from distant obstacles
+        # --- parameters ---
+        self.dt = 0.01                 # 100 Hz control loop
+        self.L = 0.33                  # F1TENTH wheelbase (m) -- used ONLY for
+        # the true-plant / dynamic-extension bookkeeping the vehicle firmware
+        # already does; the safety filter itself never uses L (that is the
+        # entire point of the model-free approach).
+        self.v_min, self.v_max = 0.0, 1.2
+        self.phi_min, self.phi_max = -0.4, 0.4   # F1TENTH steering limits (rad)
+        self.r_max = 3.0
+        self.length_scale = 0.30
         self.sigma_f = 1.0
+        self.r_buf = 0.15
 
-        # HOCBF parameters (from paper, Section II-C) - TUNED FOR 100Hz
-        # Higher update rate allows more aggressive response
-        self.lambda_0 = 0.3  # Increased for 100Hz - faster response
-        self.lambda_1 = 0.3  # Increased for 100Hz - faster response
-        self.c_q = 0.05  # Minimal confidence to maximize feasibility
+        # HOCBF parameters, Section II-C / III-C.
+        self.lambda_0 = 1.2
+        self.lambda_1 = 1.2
+        self.c_q = 0.8      # confidence quantile, Eq. (14) -- see
+        # run_ackermann_sim.py's tuning note on why this is lower than the
+        # paper's own c_q=2/3 examples: this course's B_q,phi identifiability
+        # is weaker than the paper's fully-converged illustration, so a
+        # looser (but still principled, Eq. 14-consistent) quantile is used
+        # to keep the QP feasible. Raise this once field data shows the EKF
+        # covariance converges faster/tighter than assumed here.
 
-        # State
+        # --- state ---
         self.x = 0.0
         self.y = 0.0
         self.theta = 0.0
-        self.v = 1.0
+        self.v = 0.0
 
-        # Reference command - will be updated by tangent controller
-        self.u_ref = [1.0, 0.0]  # [v_ref, ω_ref]
-        self.u_prev = [1.0, 0.0]
-        self.v_prev = 1.0  # Track previous velocity for acceleration control
+        self.u_ref = np.array([0.8, 0.0])     # [v_ref, phi_ref]
+        self.u_prev = np.array([0.8, 0.0])
+        self.v_prev = 0.8
 
-        # Tracks consecutive CBF-QP infeasible/relaxed solves. Used to
-        # pre-emptively cap the reference velocity when infeasibility
-        # persists across multiple cycles, rather than treating each
-        # occurrence independently (see lidar_callback). Steering (ω) is
-        # never touched by this cap -- only forward velocity -- so avoidance
-        # authority is preserved even while slowing down.
-        self.infeasible_streak = 0
+        self.goal_x = 10.0
+        self.goal_y = 0.0
 
-        # Goal for tangent controller
-        self.goal_x = 10.0  # Target x position (meters ahead)
-        self.goal_y = 0.0  # Target y position (stay centered)
+        # continuous persistent-excitation dither, module docstring point 4
+        self._dither_ampl = 0.05
+        self._dither_period_steps = 30
+        self._step_count = 0
+        self._excite_counter = -1
+        self._excite_steps = 24     # 1.2 s at 100 Hz -- paper Sec. V
 
-        # Initialize EKFs
         self.safety_ekf = SafetyULM_EKF(Ts=self.dt, m_inputs=2)
         self.position_ekf = PositionULM_EKF(Ts=self.dt, m_inputs=2)
 
-        # CBF object
         self.cbf = ModelFreeCBF(
             dt=self.dt,
-            u_min=[self.v_min, self.omega_min],
-            u_max=[self.v_max, self.omega_max],
+            u_min=[self.v_min, self.phi_min],
+            u_max=[self.v_max, self.phi_max],
             r_max=self.r_max,
-            r_min_obstacle=self.r_max,  # Use same value - obstacles within r_max affect barrier
+            r_min_obstacle=self.r_max,
             length_scale=self.length_scale,
             sigma_f=self.sigma_f,
             lambda_0=self.lambda_0,
             lambda_1=self.lambda_1,
-            c_q=self.c_q
+            c_q=self.c_q,
+            r_buf=self.r_buf,
         )
 
-        # ROS2 subscriptions and publishers
         self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
         self.create_subscription(LaserScan, '/scan', self.lidar_callback, 10)
         self.cmd_pub = self.create_publisher(AckermannDriveStamped, '/drive', 10)
 
-        self.get_logger().info('Model-Free CBF Node initialized')
+        self.get_logger().info('Model-Free CBF Node (Ackermann-native, u=[v,phi]) initialized')
 
-    def tangent_controller(self):
+    # -------------------------------------------------------------------
+    def gap_following_controller(self):
         """
-        Gap-following controller: finds largest gap in LiDAR and steers toward it.
-        Works in robot frame (no global coordinates needed).
-        Returns: [v_ref, omega_ref]
+        Gap-following reference controller: finds the largest free gap in
+        the LiDAR scan and steers toward it, emitting phi_ref (steering
+        angle) DIRECTLY -- no omega, no conversion. Returns [v_ref, phi_ref].
         """
-        # Default: drive straight forward
-        v_ref = 1.0
-        omega_ref = 0.0
-
+        v_ref, phi_ref = 0.8, 0.0
         if not hasattr(self, 'last_ranges'):
-            return [v_ref, omega_ref]
+            return np.array([v_ref, phi_ref])
 
-        ranges = self.last_ranges
-        angles = self.last_angles
+        ranges, angles = self.last_ranges, self.last_angles
+        front = np.abs(angles) < np.pi / 2
+        fr, fa = ranges[front], angles[front]
+        if len(fr) == 0:
+            return np.array([v_ref, phi_ref])
 
-        # Only consider front sector (-90° to +90°)
-        front_mask = cp.abs(angles) < cp.pi/2
-        front_ranges = ranges[front_mask]
-        front_angles = angles[front_mask]
-
-        if len(front_ranges) == 0:
-            return [v_ref, omega_ref]
-
-        # Find gaps (continuous sectors with range > threshold)
-        gap_threshold = 0.5  # Minimum distance to be considered "free"
-        is_free = front_ranges > gap_threshold
-
-        # Find largest gap
-        max_gap_size = 0
-        max_gap_center_angle = 0.0
-        current_gap_size = 0
-        current_gap_start_idx = 0
-
+        is_free = fr > 0.5
+        best_size, best_angle, cur_size, cur_start = 0, 0.0, 0, 0
         for i in range(len(is_free)):
             if is_free[i]:
-                if current_gap_size == 0:
-                    current_gap_start_idx = i
-                current_gap_size += 1
+                if cur_size == 0:
+                    cur_start = i
+                cur_size += 1
             else:
-                if current_gap_size > max_gap_size:
-                    max_gap_size = current_gap_size
-                    # Gap center angle
-                    gap_center_idx = current_gap_start_idx + current_gap_size // 2
-                    max_gap_center_angle = float(front_angles[gap_center_idx])
-                current_gap_size = 0
+                if cur_size > best_size:
+                    best_size = cur_size
+                    best_angle = float(fa[cur_start + cur_size // 2])
+                cur_size = 0
+        if cur_size > best_size:
+            best_size = cur_size
+            best_angle = float(fa[cur_start + cur_size // 2])
+        if best_size == 0:
+            best_angle = float(fa[int(np.argmax(fr))])
 
-        # Check last gap
-        if current_gap_size > max_gap_size:
-            max_gap_size = current_gap_size
-            gap_center_idx = current_gap_start_idx + current_gap_size // 2
-            max_gap_center_angle = float(front_angles[gap_center_idx])
+        # Steer toward the gap center directly in steering-angle space.
+        K_p = 1.2
+        phi_ref = float(np.clip(K_p * best_angle, self.phi_min, self.phi_max))
+        return np.array([v_ref, phi_ref])
 
-        # If no gap found, find direction with maximum range
-        if max_gap_size == 0:
-            max_range_idx = int(cp.argmax(front_ranges))
-            max_gap_center_angle = float(front_angles[max_range_idx])
+    def _apply_persistent_excitation(self, u_ref):
+        """Module docstring point 4: continuous small dither + a stronger
+        one-shot burst triggered on first obstacle contact."""
+        if self._excite_counter < 0 and self.cbf.N > 0:
+            self._excite_counter = 0
+        if 0 <= self._excite_counter < self._excite_steps:
+            phase = 2 * np.pi * self._excite_counter / (self._excite_steps / 2)
+            u_ref = np.array([0.5, 0.15 * np.sin(phase)])
+            self._excite_counter += 1
+        else:
+            if self._excite_counter >= 0:
+                self._excite_counter += 1
+            dither = self._dither_ampl * np.sin(
+                2 * np.pi * self._step_count / self._dither_period_steps)
+            u_ref = u_ref.copy()
+            u_ref[1] = float(np.clip(u_ref[1] + dither, self.phi_min, self.phi_max))
+        return u_ref
 
-        # Steer toward gap center with proportional control
-        # Prefer forward-facing gaps (weight by cos)
-        K_p = 2.0
-        omega_ref = K_p * max_gap_center_angle
-        omega_ref = max(-0.5, min(0.5, omega_ref))  # Clip using Python built-ins
-
-        return [v_ref, omega_ref]
-
+    # -------------------------------------------------------------------
     def odom_callback(self, msg):
-        """Update position from odometry."""
         self.x = msg.pose.pose.position.x
         self.y = msg.pose.pose.position.y
-
-        # Extract heading from quaternion (yaw for planar motion)
         quat = msg.pose.pose.orientation
         siny_cosp = 2.0 * (quat.w * quat.z + quat.x * quat.y)
         cosy_cosp = 1.0 - 2.0 * (quat.y * quat.y + quat.z * quat.z)
-        self.theta = float(cp.arctan2(siny_cosp, cosy_cosp))
-
+        self.theta = float(np.arctan2(siny_cosp, cosy_cosp))
         self.v = msg.twist.twist.linear.x
-
-        # Update position EKF
-        self.position_ekf.update(cp.array([self.x, self.y]))
+        self.position_ekf.update(np.array([self.x, self.y]))
 
     def lidar_callback(self, msg):
-        """
-        Main control loop: process LiDAR, update EKFs, compute safe control.
-        """
         start_time = time.time()
+        self._step_count += 1
 
-        # Step 1: Extract LiDAR data - AGGRESSIVE DOWNSAMPLING
-        # Pre-filter to reduce memory allocation and processing
-        ranges_raw = msg.ranges[::20]  # Downsample immediately: 360 -> 18 points
-        angles_raw = cp.linspace(msg.angle_min, msg.angle_max, len(msg.ranges), dtype=cp.float32)[::20]
+        ranges_raw = msg.ranges[::20]
+        angles_raw = np.linspace(msg.angle_min, msg.angle_max, len(msg.ranges))[::20]
+        ranges = np.asarray(ranges_raw, dtype=np.float32)
+        angles = angles_raw.astype(np.float32)
+        self.last_ranges, self.last_angles = ranges, angles
 
-        ranges = cp.asarray(ranges_raw, dtype=cp.float32)
-        angles = angles_raw
-
-        # Store for tangent controller (use sparse data)
-        self.last_ranges = ranges
-        self.last_angles = angles
-
-        # Update CBF with obstacle points (already heavily downsampled)
-        self.cbf.set_obstacles(ranges, angles)
-
-        # TANGENT CONTROLLER: Update reference command to steer around obstacles
-        # Only run every 3rd iteration to save time
-        if not hasattr(self, '_tangent_counter'):
-            self._tangent_counter = 0
-        self._tangent_counter += 1
-
-        if self._tangent_counter % 10 == 0:
-            self.u_ref = self.tangent_controller()
-
-        # Get obstacle count and min range (needed for control logic)
+        # Per-obstacle GP ingestion in the WORLD frame using odometry, so the
+        # learned barrier persists across scans (Section II-E), rather than
+        # being rebuilt from a single instantaneous scan every callback.
+        self.cbf.set_obstacles(ranges, angles, robot_xy=(self.x, self.y),
+                                robot_theta=self.theta)
         n_obstacles = self.cbf.N
         valid_ranges = ranges[(ranges > 0.1) & (ranges < self.r_max)]
+        p_world = np.array([self.x, self.y])
 
-        # Step 2: Predict EKFs - run every iteration
+        # EKF predict, Eq. (8)-(10) discretized.
         self.safety_ekf.predict(self.u_prev)
         self.position_ekf.predict(self.u_prev)
 
-        # Step 3: Compute measurements
-        # Get GP posterior mean and variance for q
-        q_meas, sigma_gp_sq = self.cbf.get_barrier_and_variance([0.0, 0.0])
+        # Nominal reference + persistent excitation.
+        if self._step_count % 3 == 0:
+            self.u_ref = self.gap_following_controller()
+        u_ref = self._apply_persistent_excitation(self.u_ref)
 
-        # Get GP gradient for q̇
-        grad_h = self.cbf.get_gradient([0.0, 0.0])
-
-        # Get velocity estimate from position ULM
-        p_est, F_p, B_p = self.position_ekf.get_estimates()
-        p_dot = F_p + B_p @ cp.array(self.u_prev)
-
-        # Compute q̇ measurement: q̇ = ∇h^T ṗ
+        # Measurements: q from GP posterior mean (Eq. 4), qdot = grad(h)^T p_dot_hat.
+        q_meas, sigma_gp_sq = self.cbf.get_barrier_and_variance(p_world)
+        grad_h = self.cbf.get_gradient(p_world)
+        _, F_p, B_p = self.position_ekf.get_estimates()
+        p_dot = F_p + B_p @ self.u_prev
         qdot_meas = float(grad_h @ p_dot)
 
-        # Compute measurement noise for q̇ (Eq. in Section III-B)
-        grad_norm = float(cp.linalg.norm(grad_h))
-        sigma_pdot = 0.01  # Position velocity uncertainty (tune this)
-        epsilon = 1e-6
-        R_qdot = grad_norm**2 * sigma_pdot**2 + sigma_gp_sq / (self.length_scale**2 * (grad_norm**2 + epsilon))
-        R_qdot = min(R_qdot, 1.0)  # Cap uncertainty when gradient is small
+        grad_norm = float(np.linalg.norm(grad_h))
+        sigma_pdot = 0.02
+        eps = 1e-6
+        R_qdot = grad_norm**2 * sigma_pdot**2 + sigma_gp_sq / (self.length_scale**2 * (grad_norm**2 + eps))
+        R_qdot = min(R_qdot, 1.0)
 
-        # Step 4: Update safety EKF with measurements
-        # Add sanity checks to prevent bad measurements from causing divergence
-        if not cp.isnan(q_meas) and not cp.isinf(q_meas):
+        if np.isfinite(q_meas):
             self.safety_ekf.update_q(float(q_meas), R_q=max(float(sigma_gp_sq), 1e-4))
         else:
             self.get_logger().warn(f'Invalid q_meas={q_meas}, skipping update')
-
-        if not cp.isnan(qdot_meas) and not cp.isinf(qdot_meas) and abs(qdot_meas) < 10.0:
+        if np.isfinite(qdot_meas) and abs(qdot_meas) < 10.0:
             self.safety_ekf.update_qdot(qdot_meas, R_qdot=max(float(R_qdot), 1e-4))
         else:
             self.get_logger().warn(f'Invalid qdot_meas={qdot_meas}, skipping update')
 
-        # Check if EKF has diverged and reset if needed
-        ekf_just_reset = False
-        if self.safety_ekf.reset_if_diverged():
-            ekf_just_reset = True
-            self.get_logger().warn(
-                f'EKF diverged! Resetting to initial conditions. '
-                f'Recent: q={q_meas:.3f}, qdot={qdot_meas:.3f}, n_obs={n_obstacles}'
-            )
-
-        # Step 5: Get estimates for control (with B_q clamped to valid range)
-        q_hat, qdot_hat, F_q_hat, B_q_hat, P_safety = self.safety_ekf.get_estimates()
-
-        # If EKF just reset, be extra conservative - don't bypass CBF
+        ekf_just_reset = self.safety_ekf.reset_if_diverged(time.time())
         if ekf_just_reset:
-            q_hat = min(q_hat, 0.5)  # Force conservative estimate
+            self.get_logger().warn(
+                f'EKF diverged! Resetting. Recent: q={q_meas:.3f}, qdot={qdot_meas:.3f}, n_obs={n_obstacles}')
 
-        # Step 6: Compute safe control
-        # Check if dangerously close first
-        min_range = float(cp.min(valid_ranges)) if len(valid_ranges) > 0 else 999.0
+        q_hat, qdot_hat, F_q_hat, B_q_hat, P_safety = self.safety_ekf.get_estimates()
+        if ekf_just_reset:
+            q_hat = min(q_hat, 0.5)
 
-        # FIX: sustained-infeasibility velocity cap. If the CBF QP has needed
-        # slack/relaxation for several consecutive cycles, treat that streak
-        # itself as a signal to slow the reference down, independent of what
-        # q_hat currently says. This targets the failure mode where repeated
-        # infeasibility drains B_q,v toward its floor before q_hat or
-        # min_range individually cross their thresholds. Only the velocity
-        # component is capped -- omega (steering) is left untouched so
-        # avoidance authority is preserved (favor steering over stopping).
-        u_ref_eff = list(self.u_ref)
-        if self.infeasible_streak >= 5:
-            cap = max(0.2, 1.0 - 0.1 * (self.infeasible_streak - 4))
-            u_ref_eff[0] = min(u_ref_eff[0], cap)
+        # Reference-level courtesy slow-down near obstacles (does not affect
+        # the safety guarantee -- the CBF-QP enforces q>=0 regardless -- it
+        # just keeps the requested reference within reach of the vehicle's
+        # bounded curvature, reducing how hard the QP has to fight it).
+        u_ref = u_ref.copy()
+        u_ref[0] *= float(np.clip((q_hat if np.isfinite(q_hat) else 1.0) / 0.6, 0.25, 1.0))
 
-        if min_range < 0.15:
-            # Emergency stop
-            u_safe = [0.0, 0.0]
-            step_feasible = True
-        elif q_hat > 0.5 and n_obstacles == 0:
-            # Safe - use reference
-            u_safe = u_ref_eff
-            step_feasible = True
+        min_range = float(np.min(valid_ranges)) if len(valid_ranges) > 0 else 999.0
+        if min_range < 0.30:
+            # Hard emergency stop -- distinct from, and in addition to, the
+            # CBF-QP: a last-resort layer for genuinely imminent contact.
+            u_safe, feasible = [0.0, self.u_prev[1]], True
         else:
-            # Use CBF with velocity-dependent safety. compute_safe_control now
-            # runs a feasibility precheck internally and falls back to a
-            # slack-relaxed solve (instead of a hard brake) if still
-            # infeasible after that; it returns (u_safe, feasible, slack).
             try:
-                u_safe, step_feasible, slack = self.cbf.compute_safe_control(
-                    u_ref=u_ref_eff,
-                    q_hat=q_hat,
-                    qdot_hat=qdot_hat,
-                    F_q_hat=F_q_hat,
-                    B_q_hat=B_q_hat,
-                    P=P_safety,
-                    v_current=self.v
-                )
-                if not step_feasible and self.infeasible_streak % 20 == 0:
-                    self.get_logger().warn(
-                        f'CBF QP relaxed (slack={slack:.3f}), streak={self.infeasible_streak}')
+                u_safe, feasible = self.cbf.compute_safe_control(
+                    u_ref=u_ref, q_hat=q_hat, qdot_hat=qdot_hat,
+                    F_q_hat=F_q_hat, B_q_hat=B_q_hat, P=P_safety, v_current=self.v)
             except Exception as e:
-                # QP failed entirely (not just infeasible -- an actual solver
-                # exception). Be cautious but still favor steering over a
-                # full stop when not critically close: keep the reference's
-                # omega and only cut velocity, rather than zeroing both.
-                if min_range > 0.1:
-                    u_safe = [0.8, u_ref_eff[1]]  # Slow forward, keep steering
-                else:
-                    u_safe = [0.0, 0.0]  # Too close, stop
-                step_feasible = False
-                self.get_logger().warn(f'CBF QP failed, min_range={min_range:.2f}m')
+                self.get_logger().warn(f'CBF QP raised {e!r}; braking with steering held')
+                u_safe, feasible = [0.0, float(self.u_prev[1])], False
 
-        self.infeasible_streak = 0 if step_feasible else self.infeasible_streak + 1
-
-        # Step 7: Send command
         self.send_command(u_safe[0], u_safe[1])
-        self.u_prev = u_safe
+        self.u_prev = np.array(u_safe)
 
-        # Minimal logging every 50th iteration (reduces overhead for 100Hz)
-        if not hasattr(self, '_log_counter'):
-            self._log_counter = 0
-        self._log_counter += 1
-
-        if self._log_counter % 50 == 0:
+        if self._step_count % 50 == 0:
             total_time = time.time() - start_time
-            dv = abs(u_safe[0] - self.u_ref[0])
-            dw = abs(u_safe[1] - self.u_ref[1])
-            action = "SAFE"
-            if dv > 0.1 or dw > 0.1:
-                action = "STEER" if dw > dv * 0.5 else "BRAKE"
-
+            action = 'SAFE' if feasible and abs(u_safe[0] - self.u_ref[0]) < 0.1 else \
+                     ('STEER' if abs(u_safe[1] - self.u_ref[1]) > 0.05 else 'BRAKE')
             self.get_logger().info(
-                f'[{action}] {total_time*1000:.0f}ms | q={q_hat:.2f} | B_q=[{B_q_hat[0]:.2f},{B_q_hat[1]:.2f}] | '
-                f'v={u_safe[0]:.2f} ω={u_safe[1]:.2f}'
-            )
+                f'[{action}] {total_time*1000:.0f}ms | q={q_hat:.2f} | '
+                f'B_q=[{B_q_hat[0]:.2f},{B_q_hat[1]:.2f}] | v={u_safe[0]:.2f} phi={u_safe[1]:.2f}')
 
-    def send_command(self, v, omega):
+    def send_command(self, v, phi):
         """
-        Publish Ackermann drive command.
-        Converts angular velocity (omega) to steering angle.
+        Publish the Ackermann drive command DIRECTLY -- phi is already the
+        physical steering angle the safety filter reasoned about, so there is
+        no conversion step here at all (contrast with the original node's
+        steering_angle = atan(L*omega/v)).
         """
         msg = AckermannDriveStamped()
         msg.drive.speed = float(v)
-
-        # Store previous velocity for next iteration
+        msg.drive.acceleration = -5.0 if v < self.v_prev - 0.1 else 3.0
         self.v_prev = v
-
-        # Convert angular velocity to steering angle using Ackermann geometry
-        # steering_angle = arctan(L * omega / v)
-        # where L is wheelbase (F1Tenth ~0.33m)
-        L = 0.33  # wheelbase in meters
-        if abs(v) > 0.1:  # Avoid division by zero
-            steering_angle = float(cp.arctan(L * omega / v))
-        else:
-            # At very low speeds, use direct proportional mapping
-            steering_angle = float(omega) * 0.33  # Scale omega to reasonable steering
-
-        # Clip to reasonable steering limits (F1Tenth: ±0.4 radians ≈ ±23°)
-        steering_angle = max(-0.4, min(0.4, steering_angle))  # Use Python min/max
-
-        msg.drive.steering_angle = steering_angle
+        msg.drive.steering_angle = float(np.clip(phi, self.phi_min, self.phi_max))
         self.cmd_pub.publish(msg)
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = ControllerNode()
-
     executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(node)
-
     try:
         executor.spin()
     except KeyboardInterrupt:
