@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
 """
-cbf_Node_refactored_ackermann.py
+cbf_Node_refactored.py (Ackermann-native revision, single-file)
 
-Ackermann-native replacement for cbf_Node_refactored.py.
+Ackermann-native replacement for the previous differential-drive-flavored
+version of this node. This file is self-contained: the barrier/QP machinery
+(rbf_kernel, ObstacleGP, ModelFreeCBF) that used to live in a separate
+CBF_refactored.py is now defined directly below, so the whole safety filter
++ ROS node ships as a single file (there is no measurable per-loop speed
+difference from having two files -- Python's import cost is a one-time
+startup cost, not a per-cycle one -- this was simply a deployment
+simplification).
 
 GROUND TRUTH: L.A. Duffaut Espinosa & C. Grund, "Safety via Control Barrier
 Functions Synthesized from Ultra-Local Models" ("the paper"). Every equation
-cited in comments below refers to that paper. This node, and
-CBF_refactored_ackermann.py that it imports, were derived from (and are
-validated against) ackermann_cbf_core.py / run_ackermann_sim.py in this same
-delivery, which reproduce the paper's Section V numerical-illustration
-methodology on true Ackermann kinematics before anything was ported to ROS.
+cited in comments below refers to that paper. This node was derived from
+(and is validated against) ackermann_cbf_core.py / run_ackermann_sim.py in
+this same delivery, which reproduce the paper's Section V numerical-
+illustration methodology on true Ackermann kinematics before anything was
+ported to ROS.
 
 WHAT CHANGED FROM THE ORIGINAL cbf_Node_refactored.py, AND WHY
 ----------------------------------------------------------------------------
@@ -27,11 +34,11 @@ WHAT CHANGED FROM THE ORIGINAL cbf_Node_refactored.py, AND WHY
 2. Per-obstacle GP barriers aggregated via the soft-min, Eq. (3), instead of
    a single GP fit fresh from every scan. Section II-E: "a separate GP h_i is
    maintained for each obstacle... each range return is attributed to the
-   obstacle whose boundary generated the reflection." CBF_refactored_
-   ackermann.ModelFreeCBF.set_obstacles() does a simple angular-gap
-   clustering step to route points to per-obstacle GPs, which persist (with a
-   bounded point buffer) across scans in the WORLD frame using odometry,
-   rather than being rebuilt from scratch every callback.
+   obstacle whose boundary generated the reflection." ModelFreeCBF.
+   set_obstacles() below does a simple angular-gap clustering step to route
+   points to per-obstacle GPs, which persist (with a bounded point buffer)
+   across scans in the WORLD frame using odometry, rather than being
+   rebuilt from scratch every callback.
 
 3. B_q is no longer clamped to be strictly positive. For a position-
    dependent barrier, B_q,v is genuinely sign-indefinite (driving TOWARD an
@@ -59,10 +66,22 @@ WHAT CHANGED FROM THE ORIGINAL cbf_Node_refactored.py, AND WHY
    v toward v_min (brakes) while still steering toward the model's best
    current guess -- rather than picking whichever box corner the (possibly
    still-unidentified) sign of B_q,phi happens to favor at full speed. See
-   CBF_refactored_ackermann.ModelFreeCBF.compute_safe_control()'s comment for
-   the failure mode this fixes.
+   ModelFreeCBF.compute_safe_control()'s comment below for the failure mode
+   this fixes.
 
-6. No CuPy. The linear algebra here is all sub-10x10 dense matrices (EKF
+7. Actuator rate limits (acceleration, deceleration, steering slew rate) are
+   now baked directly into the box of inputs the QP searches over each cycle
+   (ModelFreeCBF.effective_bounds()), rather than left unconstrained. Without
+   this, both the QP and the Lemma-1 fallback could request an instantaneous
+   speed/steering jump (a real VESC/servo can't do that), which also showed
+   up as a sharp, unrealistic "corner" in the simulated trajectory right when
+   the safety filter first went infeasible near an obstacle. This is
+   deliberately NOT done by clipping the command after the QP solves --
+   clipping afterward could silently undo the CBF constraint the QP just
+   satisfied. compute_safe_control() now requires the previously applied
+   command (u_prev) for exactly this reason.
+
+8. No CuPy. The linear algebra here is all sub-10x10 dense matrices (EKF
    state/covariance, GP kernel matrices with <=30 points); GPU kernel-launch
    overhead dominates actual compute at this size, and CuPy-on-Jetson has
    been a recurring source of friction in this project (see project memory).
@@ -82,7 +101,393 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
 from ackermann_msgs.msg import AckermannDriveStamped
 
-from auto_drive.CBF_refactored_ackermann import ModelFreeCBF
+
+def rbf_kernel(X1, X2, sigma_f, ell):
+    """Squared-exponential kernel, Eq. (4)-(6)."""
+    X1 = np.atleast_2d(X1)
+    X2 = np.atleast_2d(X2)
+    sqdist = (np.sum(X1**2, axis=1, keepdims=True)
+              + np.sum(X2**2, axis=1) - 2 * (X1 @ X2.T))
+    sqdist = np.clip(sqdist, 0, None)
+    return sigma_f**2 * np.exp(-0.5 * sqdist / ell**2)
+
+
+class ObstacleGP:
+    """Per-obstacle GP barrier, Eq. (4)-(6), Section II-E training-target
+    convention (m0 prior far from data, y=0 exactly at buffered boundary)."""
+
+    def __init__(self, length_scale=0.30, sigma_f=1.0, noise_var=5e-3,
+                 prior_mean=1.0, max_points=30):
+        self.ell = length_scale
+        self.sigma_f = sigma_f
+        self.noise_var = noise_var
+        self.m0 = prior_mean
+        self.max_points = max_points
+        self.P = np.zeros((0, 2))
+        self._K_inv = None
+        self._alpha = None
+
+    def add_points(self, pts):
+        pts = np.atleast_2d(np.asarray(pts, dtype=float))
+        if pts.size == 0:
+            return
+        if self.P.shape[0] == 0:
+            merged = pts
+        else:
+            keep = []
+            for p in pts:
+                d = np.min(np.linalg.norm(self.P - p, axis=1))
+                if d > 0.03:
+                    keep.append(p)
+            merged = np.vstack([self.P] + [np.array(keep)]) if keep else self.P
+        if merged.shape[0] > self.max_points:
+            merged = merged[-self.max_points:]
+        self.P = merged
+        self._refit()
+
+    def _refit(self):
+        N = self.P.shape[0]
+        if N == 0:
+            self._K_inv, self._alpha = None, None
+            return
+        K = rbf_kernel(self.P, self.P, self.sigma_f, self.ell) + self.noise_var * np.eye(N)
+        self._K_inv = np.linalg.inv(K)
+        Y = np.zeros((N, 1))
+        self._alpha = self._K_inv @ (Y - self.m0)
+
+    @property
+    def n_points(self):
+        return self.P.shape[0]
+
+    def posterior_mean(self, p):
+        if self.n_points == 0:
+            return self.m0
+        p = np.atleast_2d(p)
+        k_star = rbf_kernel(p, self.P, self.sigma_f, self.ell)
+        return float(self.m0 + (k_star @ self._alpha).item())
+
+    def posterior_grad(self, p):
+        if self.n_points == 0:
+            return np.zeros(2)
+        p = np.atleast_2d(p)
+        k_star = rbf_kernel(p, self.P, self.sigma_f, self.ell)
+        diff = self.P - p
+        grad = (k_star * self._alpha.T) @ diff / self.ell**2
+        return grad.flatten()
+
+    def posterior_var(self, p):
+        if self.n_points == 0:
+            return self.sigma_f**2
+        p = np.atleast_2d(p)
+        k_star = rbf_kernel(p, self.P, self.sigma_f, self.ell)
+        k_ss = rbf_kernel(p, p, self.sigma_f, self.ell)[0, 0]
+        return max(k_ss - float((k_star @ self._K_inv @ k_star.T).item()), 0.0)
+
+
+class ModelFreeCBF:
+    """
+    Ackermann-native safety filter: per-obstacle GPs + soft-min aggregation
+    (Eq. 3-6), u=[v, phi] (steering angle) everywhere.
+    """
+
+    def __init__(self, dt, u_min, u_max, r_max, r_min_obstacle,
+                 length_scale, sigma_f, lambda_0, lambda_1, c_q,
+                 kappa=12.0, r_buf=0.15, sigma_cap=None,
+                 v_accel_max=2.5, v_decel_max=3.5, phi_rate_max=3.0):
+        self.dt = dt
+        self.u_min = np.array(u_min, dtype=float)
+        self.u_max = np.array(u_max, dtype=float)
+        self.r_max = r_max
+        self.r_min_obstacle = r_min_obstacle
+        self.length_scale = length_scale
+        self.sigma_f = sigma_f
+        self.lambda_0 = lambda_0
+        self.lambda_1 = lambda_1
+        self.c_q = c_q
+        self.kappa = kappa
+        self.r_buf = r_buf
+
+        # Actuator rate limits (m/s^2 for v, rad/s for phi). Neither the QP
+        # nor the Lemma-1 fallback otherwise know how fast the vehicle can
+        # actually change speed/steering, so both could in principle request
+        # an instantaneous jump (e.g. v: 1.2 -> 0.0 in one 10ms sample) --
+        # which a real VESC/servo can't do anyway, and which was also found
+        # during validation to produce a sharp, unrealistic "corner" in the
+        # trajectory right when the QP first goes infeasible near an
+        # obstacle. effective_bounds() below shrinks the box [u_min, u_max]
+        # itself to the set actually reachable from the previous command,
+        # and THAT tighter box -- not [u_min, u_max] -- is what gets passed
+        # into feasibility checking, the tightening margin, and the QP in
+        # compute_safe_control(). This is deliberately NOT done by clipping
+        # the QP's output after the fact: post-hoc clipping could silently
+        # violate the very CBF constraint (a_cbf@u >= r_k) the QP just
+        # solved to satisfy, reopening the safety gap this file exists to
+        # close. Baking the limits into the box instead keeps the smoothing
+        # guaranteed-safe by construction.
+        self.v_accel_max = v_accel_max
+        self.v_decel_max = v_decel_max
+        self.phi_rate_max = phi_rate_max
+        # NOTE: sigma_cap intentionally defaults to None (uncapped). Capping
+        # sigma_k below what c_q * sigma_bar_eta demands silently lowers the
+        # *actual* confidence level below c_q, which would misreport the
+        # Theorem 2 violation bound. If the QP is going infeasible too often
+        # on hardware, lower c_q, lambda_0/lambda_1, or u_max instead of
+        # capping sigma_k -- see run_ackermann_sim.py's tuning notes.
+        self.sigma_cap = sigma_cap if sigma_cap is not None else np.inf
+
+        self._P_qp = np.array([8.0, 2.0])  # diagonal QP tracking weights
+        self.gps = {}
+        self.last_infeasible_info = None
+
+        # Fallback creep speed (see compute_safe_control's fallback comment):
+        # for an ACKERMANN vehicle, theta_dot = (v/L)*tan(phi) is IDENTICALLY
+        # ZERO whenever v=0, no matter what phi is commanded -- unlike a
+        # differential-drive robot, which can still rotate in place at v=0.
+        # Braking all the way to v_min=0 during an infeasible/uncertain
+        # episode therefore doesn't just slow the car down, it removes its
+        # ability to change heading (or gather new EKF information) AT ALL,
+        # which was found during validation to cause a permanent deadlock:
+        # v locks at 0, theta stops changing, F_q drifts to whatever is
+        # consistent with "parked," and the QP never becomes feasible again.
+        # A small nonzero creep speed is used for the fallback specifically
+        # (not for u_min itself, which may still legitimately be 0.0 for the
+        # QP's normal operating range) so the vehicle always retains the
+        # ability to keep turning and re-exciting the estimator. It is only
+        # engaged after being stuck infeasible-and-nearly-stopped for
+        # stuck_limit consecutive calls -- the FIRST response to infeasibility
+        # is still a full brake (best short-term stopping power); creep is
+        # the escape hatch for the deadlock case, not the default reaction.
+        self.fallback_creep_v = max(0.15, 0.25 * self.u_max[0])
+        self.stuck_limit = max(1, int(0.15 / self.dt))     # ~0.15 s of being stuck
+        self._stuck_counter = 0
+
+    # -- obstacle ingestion (per-obstacle GP, Eq. 3-6) -----------------------
+    def set_obstacles(self, ranges, angles, robot_xy=(0.0, 0.0), robot_theta=0.0,
+                       cluster_gap=0.3):
+        """
+        Convert a LiDAR scan into per-obstacle point clusters and route each
+        cluster's points to its own GP (Section II-E: "each range return is
+        attributed to the obstacle whose boundary generated the reflection").
+        Clustering here is a simple angular-gap split -- adequate for sparse,
+        already-downsampled scans; swap in a proper clustering front end if
+        the scan is dense.
+        """
+        ranges = np.asarray(ranges, dtype=float)
+        angles = np.asarray(angles, dtype=float)
+        mask = (ranges < self.r_min_obstacle) & (ranges > 0.05)
+        r, th = ranges[mask], angles[mask]
+        if len(r) == 0:
+            return
+
+        order = np.argsort(th)
+        r, th = r[order], th[order]
+        cluster_id = np.zeros(len(r), dtype=int)
+        cid = 0
+        for i in range(1, len(r)):
+            if (th[i] - th[i - 1]) > cluster_gap:
+                cid += 1
+            cluster_id[i] = cid
+
+        world_a = robot_theta + th
+        x = robot_xy[0] + r * np.cos(world_a)
+        y = robot_xy[1] + r * np.sin(world_a)
+
+        for cid_val in np.unique(cluster_id):
+            m = cluster_id == cid_val
+            pts = np.column_stack((x[m], y[m]))
+            if cid_val not in self.gps:
+                self.gps[cid_val] = ObstacleGP(self.length_scale, self.sigma_f)
+            self.gps[cid_val].add_points(pts)
+
+    def set_obstacles_xy(self, points_xy, obstacle_id=0):
+        """Directly ingest points for a single named obstacle (bypass clustering)."""
+        if obstacle_id not in self.gps:
+            self.gps[obstacle_id] = ObstacleGP(self.length_scale, self.sigma_f)
+        self.gps[obstacle_id].add_points(points_xy)
+
+    @property
+    def N(self):
+        return sum(1 for gp in self.gps.values() if gp.n_points > 0)
+
+    # -- soft-min aggregation, Eq. (3) ---------------------------------------
+    def get_barrier_and_variance(self, p):
+        terms = [(gp.posterior_mean(p) - self.r_buf, gp.posterior_var(p))
+                 for gp in self.gps.values() if gp.n_points > 0]
+        if not terms:
+            return 1.0, 0.0
+        qs = np.array([t[0] for t in terms])
+        vs = np.array([t[1] for t in terms])
+        m = np.max(-self.kappa * qs)
+        w_un = np.exp(-self.kappa * qs - m)
+        Z = np.sum(w_un)
+        q = -(np.log(Z) + m) / self.kappa
+        w = w_un / Z
+        sigma_sq = float(np.sum(w * vs))
+        q = max(-2.0, min(5.0, q))
+        return q, sigma_sq
+
+    def get_gradient(self, p):
+        active = [(gp.posterior_mean(p) - self.r_buf, gp.posterior_grad(p))
+                  for gp in self.gps.values() if gp.n_points > 0]
+        if not active:
+            return np.zeros(2)
+        qs = np.array([t[0] for t in active])
+        grads = np.array([t[1] for t in active])
+        m = np.max(-self.kappa * qs)
+        w_un = np.exp(-self.kappa * qs - m)
+        w = w_un / np.sum(w_un)
+        return (w[:, None] * grads).sum(axis=0)
+
+    # -- actuator rate limiting: shrink the box to what's reachable ----------
+    def effective_bounds(self, u_prev):
+        """Box of inputs reachable in one dt from u_prev given
+        v_accel_max/v_decel_max/phi_rate_max -- see __init__'s comment for
+        why this is used INSTEAD OF post-hoc clipping everywhere below."""
+        u_prev = np.asarray(u_prev, dtype=float)
+        lo = np.array([max(self.u_min[0], u_prev[0] - self.v_decel_max * self.dt),
+                       max(self.u_min[1], u_prev[1] - self.phi_rate_max * self.dt)])
+        hi = np.array([min(self.u_max[0], u_prev[0] + self.v_accel_max * self.dt),
+                       min(self.u_max[1], u_prev[1] + self.phi_rate_max * self.dt)])
+        return lo, hi
+
+    # -- tightening margin, Eq. (12)-(14) ------------------------------------
+    def compute_safety_margin(self, P, u_min=None, u_max=None):
+        """sigma_k = c_q * sigma_bar_eta,k (+ discretization terms, left at 0
+        here -- see Eq. 14; discretization margin can be added by the caller
+        if desired). sigma_bar_eta,k = max over box vertices, Eq. (13).
+        u_min/u_max default to the vehicle's absolute bounds but should be
+        the per-step reachable box from effective_bounds() when called from
+        compute_safe_control (see there)."""
+        u_min = self.u_min if u_min is None else u_min
+        u_max = self.u_max if u_max is None else u_max
+        best = 0.0
+        for v in (u_min[0], u_max[0]):
+            for phi in (u_min[1], u_max[1]):
+                ell = np.array([self.lambda_0 * self.lambda_1,
+                                 self.lambda_0 + self.lambda_1, 1.0, v, phi])
+                best = max(best, float(ell @ P @ ell))
+        sigma_bar = float(np.sqrt(max(best, 0.0)))
+        sigma_k = self.c_q * sigma_bar
+        return min(sigma_k, self.sigma_cap), sigma_bar
+
+    # -- Lemma 1 feasibility --------------------------------------------------
+    def check_feasibility(self, q_hat, qdot_hat, F_q_hat, B_q_hat, sigma_k,
+                           u_min=None, u_max=None):
+        u_min = self.u_min if u_min is None else u_min
+        u_max = self.u_max if u_max is None else u_max
+        B_q_hat = np.asarray(B_q_hat, dtype=float)
+        r_k = (-F_q_hat - (self.lambda_0 + self.lambda_1) * qdot_hat
+               - self.lambda_0 * self.lambda_1 * q_hat + sigma_k)
+        M_k = 0.0
+        for j in range(len(B_q_hat)):
+            M_k += B_q_hat[j] * (u_max[j] if B_q_hat[j] >= 0 else u_min[j])
+        return M_k >= r_k, M_k, r_k
+
+    # -- closed-form CBF-only QP (Eq. 11's CBF row; see module docstring in
+    #    ackermann_cbf_core.solve_cbf_qp_closed_form for the general form) ---
+    def _solve_qp(self, u_ref, a, b, u_min=None, u_max=None):
+        u_ref = np.asarray(u_ref, dtype=float)
+        P_diag = self._P_qp
+        u_min = self.u_min if u_min is None else u_min
+        u_max = self.u_max if u_max is None else u_max
+
+        a_pos, a_neg = np.clip(a, 0, None), np.clip(a, None, 0)
+        if (a_pos @ u_min + a_neg @ u_max) > b + 1e-9:
+            return None
+        u_box = np.clip(u_ref, u_min, u_max)
+        if a @ u_box <= b + 1e-9:
+            return u_box
+        denom = np.sum(a**2 / P_diag)
+        if abs(denom) < 1e-12:
+            return None
+        lam = (a @ u_ref - b) / denom
+        u = np.clip(u_ref - lam * a / P_diag, u_min, u_max)
+        if a @ u <= b + 1e-6:
+            return u
+        candidates = []
+        for fixed_0 in (u_min[0], u_max[0]):
+            if abs(a[1]) > 1e-9:
+                u1 = np.clip((b - a[0] * fixed_0) / a[1], u_min[1], u_max[1])
+                cand = np.array([fixed_0, u1])
+                if a @ cand <= b + 1e-6:
+                    candidates.append(cand)
+        for fixed_1 in (u_min[1], u_max[1]):
+            if abs(a[0]) > 1e-9:
+                u0 = np.clip((b - a[1] * fixed_1) / a[0], u_min[0], u_max[0])
+                cand = np.array([u0, fixed_1])
+                if a @ cand <= b + 1e-6:
+                    candidates.append(cand)
+        for ux in (u_min[0], u_max[0]):
+            for uy in (u_min[1], u_max[1]):
+                cand = np.array([ux, uy])
+                if a @ cand <= b + 1e-6:
+                    candidates.append(cand)
+        if not candidates:
+            return None
+        costs = [0.5 * np.sum(P_diag * (c - u_ref) ** 2) for c in candidates]
+        return candidates[int(np.argmin(costs))]
+
+    def compute_safe_control(self, u_ref, q_hat, qdot_hat, F_q_hat, B_q_hat, P,
+                              u_prev, v_current=1.0):
+        """
+        u_prev: the [v, phi] actually applied last cycle (NOT just the
+        odometry speed) -- required to compute the reachable-set box via
+        effective_bounds(). Everything below (margin, feasibility, QP,
+        fallback) is computed against that box rather than the vehicle's
+        absolute [u_min, u_max], so the resulting command is both safe
+        (Lemma 1 w.r.t. what's reachable) and automatically smooth (never
+        asks for more accel/decel/steering-rate than v_accel_max/
+        v_decel_max/phi_rate_max allow) without any post-hoc clipping.
+        """
+        u_ref = np.asarray(u_ref, dtype=float)
+        B_q_hat = np.asarray(B_q_hat, dtype=float)
+        u_lo, u_hi = self.effective_bounds(u_prev)
+
+        sigma_k, sigma_bar = self.compute_safety_margin(P, u_lo, u_hi)
+        r_k = (-F_q_hat - (self.lambda_0 + self.lambda_1) * qdot_hat
+               - self.lambda_0 * self.lambda_1 * q_hat + sigma_k)
+
+        feasible, M_k, _ = self.check_feasibility(q_hat, qdot_hat, F_q_hat, B_q_hat, sigma_k, u_lo, u_hi)
+        sol = None if not feasible else self._solve_qp(u_ref, -B_q_hat, -r_k, u_lo, u_hi)
+
+        if feasible and sol is not None:
+            self.last_infeasible_info = None
+            self._stuck_counter = 0
+            return [float(sol[0]), float(sol[1])], True
+
+        # Infeasible (Lemma 1, within the reachable box u_lo/u_hi) or the QP
+        # solve degenerated: fall back. Steering authority is preserved (pick
+        # the box side of phi that maximizes B_q@u, i.e. the model's best
+        # current guess at which way to turn) and the *target* velocity's
+        # FIRST response is a full brake for the strongest immediate stopping
+        # power -- but for this Ackermann vehicle, theta_dot=(v/L)tan(phi) is
+        # identically zero whenever v=0, no matter what phi is commanded
+        # (unlike a differential-drive robot, which can still rotate in
+        # place at v=0). Braking all the way to 0 and staying there was
+        # found during validation to cause a permanent deadlock: v locks at
+        # 0, heading stops changing, F_q drifts to whatever is consistent
+        # with "parked," and the QP never becomes feasible again. So creep is
+        # only targeted after being stuck infeasible-and-nearly-stopped for
+        # stuck_limit consecutive calls. Either way the TARGET is clipped
+        # into [u_lo, u_hi], so the fallback ramps exactly as smoothly as a
+        # normal QP solution would instead of jumping.
+        self.last_infeasible_info = dict(r_k=r_k, B_q=B_q_hat.copy(), sigma_k=sigma_k,
+                                          F_q_hat=F_q_hat, qdot_hat=qdot_hat, q_hat=q_hat,
+                                          max_achievable=M_k)
+        phi_target = self.u_max[1] if B_q_hat[1] >= 0 else self.u_min[1]
+        phi_choice = float(np.clip(phi_target, u_lo[1], u_hi[1]))
+        # Counter increments every consecutive infeasible call (reset only
+        # happens above, on the next call that is genuinely feasible again)
+        # -- NOT gated on v_current, so that once creep engages it stays
+        # engaged instead of dropping back to a full brake (and re-arming the
+        # deadlock) the instant the creep speed itself satisfies "v > 0.05".
+        self._stuck_counter += 1
+        if self._stuck_counter >= self.stuck_limit:
+            v_target = min(self.fallback_creep_v, self.u_max[0])
+        else:
+            v_target = self.u_min[0]
+        v_choice = float(np.clip(v_target, u_lo[0], u_hi[0]))
+        return [float(v_choice), float(phi_choice)], False
 
 
 class SafetyULM_EKF:
@@ -109,9 +514,6 @@ class SafetyULM_EKF:
 
         self.H_q = np.zeros((1, state_dim)); self.H_q[0, 0] = 1.0
         self.H_qdot = np.zeros((1, state_dim)); self.H_qdot[0, 1] = 1.0
-
-        self._last_reset_time = -1e9
-        self.reset_count = 0
 
     def predict(self, u):
         Ts = self.Ts
@@ -148,21 +550,6 @@ class SafetyULM_EKF:
         K = self.P @ self.H_qdot.T / S[0, 0]
         self.x = self.x + K.flatten() * y
         self.P = (np.eye(len(self.x)) - np.outer(K, self.H_qdot)) @ self.P
-
-    def reset_if_diverged(self, t):
-        # B_q,v is sign-indefinite by design (see module docstring point 3),
-        # so divergence is judged on magnitude / numerical sanity only.
-        B_qv = float(self.x[3])
-        if (abs(B_qv) > 6.0 or not np.isfinite(B_qv)) and (t - self._last_reset_time) > 1.0:
-            self.x[2] = 0.0
-            self.x[3] = 1.0
-            if self.m > 1:
-                self.x[4] = 0.0
-            self.P = np.diag([0.01, 0.01, 0.05] + [0.05] * self.m)
-            self._last_reset_time = t
-            self.reset_count += 1
-            return True
-        return False
 
     def get_estimates(self):
         B_q = np.clip(self.x[3:3 + self.m].copy(), -6.0, 6.0)
@@ -369,7 +756,6 @@ class ControllerNode(Node):
         # being rebuilt from a single instantaneous scan every callback.
         self.cbf.set_obstacles(ranges, angles, robot_xy=(self.x, self.y),
                                 robot_theta=self.theta)
-        n_obstacles = self.cbf.N
         valid_ranges = ranges[(ranges > 0.1) & (ranges < self.r_max)]
         p_world = np.array([self.x, self.y])
 
@@ -404,14 +790,7 @@ class ControllerNode(Node):
         else:
             self.get_logger().warn(f'Invalid qdot_meas={qdot_meas}, skipping update')
 
-        ekf_just_reset = self.safety_ekf.reset_if_diverged(time.time())
-        if ekf_just_reset:
-            self.get_logger().warn(
-                f'EKF diverged! Resetting. Recent: q={q_meas:.3f}, qdot={qdot_meas:.3f}, n_obs={n_obstacles}')
-
         q_hat, qdot_hat, F_q_hat, B_q_hat, P_safety = self.safety_ekf.get_estimates()
-        if ekf_just_reset:
-            q_hat = min(q_hat, 0.5)
 
         # Reference-level courtesy slow-down near obstacles (does not affect
         # the safety guarantee -- the CBF-QP enforces q>=0 regardless -- it
@@ -429,7 +808,8 @@ class ControllerNode(Node):
             try:
                 u_safe, feasible = self.cbf.compute_safe_control(
                     u_ref=u_ref, q_hat=q_hat, qdot_hat=qdot_hat,
-                    F_q_hat=F_q_hat, B_q_hat=B_q_hat, P=P_safety, v_current=self.v)
+                    F_q_hat=F_q_hat, B_q_hat=B_q_hat, P=P_safety,
+                    u_prev=self.u_prev, v_current=self.v)
             except Exception as e:
                 self.get_logger().warn(f'CBF QP raised {e!r}; braking with steering held')
                 u_safe, feasible = [0.0, float(self.u_prev[1])], False
