@@ -611,7 +611,7 @@ class ControllerNode(Node):
         # the true-plant / dynamic-extension bookkeeping the vehicle firmware
         # already does; the safety filter itself never uses L (that is the
         # entire point of the model-free approach).
-        self.v_min, self.v_max = 0.0, 1.2
+        self.v_min, self.v_max = 0.8, 1.2
         self.phi_min, self.phi_max = -0.4, 0.4   # F1TENTH steering limits (rad)
         self.r_max = 3.0
         self.length_scale = 0.30
@@ -635,9 +635,9 @@ class ControllerNode(Node):
         self.theta = 0.0
         self.v = 0.0
 
-        self.u_ref = np.array([0.8, 0.0])     # [v_ref, phi_ref]
-        self.u_prev = np.array([0.8, 0.0])
-        self.v_prev = 0.8
+        self.u_ref = np.array([1.0, 0.0])     # [v_ref, phi_ref]
+        self.u_prev = np.array([1.0, 0.0])
+        self.v_prev = 1.0
 
         self.goal_x = 10.0
         self.goal_y = 0.0
@@ -679,7 +679,7 @@ class ControllerNode(Node):
         the LiDAR scan and steers toward it, emitting phi_ref (steering
         angle) DIRECTLY -- no omega, no conversion. Returns [v_ref, phi_ref].
         """
-        v_ref, phi_ref = 0.8, 0.0
+        v_ref, phi_ref = 1.0, 0.0
         if not hasattr(self, 'last_ranges'):
             return np.array([v_ref, phi_ref])
 
