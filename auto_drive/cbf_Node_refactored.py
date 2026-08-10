@@ -235,7 +235,10 @@ class ModelFreeCBF:
         # capping sigma_k -- see run_ackermann_sim.py's tuning notes.
         self.sigma_cap = sigma_cap if sigma_cap is not None else np.inf
 
-        self._P_qp = np.array([8.0, 2.0])  # diagonal QP tracking weights
+        self._P_qp = np.array([16.0, 1.0])  # diagonal QP tracking weights:
+        # v deviations are made expensive relative to phi deviations so that
+        # when the CBF constraint forces a departure from u_ref, the QP
+        # prefers to steer around the obstacle rather than brake.
         self.gps = {}
         self.last_infeasible_info = None
 
@@ -614,7 +617,7 @@ class ControllerNode(Node):
         self.v_min, self.v_max = 0.8, 1.2
         self.phi_min, self.phi_max = -0.4, 0.4   # F1TENTH steering limits (rad)
         self.r_max = 3.0
-        self.length_scale = 0.30
+        self.length_scale = 0.40      # GP "safety factor" (l): unsafe-set radius around each LiDAR point
         self.sigma_f = 1.0
         self.r_buf = 0.15
 

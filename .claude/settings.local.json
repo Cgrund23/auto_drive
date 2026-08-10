@@ -4,7 +4,9 @@
       "Bash(ls -la auto_drive/*.py)",
       "Bash(python simulate_cbf_cpu.py)",
       "Bash(pkill -f \"python simulate_cbf_cpu.py\")",
-      "Bash(python simulate_cbf.py)"
+      "Bash(python simulate_cbf.py)",
+      "Bash(cd /Users/colingrund/Documents/GitHub/auto_drive && grep -rn \"safety factor\\\\|SF\\\\b\\\\|safety_factor\" --include=*.py --include=*.md -i . 2>/dev/null | grep -vi \"software\\\\|specif\\\\|significant\" | head -60)",
+      "Bash(python3 -m py_compile cbf_Node_refactored.py)"
     ]
   }
 }
