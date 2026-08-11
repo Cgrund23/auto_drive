@@ -614,7 +614,19 @@ class ControllerNode(Node):
         # the true-plant / dynamic-extension bookkeeping the vehicle firmware
         # already does; the safety filter itself never uses L (that is the
         # entire point of the model-free approach).
-        self.v_min, self.v_max = 0.8, 1.2
+        # v_min=0.0 (NOT 0.8): the QP needs full braking authority to buy
+        # time for steering to catch up on an oncoming obstacle -- that is
+        # the mechanism a CBF uses to avoid contact with bounded steering
+        # rate. A nonzero floor here was tried and made things WORSE (it
+        # forced the vehicle to keep closing distance at >=0.8 m/s with only
+        # phi available to react, which is what drove it into the 0.30 m
+        # hard-stop layer in the first place). The original "car locks at
+        # v=0 forever" deadlock this floor was meant to prevent is instead
+        # handled by the stuck/creep escape in ModelFreeCBF.compute_safe_
+        # control() and the mirrored escape in lidar_callback's emergency-
+        # stop branch, both of which recover from v=0 without giving up the
+        # QP's ability to actually brake when it needs to.
+        self.v_min, self.v_max = 0.0, 1.2
         self.phi_min, self.phi_max = -0.4, 0.4   # F1TENTH steering limits (rad)
         self.r_max = 3.0
         self.length_scale = 0.40      # GP "safety factor" (l): unsafe-set radius around each LiDAR point
@@ -622,8 +634,16 @@ class ControllerNode(Node):
         self.r_buf = 0.15
 
         # HOCBF parameters, Section II-C / III-C.
-        self.lambda_0 = 1.2
-        self.lambda_1 = 1.2
+        self.lambda_0 = 2.0
+        self.lambda_1 = 2.0
+        # Raised from 1.2/1.2: the (lambda_0+lambda_1)*qdot term is what
+        # makes the filter react to CLOSING RATE rather than only proximity
+        # -- this was too sluggish, letting the vehicle get deep into
+        # negative q before the QP corrected hard, which is exactly what
+        # burned through the geometric margin down to the emergency layer.
+        # Larger poles react earlier (while q is still comfortably positive
+        # but qdot is large and negative) at the cost of a twitchier
+        # response; re-tune down if it starts chattering on hardware.
         self.c_q = 0.8      # confidence quantile, Eq. (14) -- see
         # run_ackermann_sim.py's tuning note on why this is lower than the
         # paper's own c_q=2/3 examples: this course's B_q,phi identifiability
@@ -651,6 +671,10 @@ class ControllerNode(Node):
         self._step_count = 0
         self._excite_counter = -1
         self._excite_steps = 24     # 1.2 s at 100 Hz -- paper Sec. V
+
+        # Consecutive cycles the hard emergency-stop layer (below) has held
+        # v=0 -- see its comment for why this needs its own creep escape.
+        self._estop_stuck_counter = 0
 
         self.safety_ekf = SafetyULM_EKF(Ts=self.dt, m_inputs=2)
         self.position_ekf = PositionULM_EKF(Ts=self.dt, m_inputs=2)
@@ -806,8 +830,26 @@ class ControllerNode(Node):
         if min_range < 0.30:
             # Hard emergency stop -- distinct from, and in addition to, the
             # CBF-QP: a last-resort layer for genuinely imminent contact.
-            u_safe, feasible = [0.0, self.u_prev[1]], True
+            # Freezing v=0 indefinitely here is a deadlock for this Ackermann
+            # vehicle: theta_dot = (v/L)*tan(phi) is identically zero
+            # whenever v=0, so a car parked a few inches from a wall can
+            # never turn to open distance again and just sits there forever
+            # (this is exactly what was observed on hardware -- the vehicle
+            # steered toward a wall, tripped this branch, and never left).
+            # Mirror the CBF fallback's stuck/creep escape: hold a full stop
+            # briefly, then creep while re-aiming steering every cycle from
+            # the model's current best-guess direction (B_q_hat's sign)
+            # instead of freezing at whatever phi happened to be applied the
+            # instant this branch first triggered.
+            self._estop_stuck_counter += 1
+            phi_dir = self.phi_max if B_q_hat[1] >= 0 else self.phi_min
+            if self._estop_stuck_counter >= self.cbf.stuck_limit:
+                v_estop = min(self.cbf.fallback_creep_v, self.v_max)
+            else:
+                v_estop = 0.0
+            u_safe, feasible = [v_estop, phi_dir], True
         else:
+            self._estop_stuck_counter = 0
             try:
                 u_safe, feasible = self.cbf.compute_safe_control(
                     u_ref=u_ref, q_hat=q_hat, qdot_hat=qdot_hat,
@@ -822,10 +864,11 @@ class ControllerNode(Node):
 
         if self._step_count % 50 == 0:
             total_time = time.time() - start_time
-            action = 'SAFE' if feasible and abs(u_safe[0] - self.u_ref[0]) < 0.1 else \
-                     ('STEER' if abs(u_safe[1] - self.u_ref[1]) > 0.05 else 'BRAKE')
+            action = 'ESTOP' if min_range < 0.30 else \
+                     ('SAFE' if feasible and abs(u_safe[0] - self.u_ref[0]) < 0.1 else
+                      ('STEER' if abs(u_safe[1] - self.u_ref[1]) > 0.05 else 'BRAKE'))
             self.get_logger().info(
-                f'[{action}] {total_time*1000:.0f}ms | q={q_hat:.2f} | '
+                f'[{action}] {total_time*1000:.0f}ms | q={q_hat:.2f} | min_range={min_range:.2f} | '
                 f'B_q=[{B_q_hat[0]:.2f},{B_q_hat[1]:.2f}] | v={u_safe[0]:.2f} phi={u_safe[1]:.2f}')
 
     def send_command(self, v, phi):
