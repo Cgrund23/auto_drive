@@ -698,24 +698,16 @@ class ControllerNode(Node):
         self.v_min, self.v_max = 0.0, 1.2
         self.phi_min, self.phi_max = -0.4, 0.4   # F1TENTH steering limits (rad)
         self.r_max = 3.0
-        # Raised from 0.20 after a real hardware failure: the vehicle drove
-        # into an obstacle close enough to physically wedge against it
-        # (front wheel jammed, steering servo oscillating at its hard-right
-        # lock, zero actual motion despite a continuous creep command) --
-        # confirmed in simulation that at 0.20 the closest approach in the
-        # matching scenario was ~0.10m, deep inside contact range, while
-        # 0.70 clears the SAME obstacle with 0.31m to spare (never even
-        # triggers the 0.30m emergency layer). CAVEAT: this is calibrated
-        # to that specific obstacle, not a generally safer value -- a batch
-        # test across 12 randomized obstacle layouts found the worst-case
-        # closest approach IDENTICAL (~0.10m) at length_scale 0.20/0.70/0.90,
-        # and 0.90 crashed MORE often than 0.20. Watch for wheel oscillation
-        # returning: avg. consecutive-infeasible-step count across that same
-        # batch went from 1 (at 0.20) to 201 (at 0.70) to 296 (at 0.90), and
-        # long infeasible streaks are exactly what preceded the EKF
-        # destabilizing (B_q hitting its +-6 clip limits) during the
-        # hardware episode that motivated this change.
-        self.length_scale = 0.70      # GP "safety factor" (l): unsafe-set radius around each LiDAR point
+        # length_scale/lambda_0/lambda_1/c_q below were chosen by staged grid
+        # searches (sweep_left_wall_follower.py) against the hallway-with-
+        # obstacles simulation (simulate_left_wall_follower.py). Corridor
+        # width and vehicle size have both been corrected twice now (2.4m
+        # sim -> "1.0m hallway" guess -> actual 2.0m hallway with a real
+        # 8in x 16in vehicle) -- length_scale and left_wall_setpoint below
+        # are rescaled from the 1.0m-corridor sweep's findings by the width
+        # ratio (2.0/1.0 = 2x), not re-verified by a fresh sweep at this
+        # exact scale. See sweep_left_wall_follower.py to re-validate.
+        self.length_scale = 0.20      # GP "safety factor" (l): unsafe-set radius around each LiDAR point
         self.sigma_f = 1.0
         # r_buf: the CONTROLLER's belief about where the boundary is,
         # deliberately more conservative than bare vehicle geometry (that
