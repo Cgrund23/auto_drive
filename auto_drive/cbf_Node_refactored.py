@@ -91,7 +91,10 @@ WHAT CHANGED FROM THE ORIGINAL cbf_Node_refactored.py, AND WHY
    that could benefit from batched GPU evaluation -- everything else is too
    small to matter.
 """
+import csv
+import os
 import time
+from datetime import datetime
 
 import numpy as np
 import rclpy
@@ -695,7 +698,7 @@ class ControllerNode(Node):
         # control() and the mirrored escape in lidar_callback's emergency-
         # stop branch, both of which recover from v=0 without giving up the
         # QP's ability to actually brake when it needs to.
-        self.v_min, self.v_max = 0.0, 1.2
+        self.v_min, self.v_max = 0.6, 1.5
         self.phi_min, self.phi_max = -0.4, 0.4   # F1TENTH steering limits (rad)
         self.r_max = 3.0
         # length_scale/lambda_0/lambda_1/c_q below were chosen by staged grid
@@ -707,7 +710,7 @@ class ControllerNode(Node):
         # are rescaled from the 1.0m-corridor sweep's findings by the width
         # ratio (2.0/1.0 = 2x), not re-verified by a fresh sweep at this
         # exact scale. See sweep_left_wall_follower.py to re-validate.
-        self.length_scale = 0.20      # GP "safety factor" (l): unsafe-set radius around each LiDAR point
+        self.length_scale = 0.25      # GP "safety factor" (l): unsafe-set radius around each LiDAR point
         self.sigma_f = 1.0
         # r_buf: the CONTROLLER's belief about where the boundary is,
         # deliberately more conservative than bare vehicle geometry (that
@@ -825,11 +828,42 @@ class ControllerNode(Node):
             r_buf=self.r_buf,
         )
 
+        # --- hardware run logging (for offline analysis via
+        # analyze_hardware_log.py) -----------------------------------------
+        # Every control step (not just the 1-in-50 console summary in
+        # _control_step) is recorded to a CSV so a run can be replayed and
+        # plotted after the fact: position, reference vs. commanded u, the
+        # full EKF barrier estimate (q, qdot, F_q, B_q), the confidence
+        # margin, feasibility, and min_range. A second CSV records the
+        # downsampled scan (world-frame pose + ranges) at perception rate so
+        # the persistent per-obstacle GPs -- and the barrier field they
+        # define -- can be exactly reconstructed offline by replaying
+        # set_obstacles() calls through a fresh ModelFreeCBF, rather than
+        # needing to serialize the GPs' internal state directly.
+        log_dir = os.path.expanduser('~/cbf_logs')
+        os.makedirs(log_dir, exist_ok=True)
+        run_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self._control_log_path = os.path.join(log_dir, f'{run_id}_control.csv')
+        self._scan_log_path = os.path.join(log_dir, f'{run_id}_scans.csv')
+        self._control_log_f = open(self._control_log_path, 'w', newline='')
+        self._control_log_w = csv.writer(self._control_log_f)
+        self._control_log_w.writerow([
+            't', 'step', 'dt', 'x', 'y', 'theta', 'v_odom',
+            'v_ref', 'phi_ref', 'v_cmd', 'phi_cmd',
+            'q_hat', 'qdot_hat', 'F_q_hat', 'Bqv_hat', 'Bqphi_hat',
+            'sigma_k', 'min_range', 'feasible', 'n_obstacles', 'action',
+        ])
+        self._scan_log_f = open(self._scan_log_path, 'w', newline='')
+        self._scan_log_w = csv.writer(self._scan_log_f)
+        self._scan_log_header_written = False
+
         self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
         self.create_subscription(LaserScan, '/scan', self.lidar_callback, 10)
         self.cmd_pub = self.create_publisher(AckermannDriveStamped, '/drive', 10)
 
         self.get_logger().info('Model-Free CBF Node (Ackermann-native, u=[v,phi]) initialized')
+        self.get_logger().info(f'Logging control data to {self._control_log_path}')
+        self.get_logger().info(f'Logging scans to {self._scan_log_path}')
 
     # -------------------------------------------------------------------
     def _side_wall_distance(self, sign, ranges, angles):
@@ -985,6 +1019,18 @@ class ControllerNode(Node):
         ranges = np.asarray(ranges_raw, dtype=np.float32)
         angles = angles_raw.astype(np.float32)
         self.last_ranges, self.last_angles = ranges, angles
+
+        # Scan log: angles are ~constant for a given LiDAR/downsample factor,
+        # so they're written ONCE as a marker row rather than repeated every
+        # scan -- analyze_hardware_log.py knows to treat a row starting with
+        # '#angles' specially.
+        if not self._scan_log_header_written:
+            self._scan_log_w.writerow(['#angles'] + [f'{a:.6f}' for a in angles])
+            self._scan_log_w.writerow(['t', 'x', 'y', 'theta'] + [f'r{i}' for i in range(len(angles))])
+            self._scan_log_header_written = True
+        self._scan_log_w.writerow(
+            [f'{now.nanoseconds * 1e-9:.6f}', f'{self.x:.4f}', f'{self.y:.4f}', f'{self.theta:.5f}']
+            + [f'{r:.3f}' for r in ranges])
 
         # Per-obstacle GP ingestion in the WORLD frame using odometry, so the
         # learned barrier persists across scans (Section II-E), rather than
@@ -1146,21 +1192,40 @@ class ControllerNode(Node):
         self.send_command(u_safe[0], u_safe[1])
         self.u_prev = np.array(u_safe)
 
+        # Compare against u_ref (the scaled target actually being pursued
+        # this cycle), NOT self.u_ref (the raw, unscaled v_ref=1.0 the
+        # wall-follower emits) -- comparing against the unscaled value meant
+        # this label reported BRAKE for perfectly normal, feasible tracking
+        # of a courtesy-slowed target every time the vehicle held a steady,
+        # safe distance from a wall (confirmed on hardware: v matched the
+        # scaled target almost exactly, phi was small dither not a pinned
+        # fallback value -- neither is what BRAKE implies). Computed every
+        # step now (not just the 1-in-50 print) so it lands in the CSV log
+        # for every row, not just the sparse console summary.
+        action = 'ESTOP' if min_range < 0.30 else \
+                 ('SAFE' if feasible and abs(u_safe[0] - u_ref[0]) < 0.1 else
+                  ('STEER' if abs(u_safe[1] - u_ref[1]) > 0.05 else 'BRAKE'))
+
+        # sigma_k (Theorem 2 confidence margin, Eq. 12-14) isn't returned by
+        # compute_safe_control -- recompute it here against the SAME
+        # reachable box (effective_bounds(self.u_prev), now updated to this
+        # step's applied command) purely for logging; cheap (a handful of
+        # box-vertex evaluations), not on any control-critical path.
+        sigma_k, _ = self.cbf.compute_safety_margin(P_safety, *self.cbf.effective_bounds(self.u_prev))
+
+        now_s = self.get_clock().now().nanoseconds * 1e-9
+        self._control_log_w.writerow([
+            f'{now_s:.6f}', self._step_count, f'{dt_sub:.5f}',
+            f'{self.x:.4f}', f'{self.y:.4f}', f'{self.theta:.5f}', f'{self.v:.3f}',
+            f'{u_ref[0]:.3f}', f'{u_ref[1]:.4f}', f'{u_safe[0]:.3f}', f'{u_safe[1]:.4f}',
+            f'{q_hat:.4f}', f'{qdot_hat:.4f}', f'{F_q_hat:.4f}', f'{B_q_hat[0]:.4f}', f'{B_q_hat[1]:.4f}',
+            f'{sigma_k:.4f}', f'{min_range:.3f}', int(feasible), self.cbf.N, action,
+        ])
+
         if self._step_count % 50 == 0:
+            self._control_log_f.flush()
+            self._scan_log_f.flush()
             total_time = time.time() - start_time
-            # Compare against u_ref (the scaled target actually being
-            # pursued this cycle), NOT self.u_ref (the raw, unscaled
-            # v_ref=1.0 the wall-follower emits) -- comparing against the
-            # unscaled value meant this label reported BRAKE for perfectly
-            # normal, feasible tracking of a courtesy-slowed target every
-            # time the vehicle held a steady, safe distance from a wall
-            # (confirmed on hardware: v matched the scaled target almost
-            # exactly, phi was small dither not a pinned fallback value --
-            # neither is what BRAKE implies). feasible is now printed
-            # directly so this class of mislabeling is visible, not hidden.
-            action = 'ESTOP' if min_range < 0.30 else \
-                     ('SAFE' if feasible and abs(u_safe[0] - u_ref[0]) < 0.1 else
-                      ('STEER' if abs(u_safe[1] - u_ref[1]) > 0.05 else 'BRAKE'))
             self.get_logger().info(
                 f'[{action}] {total_time*1000:.0f}ms | feas={feasible} | q={q_hat:.2f} | min_range={min_range:.2f} | '
                 f'B_q=[{B_q_hat[0]:.2f},{B_q_hat[1]:.2f}] | v={u_safe[0]:.2f} phi={u_safe[1]:.2f}')
