@@ -698,7 +698,7 @@ class ControllerNode(Node):
         # control() and the mirrored escape in lidar_callback's emergency-
         # stop branch, both of which recover from v=0 without giving up the
         # QP's ability to actually brake when it needs to.
-        self.v_min, self.v_max = 0.6, 1.5
+        self.v_min, self.v_max = 0.8, 1.5
         self.phi_min, self.phi_max = -0.4, 0.4   # F1TENTH steering limits (rad)
         self.r_max = 3.0
         # length_scale/lambda_0/lambda_1/c_q below were chosen by staged grid
@@ -710,7 +710,7 @@ class ControllerNode(Node):
         # are rescaled from the 1.0m-corridor sweep's findings by the width
         # ratio (2.0/1.0 = 2x), not re-verified by a fresh sweep at this
         # exact scale. See sweep_left_wall_follower.py to re-validate.
-        self.length_scale = 0.25      # GP "safety factor" (l): unsafe-set radius around each LiDAR point
+        self.length_scale = 0.2      # GP "safety factor" (l): unsafe-set radius around each LiDAR point
         self.sigma_f = 1.0
         # r_buf: the CONTROLLER's belief about where the boundary is,
         # deliberately more conservative than bare vehicle geometry (that
@@ -1243,6 +1243,18 @@ class ControllerNode(Node):
         self.v_prev = v
         msg.drive.steering_angle = float(np.clip(phi, self.phi_min, self.phi_max))
         self.cmd_pub.publish(msg)
+
+    def destroy_node(self):
+        """Flush and close the run logs before shutdown -- main()'s finally
+        block calls this on both a clean exit and a KeyboardInterrupt, so
+        this is the one place guaranteed to run at the end of a run."""
+        for f in (getattr(self, '_control_log_f', None), getattr(self, '_scan_log_f', None)):
+            if f is not None:
+                try:
+                    f.close()
+                except Exception:
+                    pass
+        super().destroy_node()
 
 
 def main(args=None):
