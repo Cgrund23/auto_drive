@@ -264,6 +264,26 @@ class ModelFreeCBF:
         self.stuck_limit = max(1, int(0.15 / self.dt))     # ~0.15 s of being stuck
         self._stuck_counter = 0
 
+        # Fallback steering dither: a small perturbation superimposed on
+        # phi_choice below, distinct from (and in addition to) the node-level
+        # dither on u_ref. The node-level dither is USELESS during a
+        # sustained infeasible episode because this fallback branch never
+        # looks at u_ref -- it drives phi_choice, a value held essentially
+        # constant at one box extreme for as long as B_q_hat's sign doesn't
+        # flip. A constant input is the worst case for the online
+        # identifier: nothing new excites B_q,phi, so a wrong sign picked up
+        # early in a long turn can simply never correct itself, and the
+        # vehicle just keeps arcing the same way until it hits whatever is
+        # on that side. (Confirmed in simulation: B_q,phi stayed negative for
+        # 420 consecutive infeasible cycles while phi sat at its lower bound
+        # the entire time, carving the vehicle into the opposite wall.)
+        # This dither keeps phi_choice moving during the SAME box-extreme
+        # commitment, which is enough to keep re-exciting B_q,phi's sign
+        # without undoing the "steer toward the model's best guess" intent.
+        self.fallback_dither_ampl = 0.08
+        self.fallback_dither_period = max(1, int(0.3 / self.dt))  # ~0.3 s
+        self._fallback_dither_counter = 0
+
     # -- obstacle ingestion (per-obstacle GP, Eq. 3-6) -----------------------
     def set_obstacles(self, ranges, angles, robot_xy=(0.0, 0.0), robot_theta=0.0,
                        cluster_gap=0.3):
@@ -431,7 +451,7 @@ class ModelFreeCBF:
         return candidates[int(np.argmin(costs))]
 
     def compute_safe_control(self, u_ref, q_hat, qdot_hat, F_q_hat, B_q_hat, P,
-                              u_prev, v_current=1.0):
+                              u_prev, v_current=1.0, raw_side_bias=0.0):
         """
         u_prev: the [v, phi] actually applied last cycle (NOT just the
         odometry speed) -- required to compute the reachable-set box via
@@ -441,6 +461,12 @@ class ModelFreeCBF:
         (Lemma 1 w.r.t. what's reachable) and automatically smooth (never
         asks for more accel/decel/steering-rate than v_accel_max/
         v_decel_max/phi_rate_max allow) without any post-hoc clipping.
+
+        raw_side_bias: caller-supplied (min raw range on the LEFT half of the
+        current scan) - (min raw range on the RIGHT half), i.e. positive
+        means the left is more open. Used ONLY as a tie-breaker in the
+        infeasible fallback below, in place of a stale B_q_hat[1] sign -- see
+        that branch's comment for why this is necessary.
         """
         u_ref = np.asarray(u_ref, dtype=float)
         B_q_hat = np.asarray(B_q_hat, dtype=float)
@@ -456,6 +482,7 @@ class ModelFreeCBF:
         if feasible and sol is not None:
             self.last_infeasible_info = None
             self._stuck_counter = 0
+            self._fallback_dither_counter = 0
             return [float(sol[0]), float(sol[1])], True
 
         # Infeasible (Lemma 1, within the reachable box u_lo/u_hi) or the QP
@@ -477,8 +504,32 @@ class ModelFreeCBF:
         self.last_infeasible_info = dict(r_k=r_k, B_q=B_q_hat.copy(), sigma_k=sigma_k,
                                           F_q_hat=F_q_hat, qdot_hat=qdot_hat, q_hat=q_hat,
                                           max_achievable=M_k)
-        phi_target = self.u_max[1] if B_q_hat[1] >= 0 else self.u_min[1]
-        phi_choice = float(np.clip(phi_target, u_lo[1], u_hi[1]))
+        # B_q_hat[1] is a SINGLE scalar representing sensitivity to the
+        # combined soft-min barrier -- it cannot represent "steer right, this
+        # obstacle is on the left" and "steer left, that wall is now on the
+        # right" as two different facts about two different things at once.
+        # Confirmed by simulation: B_q,phi locked negative (commit right) to
+        # correctly dodge an obstacle, then STAYED negative for 200+
+        # consecutive infeasible cycles even as the vehicle closed to <0.3m
+        # of the wall on the opposite side, because nothing forced it to
+        # re-identify against a now-completely-different nearby threat --
+        # every (lambda_0/1, c_q, EKF process noise, length_scale) combo
+        # tried in simulation crashed the same way, which is what rules this
+        # out as a tuning problem. Once the model has had a fair chance
+        # (stuck_limit cycles) and is still disagreeing with which side is
+        # actually open right now, defer to the raw scan instead of the
+        # model's belief.
+        model_dir = 1.0 if B_q_hat[1] >= 0 else -1.0
+        raw_dir = 1.0 if raw_side_bias >= 0 else -1.0
+        if self._stuck_counter > self.stuck_limit and raw_side_bias != 0.0 and model_dir != raw_dir:
+            chosen_dir = raw_dir
+        else:
+            chosen_dir = model_dir
+        phi_target = self.u_max[1] if chosen_dir > 0 else self.u_min[1]
+        dither = self.fallback_dither_ampl * np.sin(
+            2 * np.pi * self._fallback_dither_counter / self.fallback_dither_period)
+        self._fallback_dither_counter += 1
+        phi_choice = float(np.clip(phi_target + dither, u_lo[1], u_hi[1]))
         # Counter increments every consecutive infeasible call (reset only
         # happens above, on the next call that is genuinely feasible again)
         # -- NOT gated on v_current, so that once creep engages it stays
@@ -629,28 +680,24 @@ class ControllerNode(Node):
         self.v_min, self.v_max = 0.0, 1.2
         self.phi_min, self.phi_max = -0.4, 0.4   # F1TENTH steering limits (rad)
         self.r_max = 3.0
-        self.length_scale = 0.40      # GP "safety factor" (l): unsafe-set radius around each LiDAR point
+        # length_scale/lambda_0/lambda_1/c_q below were chosen by a staged
+        # grid search (sweep_left_wall_follower.py) against the hallway-with-
+        # obstacles simulation (simulate_left_wall_follower.py), run AFTER
+        # adding the raw_side_bias cross-check to ModelFreeCBF's fallback --
+        # every combination tried before that fix crashed near the same
+        # spot, which is what showed the crash was a structural gap (a
+        # single scalar B_q,phi can't represent two different obstacles'
+        # opposite-signed steering sensitivities), not a tuning problem. This
+        # config was the first to complete the hallway with min_q never
+        # meaningfully negative; see that sweep's output for the full grid.
+        self.length_scale = 0.50      # GP "safety factor" (l): unsafe-set radius around each LiDAR point
         self.sigma_f = 1.0
         self.r_buf = 0.15
 
         # HOCBF parameters, Section II-C / III-C.
-        self.lambda_0 = 2.0
-        self.lambda_1 = 2.0
-        # Raised from 1.2/1.2: the (lambda_0+lambda_1)*qdot term is what
-        # makes the filter react to CLOSING RATE rather than only proximity
-        # -- this was too sluggish, letting the vehicle get deep into
-        # negative q before the QP corrected hard, which is exactly what
-        # burned through the geometric margin down to the emergency layer.
-        # Larger poles react earlier (while q is still comfortably positive
-        # but qdot is large and negative) at the cost of a twitchier
-        # response; re-tune down if it starts chattering on hardware.
-        self.c_q = 0.8      # confidence quantile, Eq. (14) -- see
-        # run_ackermann_sim.py's tuning note on why this is lower than the
-        # paper's own c_q=2/3 examples: this course's B_q,phi identifiability
-        # is weaker than the paper's fully-converged illustration, so a
-        # looser (but still principled, Eq. 14-consistent) quantile is used
-        # to keep the QP feasible. Raise this once field data shows the EKF
-        # covariance converges faster/tighter than assumed here.
+        self.lambda_0 = 2.5
+        self.lambda_1 = 2.5
+        self.c_q = 1.1      # confidence quantile, Eq. (14)
 
         # --- state ---
         self.x = 0.0
@@ -664,6 +711,14 @@ class ControllerNode(Node):
 
         self.goal_x = 10.0
         self.goal_y = 0.0
+
+        # left-hand-rule wall-follower (nominal reference controller)
+        self.left_wall_setpoint = 0.6   # target distance (m) off the left wall
+        self.wall_beam_angle = np.deg2rad(30.0)        # main wall-sensing beam, from forward
+        self.wall_beam_separation = np.deg2rad(15.0)   # 2nd beam this far forward of the 1st
+        self.wall_follow_kp = 1.5
+        self.wall_follow_kd = 0.3
+        self._wall_follow_prev_error = 0.0
 
         # continuous persistent-excitation dither, module docstring point 4
         self._dither_ampl = 0.05
@@ -700,43 +755,74 @@ class ControllerNode(Node):
         self.get_logger().info('Model-Free CBF Node (Ackermann-native, u=[v,phi]) initialized')
 
     # -------------------------------------------------------------------
-    def gap_following_controller(self):
+    def left_wall_follower_controller(self):
         """
-        Gap-following reference controller: finds the largest free gap in
-        the LiDAR scan and steers toward it, emitting phi_ref (steering
-        angle) DIRECTLY -- no omega, no conversion. Returns [v_ref, phi_ref].
+        Left-hand-rule reference controller (F1TENTH Lab 3 two-beam
+        formulation): holds the vehicle a fixed perpendicular distance off
+        the wall on its LEFT side while driving forward, emitting phi_ref
+        DIRECTLY -- no omega, no conversion. Returns [v_ref, phi_ref]; this
+        is only the NOMINAL reference -- the CBF-QP safety filter still has
+        final say over the actual command.
+
+        Angle convention (REP-103, matches this file's LiDAR frame): scan
+        angle increases counter-clockwise from the forward (+x) axis, so
+        positive angles point along +y, i.e. the vehicle's LEFT side.
+
+        Geometry: two beams -- the main wall-sensing beam at
+        `self.wall_beam_angle` from forward (30 deg by default; the F1TENTH
+        Lab 3 formulation uses 90 deg/straight-left instead, but this LiDAR
+        mount/FOV wants the wall sensed further forward) and a second beam
+        `self.wall_beam_separation` further forward of that -- give two
+        points on the wall. This uses the general point-to-line distance
+        between those two points rather than the textbook Dt=b*cos(alpha)
+        shortcut, because that shortcut is only algebraically valid when the
+        second beam is exactly perpendicular (90 deg); the general form
+        below gives the correct perpendicular distance and its
+        rate-of-change for ANY pair of beam angles, so `wall_beam_angle` can
+        be retuned freely. `Dt` is then projected `lookahead` meters further
+        along the vehicle's path so the controller corrects before it drifts
+        off the setpoint, not after.
         """
-        v_ref, phi_ref = 1.0, 0.0
-        if not hasattr(self, 'last_ranges'):
-            return np.array([v_ref, phi_ref])
+        v_ref = 1.0
+        if not hasattr(self, 'last_ranges') or len(self.last_angles) == 0:
+            return np.array([v_ref, 0.0])
 
         ranges, angles = self.last_ranges, self.last_angles
-        front = np.abs(angles) < np.pi / 2
-        fr, fa = ranges[front], angles[front]
-        if len(fr) == 0:
-            return np.array([v_ref, phi_ref])
 
-        is_free = fr > 0.5
-        best_size, best_angle, cur_size, cur_start = 0, 0.0, 0, 0
-        for i in range(len(is_free)):
-            if is_free[i]:
-                if cur_size == 0:
-                    cur_start = i
-                cur_size += 1
-            else:
-                if cur_size > best_size:
-                    best_size = cur_size
-                    best_angle = float(fa[cur_start + cur_size // 2])
-                cur_size = 0
-        if cur_size > best_size:
-            best_size = cur_size
-            best_angle = float(fa[cur_start + cur_size // 2])
-        if best_size == 0:
-            best_angle = float(fa[int(np.argmax(fr))])
+        b_angle = self.wall_beam_angle                  # main wall-sensing beam, from forward
+        a_angle = b_angle - self.wall_beam_separation    # a second, more-forward beam
 
-        # Steer toward the gap center directly in steering-angle space.
-        K_p = 1.2
-        phi_ref = float(np.clip(K_p * best_angle, self.phi_min, self.phi_max))
+        def beam_at(target_angle):
+            idx = int(np.argmin(np.abs(angles - target_angle)))
+            r = float(ranges[idx])
+            return r if np.isfinite(r) and r > 0.02 else self.r_max
+
+        a = beam_at(a_angle)
+        b = beam_at(b_angle)
+
+        # Two points on the wall, in the robot frame.
+        pa = np.array([a * np.cos(a_angle), a * np.sin(a_angle)])
+        pb = np.array([b * np.cos(b_angle), b * np.sin(b_angle)])
+        d = pb - pa
+        d_norm = float(np.linalg.norm(d))
+        if d_norm < 1e-6:
+            return np.array([v_ref, 0.0])
+
+        Dt = float(pa[0] * d[1] - pa[1] * d[0]) / d_norm   # current perpendicular distance to wall
+        lookahead = 0.5 + 0.5 * max(self.v, 0.0)           # look further ahead at higher speed
+        Dt1 = Dt - lookahead * d[1] / d_norm               # distance projected `lookahead` m ahead
+
+        error = self.left_wall_setpoint - Dt1
+        # error > 0: drifting away from the wall -> steer toward it (left,  +phi)
+        # error < 0: drifting into the wall      -> steer away from it (right, -phi)
+        # If the vehicle turns the wrong way on hardware, flip this sign --
+        # it depends on the LiDAR's mounting/angle convention matching the
+        # REP-103 assumption above.
+        d_error = error - self._wall_follow_prev_error
+        self._wall_follow_prev_error = error
+
+        phi_ref = self.wall_follow_kp * error + self.wall_follow_kd * d_error
+        phi_ref = float(np.clip(phi_ref, self.phi_min, self.phi_max))
         return np.array([v_ref, phi_ref])
 
     def _apply_persistent_excitation(self, u_ref):
@@ -786,13 +872,21 @@ class ControllerNode(Node):
         valid_ranges = ranges[(ranges > 0.1) & (ranges < self.r_max)]
         p_world = np.array([self.x, self.y])
 
+        # Raw (model-free-of-the-EKF) left-vs-right clearance, used only as a
+        # tie-breaker deep in the fallback paths below when the learned
+        # B_q_hat[1] sign has been fighting the visible geometry too long.
+        left_mask, right_mask = angles > 0, angles < 0
+        left_min = float(np.min(ranges[left_mask])) if np.any(left_mask) else self.r_max
+        right_min = float(np.min(ranges[right_mask])) if np.any(right_mask) else self.r_max
+        raw_side_bias = left_min - right_min
+
         # EKF predict, Eq. (8)-(10) discretized.
         self.safety_ekf.predict(self.u_prev)
         self.position_ekf.predict(self.u_prev)
 
         # Nominal reference + persistent excitation.
         if self._step_count % 3 == 0:
-            self.u_ref = self.gap_following_controller()
+            self.u_ref = self.left_wall_follower_controller()
         u_ref = self._apply_persistent_excitation(self.u_ref)
 
         # Measurements: q from GP posterior mean (Eq. 4), qdot = grad(h)^T p_dot_hat.
@@ -842,7 +936,13 @@ class ControllerNode(Node):
             # instead of freezing at whatever phi happened to be applied the
             # instant this branch first triggered.
             self._estop_stuck_counter += 1
-            phi_dir = self.phi_max if B_q_hat[1] >= 0 else self.phi_min
+            model_dir = 1.0 if B_q_hat[1] >= 0 else -1.0
+            raw_dir = 1.0 if raw_side_bias >= 0 else -1.0
+            if self._estop_stuck_counter > self.cbf.stuck_limit and raw_side_bias != 0.0 and model_dir != raw_dir:
+                chosen_dir = raw_dir
+            else:
+                chosen_dir = model_dir
+            phi_dir = self.phi_max if chosen_dir > 0 else self.phi_min
             if self._estop_stuck_counter >= self.cbf.stuck_limit:
                 v_estop = min(self.cbf.fallback_creep_v, self.v_max)
             else:
@@ -854,7 +954,8 @@ class ControllerNode(Node):
                 u_safe, feasible = self.cbf.compute_safe_control(
                     u_ref=u_ref, q_hat=q_hat, qdot_hat=qdot_hat,
                     F_q_hat=F_q_hat, B_q_hat=B_q_hat, P=P_safety,
-                    u_prev=self.u_prev, v_current=self.v)
+                    u_prev=self.u_prev, v_current=self.v,
+                    raw_side_bias=raw_side_bias)
             except Exception as e:
                 self.get_logger().warn(f'CBF QP raised {e!r}; braking with steering held')
                 u_safe, feasible = [0.0, float(self.u_prev[1])], False
