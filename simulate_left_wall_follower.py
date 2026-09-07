@@ -90,10 +90,13 @@ MAX_RANGE = 3.0
 BODY_ANGLES = np.linspace(ANGLE_MIN, ANGLE_MAX, N_RAYS)
 
 
-def simulate_lidar(x, y, theta):
+def simulate_lidar(x, y, theta, obstacles=None):
     """Vectorized ray-cast against the two hallway walls + all obstacles.
     Mirrors a real 2-D LiDAR: returns full-resolution (ranges, angles) in the
-    robot body frame, capped at MAX_RANGE."""
+    robot body frame, capped at MAX_RANGE. `obstacles` defaults to the
+    module-level OBSTACLES layout; pass a different list (e.g. from
+    randomize_hallway.py) to test other layouts without editing this file."""
+    obstacles = OBSTACLES if obstacles is None else obstacles
     world_angles = theta + BODY_ANGLES
     dx, dy = np.cos(world_angles), np.sin(world_angles)
     best = np.full(N_RAYS, MAX_RANGE)
@@ -106,7 +109,7 @@ def simulate_lidar(x, y, theta):
                 (xhit >= -0.5) & (xhit <= HALLWAY_LENGTH + 0.5)
         best = np.where(valid, t, best)
 
-    for (cx, cy, cr) in OBSTACLES:
+    for (cx, cy, cr) in obstacles:
         fx, fy = x - cx, y - cy
         b = 2 * (fx * dx + fy * dy)
         c = fx * fx + fy * fy - cr * cr
@@ -119,11 +122,12 @@ def simulate_lidar(x, y, theta):
     return best, BODY_ANGLES
 
 
-def check_collision(x, y):
+def check_collision(x, y, obstacles=None):
+    obstacles = OBSTACLES if obstacles is None else obstacles
     for wall_y in (HALLWAY_HALF_WIDTH, -HALLWAY_HALF_WIDTH):
         if abs(wall_y - y) < ROBOT_RADIUS:
             return True
-    for (cx, cy, cr) in OBSTACLES:
+    for (cx, cy, cr) in obstacles:
         if np.hypot(x - cx, y - cy) < cr + ROBOT_RADIUS:
             return True
     return False
@@ -159,6 +163,8 @@ class SimNode:
         self.wall_follow_kp = 1.5
         self.wall_follow_kd = 0.3
         self._wall_follow_prev_error = 0.0
+        self.wall_follow_heading_fade_start = np.deg2rad(30.0)
+        self.wall_follow_heading_fade_end = np.deg2rad(70.0)
 
         self._dither_ampl = 0.05
         self._dither_period_steps = 30
@@ -207,12 +213,22 @@ class SimNode:
         lookahead = 0.5 + 0.5 * max(self.v, 0.0)
         Dt1 = Dt - lookahead * d[1] / d_norm
 
-        error = self.left_wall_setpoint - Dt1
+        error = Dt1 - self.left_wall_setpoint
         d_error = error - self._wall_follow_prev_error
         self._wall_follow_prev_error = error
 
         phi_ref = self.wall_follow_kp * error + self.wall_follow_kd * d_error
         phi_ref = float(np.clip(phi_ref, self.phi_min, self.phi_max))
+
+        theta_err = abs(self.theta)
+        fade_start, fade_end = self.wall_follow_heading_fade_start, self.wall_follow_heading_fade_end
+        if theta_err <= fade_start:
+            authority = 1.0
+        elif theta_err >= fade_end:
+            authority = 0.0
+        else:
+            authority = 1.0 - (theta_err - fade_start) / (fade_end - fade_start)
+        phi_ref *= authority
         return np.array([v_ref, phi_ref])
 
     # -- exact port of ControllerNode._apply_persistent_excitation ---------
@@ -275,7 +291,7 @@ class SimNode:
         q_hat, qdot_hat, F_q_hat, B_q_hat, P_safety = self.safety_ekf.get_estimates()
 
         u_ref = u_ref.copy()
-        u_ref[0] *= float(np.clip((q_hat if np.isfinite(q_hat) else 1.0) / 0.6, 0.25, 1.0))
+        u_ref[0] *= float(np.clip(q_hat if np.isfinite(q_hat) else 1.0, 0.15, 1.0))
 
         min_range = float(np.min(valid_ranges)) if len(valid_ranges) > 0 else 999.0
         if min_range < 0.30:

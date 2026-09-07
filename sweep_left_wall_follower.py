@@ -72,7 +72,7 @@ import simulate_left_wall_follower as S  # noqa: E402
 MAX_STEPS = 3500  # 35 s sim time; if it hasn't finished by then, it's stuck
 
 
-def run_trial(lam, c_q, q_scale=1.0, length_scale=0.40):
+def run_trial(lam, c_q, q_scale=1.0, length_scale=0.40, wall_follow_kp=1.5):
     """Headless trial. Returns a metrics dict; no plotting."""
     sim = S.SimNode()
     sim.cbf.lambda_0 = lam
@@ -81,6 +81,7 @@ def run_trial(lam, c_q, q_scale=1.0, length_scale=0.40):
     sim.cbf.length_scale = length_scale
     sim.safety_ekf.Q[3, 3] = 2e-4 * q_scale
     sim.safety_ekf.Q[4, 4] = 2e-4 * q_scale
+    sim.wall_follow_kp = wall_follow_kp
 
     min_q = float('inf')
     max_infeasible_run = 0
@@ -115,6 +116,7 @@ def run_trial(lam, c_q, q_scale=1.0, length_scale=0.40):
             break
 
     return dict(lam=lam, c_q=c_q, q_scale=q_scale, length_scale=length_scale,
+                wall_follow_kp=wall_follow_kp,
                 reached_end=reached_end, collided=collided, collision_kind=collision_kind,
                 final_x=r['x'], min_q=min_q, max_infeasible_run=max_infeasible_run,
                 steps=step, sim_time=step * sim.dt)
@@ -133,17 +135,28 @@ def run_grid(configs, label):
     for r in results:
         tag = "END " if r['reached_end'] else ("CRASH(" + r['collision_kind'] + ")" if r['collided'] else "STUCK")
         print(f"  lam={r['lam']:.2f} c_q={r['c_q']:.2f} q_scale={r['q_scale']:.2f} "
-              f"ls={r['length_scale']:.2f} | {tag:14s} x={r['final_x']:5.2f} "
+              f"ls={r['length_scale']:.2f} kp={r['wall_follow_kp']:.2f} | {tag:14s} x={r['final_x']:5.2f} "
               f"min_q={r['min_q']:6.2f} max_infeas={r['max_infeasible_run']:4d} "
               f"t={r['sim_time']:5.1f}s")
     return results
 
 
 if __name__ == '__main__':
+    # ---- Stage 0 (NEW, post sign-fix): wall_follow_kp ----
+    # Now that the reference correctly pulls back toward the setpoint line
+    # (where all 3 obstacles sit), a too-aggressive kp fights the CBF harder
+    # than before the fix. Sweep this first, at otherwise-default params.
+    kps = [0.3, 0.6, 1.0, 1.5]
+    configs = [dict(lam=2.0, c_q=0.8, wall_follow_kp=kp) for kp in kps]
+    r0 = run_grid(configs, "Stage 0: wall_follow_kp")
+    best0 = r0[0]
+    print(f"\nStage 0 winner: wall_follow_kp={best0['wall_follow_kp']}")
+
     # ---- Stage 1: (lambda, c_q) ----
     lambdas = [1.0, 1.5, 2.0, 2.5, 3.0]
     c_qs = [0.5, 0.8, 1.1, 1.4]
-    configs = [dict(lam=lam, c_q=cq) for lam in lambdas for cq in c_qs]
+    configs = [dict(lam=lam, c_q=cq, wall_follow_kp=best0['wall_follow_kp'])
+               for lam in lambdas for cq in c_qs]
     r1 = run_grid(configs, "Stage 1: lambda_0=lambda_1 x c_q")
     best1 = r1[0]
     print(f"\nStage 1 winner: lam={best1['lam']}, c_q={best1['c_q']} "
@@ -151,15 +164,16 @@ if __name__ == '__main__':
 
     # ---- Stage 2: EKF process noise on B_q ----
     q_scales = [0.5, 1.0, 2.0, 5.0]
-    configs = [dict(lam=best1['lam'], c_q=best1['c_q'], q_scale=qs) for qs in q_scales]
+    configs = [dict(lam=best1['lam'], c_q=best1['c_q'], q_scale=qs,
+                     wall_follow_kp=best0['wall_follow_kp']) for qs in q_scales]
     r2 = run_grid(configs, "Stage 2: EKF B_q process-noise scale")
     best2 = r2[0]
     print(f"\nStage 2 winner: q_scale={best2['q_scale']}")
 
     # ---- Stage 3: length_scale (safety factor) ----
     length_scales = [0.30, 0.40, 0.50, 0.60]
-    configs = [dict(lam=best1['lam'], c_q=best1['c_q'], q_scale=best2['q_scale'], length_scale=ls)
-               for ls in length_scales]
+    configs = [dict(lam=best1['lam'], c_q=best1['c_q'], q_scale=best2['q_scale'],
+                     length_scale=ls, wall_follow_kp=best0['wall_follow_kp']) for ls in length_scales]
     r3 = run_grid(configs, "Stage 3: length_scale")
     best3 = r3[0]
     print(f"\nStage 3 winner: length_scale={best3['length_scale']}")

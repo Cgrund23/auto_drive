@@ -719,6 +719,23 @@ class ControllerNode(Node):
         self.wall_follow_kp = 1.5
         self.wall_follow_kd = 0.3
         self._wall_follow_prev_error = 0.0
+        # The two-beam measurement below assumes heading is roughly aligned
+        # with the corridor (theta~=0, i.e. close to however the vehicle was
+        # facing at startup) -- both beams are cast at shallow angles FROM
+        # THE VEHICLE'S CURRENT HEADING, so once a CBF avoidance swing
+        # rotates that heading far enough, the beams point somewhere that
+        # has nothing to do with the actual left wall, and the resulting
+        # "error" is measurement noise, not signal. Confirmed in simulation:
+        # this fed a large, confidently-wrong phi_ref that kept commanding
+        # MORE rotation once heading passed ~90 deg off-corridor, spinning
+        # the vehicle into a wall instead of recovering. Below, phi_ref's
+        # authority fades linearly to zero across this heading-error range
+        # so a large excursion is handled by the CBF/dither/creep machinery
+        # alone rather than by a reference that's no longer measuring
+        # anything real. This does NOT fix the underlying measurement -- it
+        # just stops a bad measurement from being trusted.
+        self.wall_follow_heading_fade_start = np.deg2rad(30.0)
+        self.wall_follow_heading_fade_end = np.deg2rad(70.0)
 
         # continuous persistent-excitation dither, module docstring point 4
         self._dither_ampl = 0.05
@@ -812,17 +829,40 @@ class ControllerNode(Node):
         lookahead = 0.5 + 0.5 * max(self.v, 0.0)           # look further ahead at higher speed
         Dt1 = Dt - lookahead * d[1] / d_norm               # distance projected `lookahead` m ahead
 
-        error = self.left_wall_setpoint - Dt1
-        # error > 0: drifting away from the wall -> steer toward it (left,  +phi)
-        # error < 0: drifting into the wall      -> steer away from it (right, -phi)
-        # If the vehicle turns the wrong way on hardware, flip this sign --
-        # it depends on the LiDAR's mounting/angle convention matching the
-        # REP-103 assumption above.
+        error = Dt1 - self.left_wall_setpoint
+        # error > 0: farther than setpoint (drifting away) -> steer toward the wall (left,  +phi)
+        # error < 0: closer than setpoint (drifting in)     -> steer away from the wall (right, -phi)
+        # NOTE: this was previously written as (setpoint - Dt1), which is
+        # backwards for a LEFT-side wall (that sign is correct for a RIGHT-
+        # wall follower, where "away" means turning left/positive -- carried
+        # over from the classic F1TENTH two-beam formula without flipping
+        # for this side). It barely showed up near the setpoint, but once a
+        # CBF avoidance swing pushed the vehicle far from the left wall, the
+        # backwards sign made it steer harder AWAY (right) the farther out
+        # it got, converging on hugging the RIGHT/bottom wall instead of
+        # correcting back -- confirmed in simulation. If the vehicle turns
+        # the wrong way on hardware, it's most likely this same class of
+        # bug (LiDAR mounting/angle convention not matching the REP-103
+        # assumption above), not this formula's sign again.
         d_error = error - self._wall_follow_prev_error
         self._wall_follow_prev_error = error
 
         phi_ref = self.wall_follow_kp * error + self.wall_follow_kd * d_error
         phi_ref = float(np.clip(phi_ref, self.phi_min, self.phi_max))
+
+        # Fade out the reference's authority as heading strays from
+        # corridor-aligned -- see __init__'s comment on
+        # wall_follow_heading_fade_start/end for why the measurement itself
+        # becomes unreliable here, not just noisy.
+        theta_err = abs(self.theta)
+        fade_start, fade_end = self.wall_follow_heading_fade_start, self.wall_follow_heading_fade_end
+        if theta_err <= fade_start:
+            authority = 1.0
+        elif theta_err >= fade_end:
+            authority = 0.0
+        else:
+            authority = 1.0 - (theta_err - fade_start) / (fade_end - fade_start)
+        phi_ref *= authority
         return np.array([v_ref, phi_ref])
 
     def _apply_persistent_excitation(self, u_ref):
@@ -917,8 +957,17 @@ class ControllerNode(Node):
         # the safety guarantee -- the CBF-QP enforces q>=0 regardless -- it
         # just keeps the requested reference within reach of the vehicle's
         # bounded curvature, reducing how hard the QP has to fight it).
+        # Widened from /0.6 floor 0.25: at v_ref=1.0 and this vehicle's
+        # turning radius (L=0.33, phi_max=0.4 rad -> ~0.78m radius), waiting
+        # until q_hat<0.6 to start slowing left too little runway to
+        # complete a dodge -- confirmed in simulation (crashed into the
+        # obstacle it was still approaching at full speed). Scaling from the
+        # moment q_hat drops below its safe ceiling (1.0), and allowing a
+        # slower floor (0.15 vs 0.25) right up against an obstacle, buys
+        # back some of that distance budget without touching the actual
+        # safety constraint, which the CBF-QP enforces regardless.
         u_ref = u_ref.copy()
-        u_ref[0] *= float(np.clip((q_hat if np.isfinite(q_hat) else 1.0) / 0.6, 0.25, 1.0))
+        u_ref[0] *= float(np.clip(q_hat if np.isfinite(q_hat) else 1.0, 0.15, 1.0))
 
         min_range = float(np.min(valid_ranges)) if len(valid_ranges) > 0 else 999.0
         if min_range < 0.30:
