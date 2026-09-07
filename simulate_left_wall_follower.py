@@ -77,12 +77,33 @@ np.random.seed(0)
 # World: a straight hallway with circular obstacles to slalom around
 # ============================================================================
 HALLWAY_LENGTH = 10.0
-HALLWAY_HALF_WIDTH = 1.2     # walls at y = +/- HALLWAY_HALF_WIDTH
-ROBOT_RADIUS = 0.15
-# Obstacles sit ON the nominal left-wall-following line (y = +hw - setpoint =
-# 0.6) so the car is forced to actually deviate from pure wall-following to
-# get around them, then return to hugging the wall afterward.
-OBSTACLES = [(3.0, 0.60, 0.25), (5.5, 0.55, 0.25), (8.0, 0.60, 0.25)]
+# Real hallway is 2.0m wide (was 1.0m, and 2.4m before that -- both earlier
+# guesses). This matters a lot for length_scale/left_wall_setpoint in
+# cbf_Node_refactored.py -- both are spatial and need to track the actual
+# corridor width.
+HALLWAY_HALF_WIDTH = 1.0     # walls at y = +/- HALLWAY_HALF_WIDTH
+
+# Real vehicle: 8in x 16in (0.2032m x 0.4064m). ROBOT_RADIUS is the GROUND
+# TRUTH used by check_collision() below -- it should be the vehicle's actual
+# physical extent, not a safety-margin-padded number (the padding lives in
+# cbf_Node_refactored.py's r_buf instead, which is the CONTROLLER's belief
+# about where the boundary is, deliberately more conservative than reality).
+# Using half-WIDTH (not half-length or half-diagonal) treats the vehicle as
+# a circle sized by its narrow dimension -- correct while it's driving
+# roughly straight (its usual attitude, since this is a corridor-following
+# task) but an UNDERESTIMATE during a large heading excursion, when the
+# vehicle presents closer to its long dimension to the corridor's width.
+# This session has repeatedly produced 60-90 deg excursions during obstacle
+# avoidance, so this is a real, unresolved conservatism gap, not a
+# hypothetical one -- flagging rather than silently picking the more
+# conservative half-diagonal (0.227m), which would also change collision
+# outcomes throughout the rest of this file.
+ROBOT_RADIUS = 0.2032 / 2   # = 0.1016m, vehicle half-width
+
+# Obstacles sit ON the nominal left-wall-following line (y = hw - setpoint)
+# so the car is forced to actually deviate from pure wall-following to get
+# around them, then return to hugging the wall afterward.
+OBSTACLES = [(3.0, 0.50, 0.10)]   # single obstacle -- see if post-avoidance oscillation rings out
 
 N_RAYS = 1080
 ANGLE_MIN, ANGLE_MAX = np.deg2rad(-135.0), np.deg2rad(135.0)
@@ -140,31 +161,32 @@ def check_collision(x, y, obstacles=None):
 class SimNode:
     def __init__(self):
         self.dt = 0.01
-        self.L = 0.33
+        self.L = 0.27   # estimated wheelbase from 16in vehicle length; see cbf_Node_refactored.py
         self.v_min, self.v_max = 0.0, 1.2
         self.phi_min, self.phi_max = -0.4, 0.4
         self.r_max = 3.0
-        self.length_scale = 0.50
+        self.length_scale = 0.20
         self.sigma_f = 1.0
-        self.r_buf = 0.15
+        self.r_buf = 0.1016 + 0.05    # vehicle half-width (8in/2) + noise margin
         self.lambda_0 = 2.5
         self.lambda_1 = 2.5
         self.c_q = 1.1
 
-        self.x, self.y, self.theta, self.v = 0.3, 0.6, 0.0, 0.0
+        self.x, self.y, self.theta, self.v = 0.3, 0.50, 0.0, 0.0
 
         self.u_ref = np.array([1.0, 0.0])
         self.u_prev = np.array([1.0, 0.0])
         self.v_prev = 1.0
 
-        self.left_wall_setpoint = 0.6
+        self.left_wall_setpoint = 0.50
         self.wall_beam_angle = np.deg2rad(30.0)
         self.wall_beam_separation = np.deg2rad(15.0)
-        self.wall_follow_kp = 1.5
+        self.wall_follow_kp = 0.15
         self.wall_follow_kd = 0.3
         self._wall_follow_prev_error = 0.0
         self.wall_follow_heading_fade_start = np.deg2rad(30.0)
         self.wall_follow_heading_fade_end = np.deg2rad(70.0)
+        self.wall_follow_min_authority = 0.3
 
         self._dither_ampl = 0.05
         self._dither_period_steps = 30
@@ -222,12 +244,13 @@ class SimNode:
 
         theta_err = abs(self.theta)
         fade_start, fade_end = self.wall_follow_heading_fade_start, self.wall_follow_heading_fade_end
+        min_auth = self.wall_follow_min_authority
         if theta_err <= fade_start:
             authority = 1.0
         elif theta_err >= fade_end:
-            authority = 0.0
+            authority = min_auth
         else:
-            authority = 1.0 - (theta_err - fade_start) / (fade_end - fade_start)
+            authority = 1.0 - (1.0 - min_auth) * (theta_err - fade_start) / (fade_end - fade_start)
         phi_ref *= authority
         return np.array([v_ref, phi_ref])
 

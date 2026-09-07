@@ -661,7 +661,12 @@ class ControllerNode(Node):
 
         # --- parameters ---
         self.dt = 0.01                 # 100 Hz control loop
-        self.L = 0.33                  # F1TENTH wheelbase (m) -- used ONLY for
+        # Estimated from the real 16in vehicle length (0.65-0.70x length is
+        # a typical wheelbase/length ratio) -- not yet a direct measurement,
+        # replace with the actual wheelbase when known. Was 0.33m, a generic
+        # F1TENTH placeholder inconsistent with a 16in-long chassis (would
+        # leave almost no front/rear overhang).
+        self.L = 0.27                  # wheelbase (m) -- used ONLY for
         # the true-plant / dynamic-extension bookkeeping the vehicle firmware
         # already does; the safety filter itself never uses L (that is the
         # entire point of the model-free approach).
@@ -680,20 +685,29 @@ class ControllerNode(Node):
         self.v_min, self.v_max = 0.0, 1.2
         self.phi_min, self.phi_max = -0.4, 0.4   # F1TENTH steering limits (rad)
         self.r_max = 3.0
-        # length_scale/lambda_0/lambda_1/c_q below were chosen by a staged
-        # grid search (sweep_left_wall_follower.py) against the hallway-with-
-        # obstacles simulation (simulate_left_wall_follower.py), run AFTER
-        # adding the raw_side_bias cross-check to ModelFreeCBF's fallback --
-        # every combination tried before that fix crashed near the same
-        # spot, which is what showed the crash was a structural gap (a
-        # single scalar B_q,phi can't represent two different obstacles'
-        # opposite-signed steering sensitivities), not a tuning problem. This
-        # config was the first to complete the hallway with min_q never
-        # meaningfully negative; see that sweep's output for the full grid.
-        self.length_scale = 0.50      # GP "safety factor" (l): unsafe-set radius around each LiDAR point
+        # length_scale/lambda_0/lambda_1/c_q below were chosen by staged grid
+        # searches (sweep_left_wall_follower.py) against the hallway-with-
+        # obstacles simulation (simulate_left_wall_follower.py). Corridor
+        # width and vehicle size have both been corrected twice now (2.4m
+        # sim -> "1.0m hallway" guess -> actual 2.0m hallway with a real
+        # 8in x 16in vehicle) -- length_scale and left_wall_setpoint below
+        # are rescaled from the 1.0m-corridor sweep's findings by the width
+        # ratio (2.0/1.0 = 2x), not re-verified by a fresh sweep at this
+        # exact scale. See sweep_left_wall_follower.py to re-validate.
+        self.length_scale = 0.20      # GP "safety factor" (l): unsafe-set radius around each LiDAR point
         self.sigma_f = 1.0
-        self.r_buf = 0.15
-
+        # r_buf: the CONTROLLER's belief about where the boundary is,
+        # deliberately more conservative than bare vehicle geometry (that
+        # ground truth lives in simulate_left_wall_follower.py's
+        # ROBOT_RADIUS). Derived from the real vehicle -- 8in wide -> 0.1016m
+        # half-width -- plus a 0.05m margin for LiDAR/EKF noise. Uses the
+        # vehicle's HALF-WIDTH, not half-length or half-diagonal: correct
+        # while driving roughly straight, but an underestimate during a
+        # large heading excursion, when the vehicle presents closer to its
+        # long (16in) dimension to the corridor's width. This session has
+        # repeatedly produced 60-90 deg excursions during avoidance, so this
+        # is a real, unresolved conservatism gap, not a hypothetical one.
+        self.r_buf = 0.1016 + 0.05    # = 0.1516, vehicle half-width + noise margin
         # HOCBF parameters, Section II-C / III-C.
         self.lambda_0 = 2.5
         self.lambda_1 = 2.5
@@ -713,10 +727,16 @@ class ControllerNode(Node):
         self.goal_y = 0.0
 
         # left-hand-rule wall-follower (nominal reference controller)
-        self.left_wall_setpoint = 0.6   # target distance (m) off the left wall
+        # Rescaled for the real 2.0m-wide hallway. Derived the same way as
+        # before: setpoint = half_width / 2 (1.0m half-width / 2 = 0.5m).
+        self.left_wall_setpoint = 0.5   # target distance (m) off the left wall
         self.wall_beam_angle = np.deg2rad(30.0)        # main wall-sensing beam, from forward
         self.wall_beam_separation = np.deg2rad(15.0)   # 2nd beam this far forward of the 1st
-        self.wall_follow_kp = 1.5
+        # Scaled down from the 1.0m-corridor sweep's kp=0.3 by the setpoint
+        # ratio (0.25 -> 0.5, so kp halved) to produce roughly the same
+        # steering response per unit of ACTUAL lateral error, not per unit
+        # of setpoint -- not independently re-verified at this exact scale.
+        self.wall_follow_kp = 0.15
         self.wall_follow_kd = 0.3
         self._wall_follow_prev_error = 0.0
         # The two-beam measurement below assumes heading is roughly aligned
@@ -729,13 +749,26 @@ class ControllerNode(Node):
         # this fed a large, confidently-wrong phi_ref that kept commanding
         # MORE rotation once heading passed ~90 deg off-corridor, spinning
         # the vehicle into a wall instead of recovering. Below, phi_ref's
-        # authority fades linearly to zero across this heading-error range
-        # so a large excursion is handled by the CBF/dither/creep machinery
-        # alone rather than by a reference that's no longer measuring
-        # anything real. This does NOT fix the underlying measurement -- it
-        # just stops a bad measurement from being trusted.
+        # authority fades across this heading-error range so a large
+        # excursion is handled by the CBF/dither/creep machinery alone
+        # rather than by a reference that's no longer measuring anything
+        # real. This does NOT fix the underlying measurement -- it just
+        # stops a bad measurement from being trusted.
+        #
+        # wall_follow_min_authority: the fade above is NOT allowed to reach
+        # zero. Confirmed in simulation that fading all the way out creates
+        # a deadlock of its own: once heading drifts into the fade band
+        # (e.g. ~65 deg), authority drops to ~5-10%, phi_cmd becomes just
+        # symmetric dither noise averaging ~0, theta_dot averages ~0, and
+        # heading simply STOPS recovering -- stuck for 2+ seconds with no
+        # net corrective effort in either direction, drifting sideways
+        # until something else (a wall) forces a reaction. A floor keeps
+        # some minimum turn-back-toward-corridor effort alive even while
+        # trusting the beam measurement less, so heading actually has a
+        # chance to unwind instead of parking.
         self.wall_follow_heading_fade_start = np.deg2rad(30.0)
         self.wall_follow_heading_fade_end = np.deg2rad(70.0)
+        self.wall_follow_min_authority = 0.3
 
         # continuous persistent-excitation dither, module docstring point 4
         self._dither_ampl = 0.05
@@ -856,12 +889,13 @@ class ControllerNode(Node):
         # becomes unreliable here, not just noisy.
         theta_err = abs(self.theta)
         fade_start, fade_end = self.wall_follow_heading_fade_start, self.wall_follow_heading_fade_end
+        min_auth = self.wall_follow_min_authority
         if theta_err <= fade_start:
             authority = 1.0
         elif theta_err >= fade_end:
-            authority = 0.0
+            authority = min_auth
         else:
-            authority = 1.0 - (theta_err - fade_start) / (fade_end - fade_start)
+            authority = 1.0 - (1.0 - min_auth) * (theta_err - fade_start) / (fade_end - fade_start)
         phi_ref *= authority
         return np.array([v_ref, phi_ref])
 

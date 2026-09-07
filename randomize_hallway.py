@@ -27,16 +27,22 @@ import simulate_left_wall_follower as S  # noqa: E402 (stubs installed inside th
 MAX_STEPS = 3500
 
 
-def random_obstacles(rng, n=3, hallway_length=S.HALLWAY_LENGTH, half_width=S.HALLWAY_HALF_WIDTH):
+def random_obstacles(rng, n=3, hallway_length=None, half_width=None):
     """n obstacles spread along the corridor with jittered spacing, each at a
     random lateral offset and radius -- unlike the fixed test layout, NOT
-    pinned to the wall-follower's setpoint line."""
+    pinned to the wall-follower's setpoint line. Defaults resolve against
+    S.HALLWAY_LENGTH/HALF_WIDTH at CALL time (not import time), so changing
+    those module constants (e.g. to match a different real hallway) takes
+    effect here too. y/radius ranges scale with half_width rather than
+    being hardcoded, so this stays sensible if the corridor width changes."""
+    hallway_length = S.HALLWAY_LENGTH if hallway_length is None else hallway_length
+    half_width = S.HALLWAY_HALF_WIDTH if half_width is None else half_width
     obstacles = []
     for i in range(n):
         base_x = hallway_length * (i + 1) / (n + 1)
         x = base_x + rng.uniform(-0.7, 0.7)
-        y = rng.uniform(-0.7, 0.7)
-        r = rng.uniform(0.20, 0.35)
+        y = rng.uniform(-0.7 * half_width, 0.7 * half_width)
+        r = rng.uniform(0.15, 0.30) * half_width
         obstacles.append((float(x), float(y), float(r)))
     return obstacles
 

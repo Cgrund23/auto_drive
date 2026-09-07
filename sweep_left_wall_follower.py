@@ -72,13 +72,16 @@ import simulate_left_wall_follower as S  # noqa: E402
 MAX_STEPS = 3500  # 35 s sim time; if it hasn't finished by then, it's stuck
 
 
-def run_trial(lam, c_q, q_scale=1.0, length_scale=0.40, wall_follow_kp=1.5):
-    """Headless trial. Returns a metrics dict; no plotting."""
+def run_trial(lam, c_q, q_scale=1.0, length_scale=None, wall_follow_kp=1.5):
+    """Headless trial. Returns a metrics dict; no plotting. length_scale
+    defaults to SimNode's own (production) value if not given, resolved at
+    call time so it tracks whatever that default currently is."""
     sim = S.SimNode()
     sim.cbf.lambda_0 = lam
     sim.cbf.lambda_1 = lam
     sim.cbf.c_q = c_q
-    sim.cbf.length_scale = length_scale
+    if length_scale is not None:
+        sim.cbf.length_scale = length_scale
     sim.safety_ekf.Q[3, 3] = 2e-4 * q_scale
     sim.safety_ekf.Q[4, 4] = 2e-4 * q_scale
     sim.wall_follow_kp = wall_follow_kp
@@ -115,7 +118,7 @@ def run_trial(lam, c_q, q_scale=1.0, length_scale=0.40, wall_follow_kp=1.5):
             reached_end = True
             break
 
-    return dict(lam=lam, c_q=c_q, q_scale=q_scale, length_scale=length_scale,
+    return dict(lam=lam, c_q=c_q, q_scale=q_scale, length_scale=sim.cbf.length_scale,
                 wall_follow_kp=wall_follow_kp,
                 reached_end=reached_end, collided=collided, collision_kind=collision_kind,
                 final_x=r['x'], min_q=min_q, max_infeasible_run=max_infeasible_run,
@@ -171,7 +174,10 @@ if __name__ == '__main__':
     print(f"\nStage 2 winner: q_scale={best2['q_scale']}")
 
     # ---- Stage 3: length_scale (safety factor) ----
-    length_scales = [0.30, 0.40, 0.50, 0.60]
+    # Range rescaled for the real ~1.0m-wide hallway (was 0.30-0.60, sized
+    # for the old 2.4m-wide simulated corridor -- 0.5-0.6m of GP decay
+    # radius in a 1.0m corridor covers nearly the whole cross-section).
+    length_scales = [0.10, 0.15, 0.20, 0.25, 0.30]
     configs = [dict(lam=best1['lam'], c_q=best1['c_q'], q_scale=best2['q_scale'],
                      length_scale=ls, wall_follow_kp=best0['wall_follow_kp']) for ls in length_scales]
     r3 = run_grid(configs, "Stage 3: length_scale")
