@@ -7,7 +7,7 @@ This does NOT reimplement the safety filter -- it imports ModelFreeCBF,
 SafetyULM_EKF, and PositionULM_EKF directly from cbf_Node_refactored.py (the
 real, currently-tuned production code) via a small rclpy/message stub, since
 this machine has no ROS install. SimNode below mirrors ControllerNode's
-lidar_callback/left_wall_follower_controller/_apply_persistent_excitation
+lidar_callback/center_lock_controller/_apply_persistent_excitation
 logic line-for-line, with the same parameter values as the real node, just
 swapping ROS pub/sub for a simulated Ackermann bicycle model and a ray-cast
 LiDAR in a synthetic hallway-with-obstacles world.
@@ -100,10 +100,10 @@ HALLWAY_HALF_WIDTH = 1.0     # walls at y = +/- HALLWAY_HALF_WIDTH
 # outcomes throughout the rest of this file.
 ROBOT_RADIUS = 0.2032 / 2   # = 0.1016m, vehicle half-width
 
-# Obstacles sit ON the nominal left-wall-following line (y = hw - setpoint)
-# so the car is forced to actually deviate from pure wall-following to get
-# around them, then return to hugging the wall afterward.
-OBSTACLES = [(3.0, 0.50, 0.10)]   # single obstacle -- see if post-avoidance oscillation rings out
+# Obstacle sits ON the nominal center-lock line (y=0) so the car is forced
+# to actually deviate from centering to get around it, then return to
+# center afterward.
+OBSTACLES = [(3.0, 0.0, 0.10)]
 
 N_RAYS = 1080
 ANGLE_MIN, ANGLE_MAX = np.deg2rad(-135.0), np.deg2rad(135.0)
@@ -183,15 +183,14 @@ class SimNode:
         self.u_prev = np.array([1.0, 0.0])
         self.v_prev = 1.0
 
-        self.left_wall_setpoint = 0.50
         self.wall_beam_angle = np.deg2rad(30.0)
         self.wall_beam_separation = np.deg2rad(15.0)
-        self.wall_follow_kp = 0.15
-        self.wall_follow_kd = 0.3
+        self.wall_follow_kp = 0.075   # halved for center-lock; see cbf_Node_refactored.py
+        self.wall_follow_kd = 0.15
         self._wall_follow_prev_error = 0.0
         self.wall_follow_heading_fade_start = np.deg2rad(30.0)
         self.wall_follow_heading_fade_end = np.deg2rad(70.0)
-        self.wall_follow_min_authority = 0.3
+        self.heading_correction_kp = 0.6   # see matching comment in cbf_Node_refactored.py
 
         self._dither_ampl = 0.05
         self._dither_period_steps = 30
@@ -211,15 +210,10 @@ class SimNode:
         self.last_ranges = np.array([])
         self.last_angles = np.array([])
 
-    # -- exact port of ControllerNode.left_wall_follower_controller --------
-    def left_wall_follower_controller(self):
-        v_ref = 1.0
-        if len(self.last_angles) == 0:
-            return np.array([v_ref, 0.0])
-
-        ranges, angles = self.last_ranges, self.last_angles
-        b_angle = self.wall_beam_angle
-        a_angle = b_angle - self.wall_beam_separation
+    # -- exact port of ControllerNode._side_wall_distance -------------------
+    def _side_wall_distance(self, sign, ranges, angles):
+        b_angle = sign * self.wall_beam_angle
+        a_angle = b_angle - sign * self.wall_beam_separation
 
         def beam_at(target_angle):
             idx = int(np.argmin(np.abs(angles - target_angle)))
@@ -234,29 +228,44 @@ class SimNode:
         d = pb - pa
         d_norm = float(np.linalg.norm(d))
         if d_norm < 1e-6:
-            return np.array([v_ref, 0.0])
+            return None
 
         Dt = float(pa[0] * d[1] - pa[1] * d[0]) / d_norm
         lookahead = 0.5 + 0.5 * max(self.v, 0.0)
-        Dt1 = Dt - lookahead * d[1] / d_norm
+        return Dt - lookahead * d[1] / d_norm
 
-        error = Dt1 - self.left_wall_setpoint
+    # -- exact port of ControllerNode.center_lock_controller ----------------
+    def center_lock_controller(self):
+        v_ref = 1.0
+        if len(self.last_angles) == 0:
+            return np.array([v_ref, 0.0])
+
+        ranges, angles = self.last_ranges, self.last_angles
+        Dt_left = self._side_wall_distance(1.0, ranges, angles)
+        Dt_right = self._side_wall_distance(-1.0, ranges, angles)
+        if Dt_left is None or Dt_right is None:
+            return np.array([v_ref, 0.0])
+
+        error = Dt_left + Dt_right
         d_error = error - self._wall_follow_prev_error
         self._wall_follow_prev_error = error
 
         phi_ref = self.wall_follow_kp * error + self.wall_follow_kd * d_error
         phi_ref = float(np.clip(phi_ref, self.phi_min, self.phi_max))
 
-        theta_err = abs(self.theta)
+        theta_err = self.theta   # signed; already wrapped to [-pi, pi]
         fade_start, fade_end = self.wall_follow_heading_fade_start, self.wall_follow_heading_fade_end
-        min_auth = self.wall_follow_min_authority
-        if theta_err <= fade_start:
-            authority = 1.0
-        elif theta_err >= fade_end:
-            authority = min_auth
+        abs_err = abs(theta_err)
+        if abs_err <= fade_start:
+            beam_weight = 1.0
+        elif abs_err >= fade_end:
+            beam_weight = 0.0
         else:
-            authority = 1.0 - (1.0 - min_auth) * (theta_err - fade_start) / (fade_end - fade_start)
-        phi_ref *= authority
+            beam_weight = 1.0 - (abs_err - fade_start) / (fade_end - fade_start)
+
+        heading_phi = float(np.clip(-self.heading_correction_kp * theta_err,
+                                     self.phi_min, self.phi_max))
+        phi_ref = beam_weight * phi_ref + (1.0 - beam_weight) * heading_phi
         return np.array([v_ref, phi_ref])
 
     # -- exact port of ControllerNode._apply_persistent_excitation ---------
@@ -318,7 +327,7 @@ class SimNode:
         self.position_ekf.update(p_world)
 
         if self._step_count % 3 == 0:
-            self.u_ref = self.left_wall_follower_controller()
+            self.u_ref = self.center_lock_controller()
         u_ref = self._apply_persistent_excitation(self.u_ref)
 
         q_meas, sigma_gp_sq = self.cbf.get_barrier_and_variance(p_world)

@@ -747,49 +747,62 @@ class ControllerNode(Node):
         self.goal_x = 10.0
         self.goal_y = 0.0
 
-        # left-hand-rule wall-follower (nominal reference controller)
-        # Rescaled for the real 2.0m-wide hallway. Derived the same way as
-        # before: setpoint = half_width / 2 (1.0m half-width / 2 = 0.5m).
-        self.left_wall_setpoint = 0.5   # target distance (m) off the left wall
+        # center-lock corridor-follower (nominal reference controller):
+        # drives to keep the vehicle EQUIDISTANT from whatever is on its left
+        # and right (walls or obstacles), rather than hugging the left wall
+        # at a fixed offset. No setpoint distance needed -- the target is
+        # simply left_distance == right_distance.
         self.wall_beam_angle = np.deg2rad(30.0)        # main wall-sensing beam, from forward
         self.wall_beam_separation = np.deg2rad(15.0)   # 2nd beam this far forward of the 1st
-        # Scaled down from the 1.0m-corridor sweep's kp=0.3 by the setpoint
-        # ratio (0.25 -> 0.5, so kp halved) to produce roughly the same
-        # steering response per unit of ACTUAL lateral error, not per unit
-        # of setpoint -- not independently re-verified at this exact scale.
-        self.wall_follow_kp = 0.15
-        self.wall_follow_kd = 0.3
+        # Halved again from the left-wall-hugging values (kp=0.15, kd=0.3):
+        # center_lock_controller()'s error = Dt_left + Dt_right is a SUM of
+        # two distances that each move by ~1x a lateral shift, so it has
+        # ~2x the old error's sensitivity to the same physical drift
+        # (d(error)/dy ~= -2 now vs ~= -1 for the old single-wall-distance
+        # error). Halving kp/kd here targets the same steering response per
+        # meter of actual lateral drift as before, not re-independently
+        # verified at this exact scale.
+        self.wall_follow_kp = 0.075
+        self.wall_follow_kd = 0.15
         self._wall_follow_prev_error = 0.0
         # The two-beam measurement below assumes heading is roughly aligned
         # with the corridor (theta~=0, i.e. close to however the vehicle was
         # facing at startup) -- both beams are cast at shallow angles FROM
         # THE VEHICLE'S CURRENT HEADING, so once a CBF avoidance swing
         # rotates that heading far enough, the beams point somewhere that
-        # has nothing to do with the actual left wall, and the resulting
-        # "error" is measurement noise, not signal. Confirmed in simulation:
-        # this fed a large, confidently-wrong phi_ref that kept commanding
-        # MORE rotation once heading passed ~90 deg off-corridor, spinning
-        # the vehicle into a wall instead of recovering. Below, phi_ref's
-        # authority fades across this heading-error range so a large
-        # excursion is handled by the CBF/dither/creep machinery alone
-        # rather than by a reference that's no longer measuring anything
-        # real. This does NOT fix the underlying measurement -- it just
-        # stops a bad measurement from being trusted.
-        #
-        # wall_follow_min_authority: the fade above is NOT allowed to reach
-        # zero. Confirmed in simulation that fading all the way out creates
-        # a deadlock of its own: once heading drifts into the fade band
-        # (e.g. ~65 deg), authority drops to ~5-10%, phi_cmd becomes just
-        # symmetric dither noise averaging ~0, theta_dot averages ~0, and
-        # heading simply STOPS recovering -- stuck for 2+ seconds with no
-        # net corrective effort in either direction, drifting sideways
-        # until something else (a wall) forces a reaction. A floor keeps
-        # some minimum turn-back-toward-corridor effort alive even while
-        # trusting the beam measurement less, so heading actually has a
-        # chance to unwind instead of parking.
+        # has nothing to do with the actual left/right walls, and the
+        # resulting "error" is measurement noise, not signal. Confirmed in
+        # simulation twice: (1) trusting it anyway fed a large, confidently-
+        # wrong phi_ref that kept commanding MORE rotation once heading
+        # passed ~90 deg off-corridor, spinning the vehicle into a wall; (2)
+        # an earlier fix that just faded this reference's authority toward a
+        # nonzero FLOOR (instead of a real correction) created its own
+        # deadlock -- once in the fade band, phi_cmd became symmetric dither
+        # noise averaging ~0, so heading simply stopped recovering -- AND,
+        # separately, once heading had already flipped past ~90-180 deg
+        # entirely, a beam-blind fallback had no opinion at all about which
+        # way was actually "aligned with the corridor," so the vehicle would
+        # just cruise confidently at full v_ref in whatever direction it was
+        # now facing (confirmed driving 25m backward past the start of a
+        # 10m corridor before finally hitting something). Below, phi_ref is
+        # blended between the (locally accurate near theta=0) beam-based
+        # term and an ABSOLUTE heading-correction term that actively drives
+        # theta back toward 0 -- using odometry theta directly, which is
+        # available and reliable at any heading, unlike the beam geometry.
+        # The blend weight is the beam term's fade (1.0 at theta_err=0, 0.0
+        # by fade_end) so near-corridor-aligned tracking is still governed
+        # by the more precise beam measurement, while a large excursion
+        # hands off entirely to the term that can actually undo it.
         self.wall_follow_heading_fade_start = np.deg2rad(30.0)
         self.wall_follow_heading_fade_end = np.deg2rad(70.0)
-        self.wall_follow_min_authority = 0.3
+        # Gain on the absolute heading-correction term (phi = -kp*theta_err).
+        # Deliberately strong: phi saturates at phi_max/kp ~= 0.4/0.6 ~= 0.67
+        # rad (~38 deg) of heading error, so anything beyond a moderate
+        # excursion commands full corrective lock rather than a gentle
+        # nudge -- appropriate here since, by construction, this term only
+        # gets significant blend weight once the beam measurement has
+        # already been judged unreliable (heading well off-corridor).
+        self.heading_correction_kp = 0.6
 
         # continuous persistent-excitation dither, module docstring point 4
         self._dither_ampl = 0.05
@@ -827,42 +840,20 @@ class ControllerNode(Node):
         self.get_logger().info('Model-Free CBF Node (Ackermann-native, u=[v,phi]) initialized')
 
     # -------------------------------------------------------------------
-    def left_wall_follower_controller(self):
+    def _side_wall_distance(self, sign, ranges, angles):
         """
-        Left-hand-rule reference controller (F1TENTH Lab 3 two-beam
-        formulation): holds the vehicle a fixed perpendicular distance off
-        the wall on its LEFT side while driving forward, emitting phi_ref
-        DIRECTLY -- no omega, no conversion. Returns [v_ref, phi_ref]; this
-        is only the NOMINAL reference -- the CBF-QP safety filter still has
-        final say over the actual command.
-
-        Angle convention (REP-103, matches this file's LiDAR frame): scan
-        angle increases counter-clockwise from the forward (+x) axis, so
-        positive angles point along +y, i.e. the vehicle's LEFT side.
-
-        Geometry: two beams -- the main wall-sensing beam at
-        `self.wall_beam_angle` from forward (30 deg by default; the F1TENTH
-        Lab 3 formulation uses 90 deg/straight-left instead, but this LiDAR
-        mount/FOV wants the wall sensed further forward) and a second beam
-        `self.wall_beam_separation` further forward of that -- give two
-        points on the wall. This uses the general point-to-line distance
-        between those two points rather than the textbook Dt=b*cos(alpha)
-        shortcut, because that shortcut is only algebraically valid when the
-        second beam is exactly perpendicular (90 deg); the general form
-        below gives the correct perpendicular distance and its
-        rate-of-change for ANY pair of beam angles, so `wall_beam_angle` can
-        be retuned freely. `Dt` is then projected `lookahead` meters further
-        along the vehicle's path so the controller corrects before it drifts
-        off the setpoint, not after.
+        Perpendicular distance (projected `lookahead` m ahead) to whatever
+        the two-beam pair on ONE side (sign=+1.0 -> left, sign=-1.0 ->
+        right) is looking at -- wall or obstacle, this reference doesn't
+        distinguish. Same general point-to-line geometry as the original
+        left-wall-follower (kept because it's exact for ANY pair of beam
+        angles, not just 90 deg), just parameterized by `sign` so the
+        identical formula produces both sides' distances -- see
+        center_lock_controller() for why the two share one sign convention
+        rather than needing an abs().
         """
-        v_ref = 1.0
-        if not hasattr(self, 'last_ranges') or len(self.last_angles) == 0:
-            return np.array([v_ref, 0.0])
-
-        ranges, angles = self.last_ranges, self.last_angles
-
-        b_angle = self.wall_beam_angle                  # main wall-sensing beam, from forward
-        a_angle = b_angle - self.wall_beam_separation    # a second, more-forward beam
+        b_angle = sign * self.wall_beam_angle
+        a_angle = b_angle - sign * self.wall_beam_separation
 
         def beam_at(target_angle):
             idx = int(np.argmin(np.abs(angles - target_angle)))
@@ -872,53 +863,81 @@ class ControllerNode(Node):
         a = beam_at(a_angle)
         b = beam_at(b_angle)
 
-        # Two points on the wall, in the robot frame.
         pa = np.array([a * np.cos(a_angle), a * np.sin(a_angle)])
         pb = np.array([b * np.cos(b_angle), b * np.sin(b_angle)])
         d = pb - pa
         d_norm = float(np.linalg.norm(d))
         if d_norm < 1e-6:
+            return None
+
+        Dt = float(pa[0] * d[1] - pa[1] * d[0]) / d_norm
+        lookahead = 0.5 + 0.5 * max(self.v, 0.0)
+        return Dt - lookahead * d[1] / d_norm
+
+    def center_lock_controller(self):
+        """
+        Center-lock reference controller: steers to keep the vehicle
+        EQUIDISTANT from whatever is on its left and right (corridor walls,
+        or an obstacle intruding from either side), emitting phi_ref
+        DIRECTLY -- no omega, no conversion. Returns [v_ref, phi_ref]; this
+        is only the NOMINAL reference -- the CBF-QP safety filter still has
+        final say over the actual command. Replaces the previous fixed-
+        offset LEFT-wall-hugging reference (see git history for that
+        version) -- same two-beam geometry, just mirrored onto both sides.
+
+        Angle convention (REP-103, matches this file's LiDAR frame): scan
+        angle increases counter-clockwise from the forward (+x) axis, so
+        positive angles point along +y (left), negative along -y (right).
+
+        _side_wall_distance's point-line formula gives a POSITIVE number for
+        the left-side beam pair and a NEGATIVE number of the same magnitude
+        for the right-side pair when the vehicle is symmetric between two
+        parallel surfaces (verified algebraically: mirroring the beam
+        angles about the forward axis negates Dt). That means the two
+        distances can be combined with a plain sum instead of needing
+        abs() + subtraction: left_dist + right_dist == 0 exactly when
+        centered, > 0 when there's more room on the left (steer left to
+        recenter), < 0 when there's more room on the right (steer right).
+        """
+        v_ref = 1.0
+        if not hasattr(self, 'last_ranges') or len(self.last_angles) == 0:
             return np.array([v_ref, 0.0])
 
-        Dt = float(pa[0] * d[1] - pa[1] * d[0]) / d_norm   # current perpendicular distance to wall
-        lookahead = 0.5 + 0.5 * max(self.v, 0.0)           # look further ahead at higher speed
-        Dt1 = Dt - lookahead * d[1] / d_norm               # distance projected `lookahead` m ahead
+        ranges, angles = self.last_ranges, self.last_angles
 
-        error = Dt1 - self.left_wall_setpoint
-        # error > 0: farther than setpoint (drifting away) -> steer toward the wall (left,  +phi)
-        # error < 0: closer than setpoint (drifting in)     -> steer away from the wall (right, -phi)
-        # NOTE: this was previously written as (setpoint - Dt1), which is
-        # backwards for a LEFT-side wall (that sign is correct for a RIGHT-
-        # wall follower, where "away" means turning left/positive -- carried
-        # over from the classic F1TENTH two-beam formula without flipping
-        # for this side). It barely showed up near the setpoint, but once a
-        # CBF avoidance swing pushed the vehicle far from the left wall, the
-        # backwards sign made it steer harder AWAY (right) the farther out
-        # it got, converging on hugging the RIGHT/bottom wall instead of
-        # correcting back -- confirmed in simulation. If the vehicle turns
-        # the wrong way on hardware, it's most likely this same class of
-        # bug (LiDAR mounting/angle convention not matching the REP-103
-        # assumption above), not this formula's sign again.
+        Dt_left = self._side_wall_distance(1.0, ranges, angles)
+        Dt_right = self._side_wall_distance(-1.0, ranges, angles)
+        if Dt_left is None or Dt_right is None:
+            return np.array([v_ref, 0.0])
+
+        error = Dt_left + Dt_right
+        # error > 0: more clearance on the left  -> steer toward it (left,  +phi)
+        # error < 0: more clearance on the right -> steer toward it (right, -phi)
         d_error = error - self._wall_follow_prev_error
         self._wall_follow_prev_error = error
 
         phi_ref = self.wall_follow_kp * error + self.wall_follow_kd * d_error
         phi_ref = float(np.clip(phi_ref, self.phi_min, self.phi_max))
 
-        # Fade out the reference's authority as heading strays from
-        # corridor-aligned -- see __init__'s comment on
-        # wall_follow_heading_fade_start/end for why the measurement itself
-        # becomes unreliable here, not just noisy.
-        theta_err = abs(self.theta)
+        # Blend the beam-based term against an ABSOLUTE heading-correction
+        # term as heading strays from corridor-aligned -- see __init__'s
+        # comment on wall_follow_heading_fade_start/end / heading_correction_kp
+        # for why the beam measurement becomes unreliable (not just noisy)
+        # past a certain heading error, and why a real correction is needed
+        # here instead of just fading toward silence.
+        theta_err = self.theta   # signed; already wrapped to [-pi, pi]
         fade_start, fade_end = self.wall_follow_heading_fade_start, self.wall_follow_heading_fade_end
-        min_auth = self.wall_follow_min_authority
-        if theta_err <= fade_start:
-            authority = 1.0
-        elif theta_err >= fade_end:
-            authority = min_auth
+        abs_err = abs(theta_err)
+        if abs_err <= fade_start:
+            beam_weight = 1.0
+        elif abs_err >= fade_end:
+            beam_weight = 0.0
         else:
-            authority = 1.0 - (1.0 - min_auth) * (theta_err - fade_start) / (fade_end - fade_start)
-        phi_ref *= authority
+            beam_weight = 1.0 - (abs_err - fade_start) / (fade_end - fade_start)
+
+        heading_phi = float(np.clip(-self.heading_correction_kp * theta_err,
+                                     self.phi_min, self.phi_max))
+        phi_ref = beam_weight * phi_ref + (1.0 - beam_weight) * heading_phi
         return np.array([v_ref, phi_ref])
 
     def _apply_persistent_excitation(self, u_ref):
@@ -1030,7 +1049,7 @@ class ControllerNode(Node):
 
         # Nominal reference + persistent excitation.
         if self._step_count % 3 == 0:
-            self.u_ref = self.left_wall_follower_controller()
+            self.u_ref = self.center_lock_controller()
         u_ref = self._apply_persistent_excitation(self.u_ref)
 
         # Measurements: q from GP posterior mean (Eq. 4), qdot = grad(h)^T p_dot_hat.
