@@ -294,6 +294,7 @@ def plot(cols, scans, cbf, out_png):
                            'when per-call compute time stays flat)')
         ax_scan.legend(fontsize=7)
         ax_scan.grid(alpha=0.3)
+        ax_scan.ticklabel_format(useOffset=False, style='plain', axis='y')
 
     plt.tight_layout()
     plt.savefig(out_png, dpi=140)
