@@ -1,0 +1,79 @@
+[4.867s] Invoking command in '/home/jetson/f1tenth_ws/src/auto_drive': NX_CONNECTION=192.168.1.5 64501 192.168.1.12 4000 PYTHONPATH=/home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/auto_drive build --build-base /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build install --record /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/install.log --install-scripts $base/lib/auto_drive --single-version-externally-managed install_data
+[5.693s] /home/jetson/.local/lib/python3.8/site-packages/setuptools/dist.py:495: SetuptoolsDeprecationWarning: Invalid dash-separated options
+[5.694s] !!
+[5.694s] 
+[5.695s]         ********************************************************************************
+[5.695s]         Usage of dash-separated 'script-dir' will not be supported in future
+[5.696s]         versions. Please use the underscore name 'script_dir' instead.
+[5.696s] 
+[5.696s]         This deprecation is overdue, please update your project and remove deprecated
+[5.697s]         calls to avoid build errors in the future.
+[5.697s] 
+[5.698s]         See https://setuptools.pypa.io/en/latest/userguide/declarative_config.html for details.
+[5.698s]         ********************************************************************************
+[5.699s] 
+[5.699s] !!
+[5.699s]   opt = self.warn_dash_deprecation(opt, section)
+[5.801s] /home/jetson/.local/lib/python3.8/site-packages/setuptools/_distutils/dist.py:261: UserWarning: Unknown distribution option: 'tests_require'
+[5.802s]   warnings.warn(msg)
+[6.430s] running egg_info
+[6.530s] creating build/auto_drive/auto_drive.egg-info
+[6.531s] writing build/auto_drive/auto_drive.egg-info/PKG-INFO
+[6.534s] writing dependency_links to build/auto_drive/auto_drive.egg-info/dependency_links.txt
+[6.535s] writing entry points to build/auto_drive/auto_drive.egg-info/entry_points.txt
+[6.537s] writing requirements to build/auto_drive/auto_drive.egg-info/requires.txt
+[6.538s] writing top-level names to build/auto_drive/auto_drive.egg-info/top_level.txt
+[7.078s] writing manifest file 'build/auto_drive/auto_drive.egg-info/SOURCES.txt'
+[7.274s] reading manifest file 'build/auto_drive/auto_drive.egg-info/SOURCES.txt'
+[7.275s] adding license file 'LICENSE'
+[7.281s] writing manifest file 'build/auto_drive/auto_drive.egg-info/SOURCES.txt'
+[7.281s] running build
+[7.282s] running build_py
+[7.283s] creating /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[7.285s] copying auto_drive/test_invert.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[7.287s] copying auto_drive/PP.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[7.288s] copying auto_drive/kalman_filter.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[7.289s] copying auto_drive/__init__.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[7.290s] copying auto_drive/CBF.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[7.291s] copying auto_drive/IP_ackermann.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[7.292s] copying auto_drive/math.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[7.294s] copying auto_drive/Model_Free_Node.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[7.295s] copying auto_drive/test2.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[7.296s] copying auto_drive/test_barriers.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[7.297s] copying auto_drive/cbf_Node.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[7.300s] running install
+[7.330s] running install_lib
+[7.426s] creating /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive
+[7.427s] copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/test_invert.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive
+[7.428s] copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/PP.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive
+[7.429s] copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/kalman_filter.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive
+[7.430s] copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/__init__.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive
+[7.431s] copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/CBF.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive
+[7.432s] copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/IP_ackermann.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive
+[7.433s] copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/math.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive
+[7.434s] copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/Model_Free_Node.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive
+[7.434s] copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/test2.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive
+[7.435s] copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/test_barriers.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive
+[7.436s] copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/cbf_Node.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive
+[7.440s] byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/test_invert.py to test_invert.cpython-38.pyc
+[7.445s] byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/PP.py to PP.cpython-38.pyc
+[7.449s] byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/kalman_filter.py to kalman_filter.cpython-38.pyc
+[7.453s] byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/__init__.py to __init__.cpython-38.pyc
+[7.454s] byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/CBF.py to CBF.cpython-38.pyc
+[7.472s] byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/IP_ackermann.py to IP_ackermann.cpython-38.pyc
+[7.475s] byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/math.py to math.cpython-38.pyc
+[7.477s] byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/Model_Free_Node.py to Model_Free_Node.cpython-38.pyc
+[7.484s] byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/test2.py to test2.cpython-38.pyc
+[7.486s] byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/test_barriers.py to test_barriers.cpython-38.pyc
+[7.492s] byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/cbf_Node.py to cbf_Node.cpython-38.pyc
+[7.497s] running install_data
+[7.499s] creating /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/share/ament_index/resource_index/packages
+[7.501s] copying resource/auto_drive -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/share/ament_index/resource_index/packages
+[7.502s] copying package.xml -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/share/auto_drive
+[7.503s] running install_egg_info
+[7.603s] Copying build/auto_drive/auto_drive.egg-info to /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive-0.0.0-py3.8.egg-info
+[7.610s] running install_scripts
+[7.842s] Installing Model_Free_Node script to /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/auto_drive
+[7.843s] Installing cbf_Node script to /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/auto_drive
+[7.847s] writing list of installed files to '/home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/install.log'
+[7.976s] Invoked command in '/home/jetson/f1tenth_ws/src/auto_drive' returned '0': NX_CONNECTION=192.168.1.5 64501 192.168.1.12 4000 PYTHONPATH=/home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/auto_drive build --build-base /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build install --record /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/install.log --install-scripts $base/lib/auto_drive --single-version-externally-managed install_data

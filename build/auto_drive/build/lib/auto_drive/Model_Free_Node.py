@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+import rclpy
+import numpy as np
+import sys
+sys.path.append("/home/jetson/f1tenth_ws/src/auto_drive/auto_drive")
+from dataclasses import dataclass
+from rclpy.node import Node
+from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
+from std_msgs.msg import Float64, Float64MultiArray
+from sensor_msgs.msg import LaserScan, Joy
+from ackermann_msgs.msg import AckermannDriveStamped
+from rclpy.time import Time
+
+from PP import PP
+from IP_ackermann import IP
+
+
+class Controller_Node(Node):
+    def __init__(self):
+        super().__init__('Controller_Node')
+        self.last_time = None
+        self.subscription = self.create_subscription(Odometry,'/odom',self.pose_callback,10)
+        self.subscription = self.create_subscription(LaserScan,'/scan',self.lidar_pose_callback,10)
+        self.subscription = self.create_subscription(Joy,'/joy',self.run,10)
+        
+        class params():
+
+            xdim: float = 4
+            udim: float = 2
+            lf: float = 1
+            lr: float = 1
+ 
+            u_max: float = [1,1.54] # max accel, angle
+            u_min: float = [0.25,-1.54] # min accel, angle
+
+            # Initial state
+            
+            x0: float = 0   # Start x
+            y0: float = 0   # Start y
+            theta0: float = 0 # start theta
+            v0: float = 0.0 # initial velocity
+            state: float = [x0,y0,theta0,v0] # starting state vector
+
+            # Gains
+            Kvi: float = .01
+            Kvp: float = 5
+
+            Kthetap: float = .5
+            Kthetai: float = .1
+
+            # waypoints
+            wx: float = [2, 10, 20, 30.0]
+            wy: float = [2, 7, 1, 3.0]
+
+        self.params = params # store structure
+        self.PP = PP(self.params) # pass structure to car
+        self.PP.get_trajectory(self.params.wx,self.params.wy)
+        self.IP_vel = IP(alpha = 3, kp = 2, ki = 1,dt = 0.002)
+        self.IP_theta = IP(alpha = 10, kp = 7, ki = 15,dt = 0.002)
+        self.pressed = 0
+        self.pressed2 = 0
+
+        # Publisher
+        self.my_vel_command = self.create_publisher(AckermannDriveStamped, "/drive", 10)       # Send velocity and steer angle
+        self.visual = self.create_publisher(Float64MultiArray, "visual", 10)    # send data to visulise will be changing
+        self.F = self.create_publisher(Float64, "F", 10)    # send data to visulise will be changing
+        self.brake = self.create_publisher(Float64, "commands/motor/brake", 10)    # send data to visulise will be changing
+        self.left_dist = 0
+    def run(self, msg):
+        """Callback function to process Joy messages."""
+        button_pressed = msg.buttons  # List of button states (0 = released, 1 = pressed)
+        self.pressed = button_pressed[5]
+        self.pressed2 = button_pressed[0]
+   
+
+    def pose_callback(self,msg):
+        #print("pose call")
+        x = msg.pose.pose.position.x
+        y = msg.pose.pose.position.y
+
+        # Quarternon to euler
+        z = msg.pose.pose.orientation.z
+        w = msg.pose.pose.orientation.w
+        t3 = +2.0 * (w * z)
+        t4 = +1.0 - 2.0 * (z * z)
+        theta = np.arctan2(t3, t4)
+        
+        
+        # speed
+        v = msg.twist.twist.linear.x
+        #print("velocity of car")
+        #print(v)
+        #vdes,thetades = self.PP.control(x,y,v,theta)
+        vdes = 0.5
+        F = 0
+        if self.pressed == 1:
+            v,F = self.IP_vel.control(-v,vdes)
+        if self.pressed2 == 1:
+            print('brake pull')
+            self.brake.publish(Float64(data=200000.0))
+            v = 0.0
+            F = 0
+
+        # msg = Float64()
+        # msg.data = float(F)
+        # self.F.publish(msg)
+
+        thetades = 0
+        left_des = 0.5
+        F = 0
+        if self.pressed == 1:
+            theta,F = self.IP_theta.control(x=self.left_dist, x_ref=left_des)
+        #print(v,theta)
+        msg = Float64()
+        msg.data = float(F)
+        self.F.publish(msg)
+        
+        self.send_vel(1.5,-theta)
+
+    def lidar_pose_callback(self, msg):
+        #print("lidar call")
+        ranges = np.array(msg.ranges)  # DistanceS
+        angle = np.arange(msg.angle_min, msg.angle_max, msg.angle_increment)  # Angles
+        #print(msg.angle_min, msg.angle_max, msg.angle_increment) 
+        
+        # Extract relevant distances (indexes depend on LiDAR setup)
+        front_idx = len(ranges) // 2  # Directly ahead
+        #left_idx = int((msg.angle_max - (3.14 / 2)) / msg.angle_increment) - 100 # 90 degrees left
+        left_idx = 480
+        # left_idx_start = int((msg.angle_min + (3.14 / 2)) / msg.angle_increment) - 5 # 90 degrees left
+        # left_idx_end = int((msg.angle_min + (3.14 / 2)) / msg.angle_increment) + 5  # 180 degrees left
+        left_idx_start = 805
+        left_idx_end = 810
+        right_idx = int((msg.angle_max + (3.14 / 2)) / msg.angle_increment)  # 90 degrees right
+
+        self.front_dist = ranges[front_idx] if ranges[front_idx] > 0 else float('inf')
+        self.right_dist = ranges[left_idx] if ranges[left_idx] > 0 else float('inf')
+        self.left_dist = ranges[left_idx_start:left_idx_end].mean() if ranges[left_idx_start:left_idx_end].min() > 0 else float('inf')
+        #self.left_dist = ranges[right_idx] if ranges[right_idx] > 0 else float('inf')
+        #print(self.left_dist, left_idx_start, left_idx_end)
+        
+        # if ranges.min() < .1:
+        #     #self.send_vel(0,0)
+        #     return
+        # try:
+        #     #print(msg)
+        #     pass
+        # except Exception as e:
+        #     print(f"An error occurred: {e}")
+
+    def send_vel(self,x,z):
+        # z = 0.0
+        #print(z)
+        msg = AckermannDriveStamped()
+        if self.pressed2 == 1:
+            msg.drive.acceleration = -5.0 # add brake
+        msg.drive.speed = float(x)  # Set desired velocity in m/s
+        msg.drive.steering_angle = float(z)  # Set steering angle in radians
+        self.my_vel_command.publish(msg)
+        #self.get_logger().info(f'Publishing Velocity:{msg.drive.speed} m/s')
+
+def main(args=None):
+    rclpy.init(args=args)
+    controller = Controller_Node()
+    controller.get_logger().info("Hello friend!")
+    rclpy.spin(controller)
+    controller.destroy_node()
+    rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

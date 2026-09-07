@@ -1,0 +1,9 @@
+Metadata-Version: 2.1
+Name: auto_drive
+Version: 0.0.0
+Summary: First shot at autonomy
+Maintainer: jetson
+Maintainer-email: cgrund@uvm.edu
+License: MIT
+License-File: LICENSE
+Requires-Dist: setuptools

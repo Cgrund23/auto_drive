@@ -1,0 +1,160 @@
+[0.000000] (-) TimerEvent: {}
+[0.001937] (auto_drive) JobQueued: {'identifier': 'auto_drive', 'dependencies': OrderedDict()}
+[0.003068] (auto_drive) JobStarted: {'identifier': 'auto_drive'}
+[0.099905] (-) TimerEvent: {}
+[0.202380] (-) TimerEvent: {}
+[0.303419] (-) TimerEvent: {}
+[0.404396] (-) TimerEvent: {}
+[0.505317] (-) TimerEvent: {}
+[0.606349] (-) TimerEvent: {}
+[0.707447] (-) TimerEvent: {}
+[0.808525] (-) TimerEvent: {}
+[0.909544] (-) TimerEvent: {}
+[1.010496] (-) TimerEvent: {}
+[1.111567] (-) TimerEvent: {}
+[1.212556] (-) TimerEvent: {}
+[1.313485] (-) TimerEvent: {}
+[1.414433] (-) TimerEvent: {}
+[1.515817] (-) TimerEvent: {}
+[1.618640] (-) TimerEvent: {}
+[1.720724] (-) TimerEvent: {}
+[1.821695] (-) TimerEvent: {}
+[1.922676] (-) TimerEvent: {}
+[2.023667] (-) TimerEvent: {}
+[2.124678] (-) TimerEvent: {}
+[2.225694] (-) TimerEvent: {}
+[2.326726] (-) TimerEvent: {}
+[2.427674] (-) TimerEvent: {}
+[2.528585] (-) TimerEvent: {}
+[2.629481] (-) TimerEvent: {}
+[2.730502] (-) TimerEvent: {}
+[2.831639] (-) TimerEvent: {}
+[2.932615] (-) TimerEvent: {}
+[3.033567] (-) TimerEvent: {}
+[3.134418] (-) TimerEvent: {}
+[3.235495] (-) TimerEvent: {}
+[3.336579] (-) TimerEvent: {}
+[3.437653] (-) TimerEvent: {}
+[3.538516] (-) TimerEvent: {}
+[3.639724] (-) TimerEvent: {}
+[3.740754] (-) TimerEvent: {}
+[3.841683] (-) TimerEvent: {}
+[3.942702] (-) TimerEvent: {}
+[4.043709] (-) TimerEvent: {}
+[4.144604] (-) TimerEvent: {}
+[4.245695] (-) TimerEvent: {}
+[4.346741] (-) TimerEvent: {}
+[4.447740] (-) TimerEvent: {}
+[4.548677] (-) TimerEvent: {}
+[4.649715] (-) TimerEvent: {}
+[4.750692] (-) TimerEvent: {}
+[4.851724] (-) TimerEvent: {}
+[4.952766] (-) TimerEvent: {}
+[4.988360] (auto_drive) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', '-W', 'ignore:easy_install command is deprecated', 'setup.py', 'egg_info', '--egg-base', 'build/auto_drive', 'build', '--build-base', '/home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build', 'install', '--record', '/home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/install.log', '--install-scripts', '$base/lib/auto_drive', '--single-version-externally-managed', 'install_data'], 'cwd': '/home/jetson/f1tenth_ws/src/auto_drive', 'env': {'NX_ROOT': '/home/jetson/.nx', 'GJS_DEBUG_TOPICS': 'JS ERROR;JS LOG', 'LESSOPEN': '| /usr/bin/lesspipe %s', 'PULSE_CLIENTCONFIG': '/home/jetson/.nx/nxdevice/D-1002-EC4BE2ED133FC340EF05951A0D9AA2F4/audio/client.conf', 'MAIL': '/var/mail/jetson', 'USER': 'jetson', 'XDG_SESSION_TYPE': 'x11', 'NX_SYSTEM': '/usr/NX', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/usr/local/cuda-11.4/lib64:/home/jetson/f1tenth_ws/install/vesc_driver/lib:/home/jetson/f1tenth_ws/install/vesc_ackermann/lib:/home/jetson/f1tenth_ws/install/vesc_msgs/lib:/home/jetson/f1tenth_ws/install/teleop_tools_msgs/lib:/opt/ros/foxy/opt/yaml_cpp_vendor/lib:/opt/ros/foxy/opt/rviz_ogre_vendor/lib:/opt/ros/foxy/lib/aarch64-linux-gnu:/opt/ros/foxy/lib:/usr/local/cuda-11.4/lib64:', 'HOME': '/home/jetson', 'OLDPWD': '/home/jetson/f1tenth_ws', 'DESKTOP_SESSION': 'ubuntu-xorg', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'DBUS_SESSION_BUS_ADDRESS': 'unix:abstract=/tmp/dbus-ekYygqjqLl,guid=360c07bd03eadad0e68477976a5404e2', 'COLORTERM': 'truecolor', 'TERMINATOR_DBUS_NAME': 'net.tenshu.Terminator2f4141aec58b2d71aa3dd4b2d054681d7', 'PULSE_SCRIPT': '/home/jetson/.nx/nxdevice/D-1002-EC4BE2ED133FC340EF05951A0D9AA2F4/audio/default.pa', 'WAYLAND_DISPLAY': 'no', 'COLCON_PREFIX_PATH': '/home/jetson/f1tenth_ws/install', 'ROS_DISTRO': 'foxy', 'LOGNAME': 'jetson', 'PULSE_SERVER': '/home/jetson/.nx/nxdevice/D-1002-EC4BE2ED133FC340EF05951A0D9AA2F4/audio/native.socket', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'jetson', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'ROS_LOCALHOST_ONLY': '0', 'PATH': '/home/jetson/cmake-3.19.5-linux-aarch64/bin:/usr/local/cuda-11.4/bin:/usr/local/cuda-11.0/bin:/opt/ros/foxy/bin:/home/jetson/cmake-3.19.5-linux-aarch64/bin:/usr/local/cuda-11.4/bin:/usr/local/cuda-11.0/bin:/home/jetson/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu:@/tmp/.ICE-unix/3012,unix/ubuntu:/tmp/.ICE-unix/3012', 'PULSE_RUNTIME_PATH': '/run/user/1000/pulse', 'XDG_MENU_PREFIX': 'gnome-', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/44885d8c_d7c7_496f_93b5_fcc4250e6af6', 'XDG_RUNTIME_DIR': '/run/user/1000', 'PULSE_CONFIG': '/home/jetson/.nx/nxdevice/D-1002-EC4BE2ED133FC340EF05951A0D9AA2F4/audio/daemon.conf', 'GDK_BACKEND': 'x11', 'DISPLAY': ':1002', 'TERMINATOR_DBUS_PATH': '/net/tenshu/Terminator2', 'LD_PRELOAD': '', 'LANG': 'en_US.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'NX_TEMP': '/tmp', 'XMODIFIERS': '@im=ibus', 'XAUTHORITY': '/home/jetson/.Xauthority', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:', 'GNOME_TERMINAL_SERVICE': ':1.90', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/jetson/f1tenth_ws/install/f1tenth_stack:/home/jetson/f1tenth_ws/install/vesc:/home/jetson/f1tenth_ws/install/vesc_driver:/home/jetson/f1tenth_ws/install/vesc_ackermann:/home/jetson/f1tenth_ws/install/vesc_msgs:/home/jetson/f1tenth_ws/install/teleop_tools:/home/jetson/f1tenth_ws/install/joy_teleop:/home/jetson/f1tenth_ws/install/teleop_tools_msgs:/home/jetson/f1tenth_ws/install/mouse_teleop:/home/jetson/f1tenth_ws/install/key_teleop:/home/jetson/f1tenth_ws/install/auto_drive:/home/jetson/f1tenth_ws/install/ackermann_mux:/opt/ros/foxy', 'SHELL': '/bin/bash', 'TERMINATOR_UUID': 'urn:uuid:8c763934-9ddb-4bda-844f-f18c80e42ea8', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'NX_SESSION_ID': 'EC4BE2ED133FC340EF05951A0D9AA2F4', 'GJS_DEBUG_OUTPUT': 'stderr', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive', 'NX_RUNNER': '/usr/NX/bin/nxrunner', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu-xorg:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu-xorg:/usr/local/share:/usr/share:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages:/home/jetson/f1tenth_ws/install/f1tenth_stack/lib/python3.8/site-packages:/home/jetson/f1tenth_ws/install/vesc_msgs/lib/python3.8/site-packages:/home/jetson/f1tenth_ws/install/joy_teleop/lib/python3.8/site-packages:/home/jetson/f1tenth_ws/install/teleop_tools_msgs/lib/python3.8/site-packages:/home/jetson/f1tenth_ws/install/mouse_teleop/lib/python3.8/site-packages:/home/jetson/f1tenth_ws/install/key_teleop/lib/python3.8/site-packages:/home/jetson/f1tenth_ws/install/auto_drive/lib/python3.8/site-packages:/opt/ros/foxy/lib/python3.8/site-packages', 'COLCON': '1', 'VTE_VERSION': '6003', 'CMAKE_PREFIX_PATH': '/home/jetson/f1tenth_ws/install/vesc:/home/jetson/f1tenth_ws/install/vesc_driver:/home/jetson/f1tenth_ws/install/vesc_ackermann:/home/jetson/f1tenth_ws/install/vesc_msgs:/home/jetson/f1tenth_ws/install/teleop_tools:/home/jetson/f1tenth_ws/install/teleop_tools_msgs:/home/jetson/f1tenth_ws/install/ackermann_mux', 'NX_CONNECTION': '192.168.1.8 58977 192.168.1.10 4000', 'NXDIR': '/usr/NX'}, 'shell': False}
+[5.053372] (-) TimerEvent: {}
+[5.155327] (-) TimerEvent: {}
+[5.256247] (-) TimerEvent: {}
+[5.357206] (-) TimerEvent: {}
+[5.458059] (-) TimerEvent: {}
+[5.559383] (-) TimerEvent: {}
+[5.660262] (-) TimerEvent: {}
+[5.761236] (-) TimerEvent: {}
+[5.850279] (auto_drive) StderrLine: {'line': b'/home/jetson/.local/lib/python3.8/site-packages/setuptools/dist.py:495: SetuptoolsDeprecationWarning: Invalid dash-separated options\n'}
+[5.852262] (auto_drive) StderrLine: {'line': b'!!\n'}
+[5.852770] (auto_drive) StderrLine: {'line': b'\n'}
+[5.853287] (auto_drive) StderrLine: {'line': b'        ********************************************************************************\n'}
+[5.853714] (auto_drive) StderrLine: {'line': b"        Usage of dash-separated 'script-dir' will not be supported in future\n"}
+[5.854128] (auto_drive) StderrLine: {'line': b"        versions. Please use the underscore name 'script_dir' instead.\n"}
+[5.854539] (auto_drive) StderrLine: {'line': b'\n'}
+[5.855091] (auto_drive) StderrLine: {'line': b'        This deprecation is overdue, please update your project and remove deprecated\n'}
+[5.855498] (auto_drive) StderrLine: {'line': b'        calls to avoid build errors in the future.\n'}
+[5.855876] (auto_drive) StderrLine: {'line': b'\n'}
+[5.856330] (auto_drive) StderrLine: {'line': b'        See https://setuptools.pypa.io/en/latest/userguide/declarative_config.html for details.\n'}
+[5.856740] (auto_drive) StderrLine: {'line': b'        ********************************************************************************\n'}
+[5.857127] (auto_drive) StderrLine: {'line': b'\n'}
+[5.857523] (auto_drive) StderrLine: {'line': b'!!\n'}
+[5.857938] (auto_drive) StderrLine: {'line': b'  opt = self.warn_dash_deprecation(opt, section)\n'}
+[5.861457] (-) TimerEvent: {}
+[5.959428] (auto_drive) StderrLine: {'line': b"/home/jetson/.local/lib/python3.8/site-packages/setuptools/_distutils/dist.py:261: UserWarning: Unknown distribution option: 'tests_require'\n"}
+[5.960272] (auto_drive) StderrLine: {'line': b'  warnings.warn(msg)\n'}
+[5.961629] (-) TimerEvent: {}
+[6.062476] (-) TimerEvent: {}
+[6.163525] (-) TimerEvent: {}
+[6.264534] (-) TimerEvent: {}
+[6.365522] (-) TimerEvent: {}
+[6.466548] (-) TimerEvent: {}
+[6.567616] (-) TimerEvent: {}
+[6.581511] (auto_drive) StdoutLine: {'line': b'running egg_info\n'}
+[6.667879] (-) TimerEvent: {}
+[6.684277] (auto_drive) StdoutLine: {'line': b'writing build/auto_drive/auto_drive.egg-info/PKG-INFO\n'}
+[6.687357] (auto_drive) StdoutLine: {'line': b'writing dependency_links to build/auto_drive/auto_drive.egg-info/dependency_links.txt\n'}
+[6.688847] (auto_drive) StdoutLine: {'line': b'writing entry points to build/auto_drive/auto_drive.egg-info/entry_points.txt\n'}
+[6.690049] (auto_drive) StdoutLine: {'line': b'writing requirements to build/auto_drive/auto_drive.egg-info/requires.txt\n'}
+[6.690982] (auto_drive) StdoutLine: {'line': b'writing top-level names to build/auto_drive/auto_drive.egg-info/top_level.txt\n'}
+[6.768098] (-) TimerEvent: {}
+[6.869001] (-) TimerEvent: {}
+[6.969887] (-) TimerEvent: {}
+[7.070804] (-) TimerEvent: {}
+[7.171801] (-) TimerEvent: {}
+[7.272756] (-) TimerEvent: {}
+[7.373655] (-) TimerEvent: {}
+[7.418105] (auto_drive) StdoutLine: {'line': b"reading manifest file 'build/auto_drive/auto_drive.egg-info/SOURCES.txt'\n"}
+[7.422113] (auto_drive) StdoutLine: {'line': b"adding license file 'LICENSE'\n"}
+[7.428675] (auto_drive) StdoutLine: {'line': b"writing manifest file 'build/auto_drive/auto_drive.egg-info/SOURCES.txt'\n"}
+[7.429729] (auto_drive) StdoutLine: {'line': b'running build\n'}
+[7.430323] (auto_drive) StdoutLine: {'line': b'running build_py\n'}
+[7.434254] (auto_drive) StdoutLine: {'line': b'copying auto_drive/test_invert.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.436126] (auto_drive) StdoutLine: {'line': b'copying auto_drive/PP.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.437446] (auto_drive) StdoutLine: {'line': b'copying auto_drive/kalman_filter.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.438866] (auto_drive) StdoutLine: {'line': b'copying auto_drive/__init__.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.439847] (auto_drive) StdoutLine: {'line': b'copying auto_drive/CBF.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.441588] (auto_drive) StdoutLine: {'line': b'copying auto_drive/IP_ackermann.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.443082] (auto_drive) StdoutLine: {'line': b'copying auto_drive/math.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.444321] (auto_drive) StdoutLine: {'line': b'copying auto_drive/barrier_visualizer.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.445558] (auto_drive) StdoutLine: {'line': b'copying auto_drive/cbf_visualizer.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.446773] (auto_drive) StdoutLine: {'line': b'copying auto_drive/cbf_Node_refactored.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.448459] (auto_drive) StdoutLine: {'line': b'copying auto_drive/Model_Free_Node.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.450027] (auto_drive) StdoutLine: {'line': b'copying auto_drive/test2.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.451438] (auto_drive) StdoutLine: {'line': b'copying auto_drive/test_barriers.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.452884] (auto_drive) StdoutLine: {'line': b'copying auto_drive/CBF_refactored.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.454101] (auto_drive) StdoutLine: {'line': b'copying auto_drive/test_model_free_cbf.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.455431] (auto_drive) StdoutLine: {'line': b'copying auto_drive/cbf_Node.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive\n'}
+[7.458791] (auto_drive) StdoutLine: {'line': b'running install\n'}
+[7.473878] (-) TimerEvent: {}
+[7.490814] (auto_drive) StdoutLine: {'line': b'running install_lib\n'}
+[7.574123] (-) TimerEvent: {}
+[7.592235] (auto_drive) StdoutLine: {'line': b'copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/CBF.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive\n'}
+[7.594126] (auto_drive) StdoutLine: {'line': b'copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/barrier_visualizer.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive\n'}
+[7.595095] (auto_drive) StdoutLine: {'line': b'copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/cbf_visualizer.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive\n'}
+[7.596086] (auto_drive) StdoutLine: {'line': b'copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/cbf_Node_refactored.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive\n'}
+[7.597960] (auto_drive) StdoutLine: {'line': b'copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/CBF_refactored.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive\n'}
+[7.598813] (auto_drive) StdoutLine: {'line': b'copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/test_model_free_cbf.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive\n'}
+[7.599848] (auto_drive) StdoutLine: {'line': b'copying /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive/cbf_Node.py -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive\n'}
+[7.604377] (auto_drive) StdoutLine: {'line': b'byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/CBF.py to CBF.cpython-38.pyc\n'}
+[7.625387] (auto_drive) StdoutLine: {'line': b'byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/barrier_visualizer.py to barrier_visualizer.cpython-38.pyc\n'}
+[7.636544] (auto_drive) StdoutLine: {'line': b'byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/cbf_visualizer.py to cbf_visualizer.cpython-38.pyc\n'}
+[7.644588] (auto_drive) StdoutLine: {'line': b'byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/cbf_Node_refactored.py to cbf_Node_refactored.cpython-38.pyc\n'}
+[7.663314] (auto_drive) StdoutLine: {'line': b'byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/CBF_refactored.py to CBF_refactored.cpython-38.pyc\n'}
+[7.671188] (auto_drive) StdoutLine: {'line': b'byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/test_model_free_cbf.py to test_model_free_cbf.cpython-38.pyc\n'}
+[7.674329] (-) TimerEvent: {}
+[7.679201] (auto_drive) StdoutLine: {'line': b'byte-compiling /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive/cbf_Node.py to cbf_Node.cpython-38.pyc\n'}
+[7.685600] (auto_drive) StdoutLine: {'line': b'running install_data\n'}
+[7.689444] (auto_drive) StdoutLine: {'line': b'copying resource/auto_drive -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/share/ament_index/resource_index/packages\n'}
+[7.691429] (auto_drive) StdoutLine: {'line': b'copying package.xml -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/share/auto_drive\n'}
+[7.692275] (auto_drive) StdoutLine: {'line': b'running install_egg_info\n'}
+[7.774591] (-) TimerEvent: {}
+[7.788130] (auto_drive) StdoutLine: {'line': b"removing '/home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive-0.0.0-py3.8.egg-info' (and everything under it)\n"}
+[7.790306] (auto_drive) StdoutLine: {'line': b'Copying build/auto_drive/auto_drive.egg-info to /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive-0.0.0-py3.8.egg-info\n'}
+[7.797132] (auto_drive) StdoutLine: {'line': b'running install_scripts\n'}
+[7.874854] (-) TimerEvent: {}
+[7.975863] (-) TimerEvent: {}
+[8.029806] (auto_drive) StdoutLine: {'line': b'Installing Model_Free_Node script to /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/auto_drive\n'}
+[8.031781] (auto_drive) StdoutLine: {'line': b'Installing cbf_Node script to /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/auto_drive\n'}
+[8.032917] (auto_drive) StdoutLine: {'line': b'Installing cbf_Node_refactored script to /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/auto_drive\n'}
+[8.033712] (auto_drive) StdoutLine: {'line': b'Installing cbf_visualizer script to /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/auto_drive\n'}
+[8.036984] (auto_drive) StdoutLine: {'line': b"writing list of installed files to '/home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/install.log'\n"}
+[8.076136] (-) TimerEvent: {}
+[8.161871] (auto_drive) CommandEnded: {'returncode': 0}
+[8.176372] (-) TimerEvent: {}
+[8.252419] (auto_drive) JobEnded: {'identifier': 'auto_drive', 'rc': 0}
+[8.256861] (-) EventReactorShutdown: {}

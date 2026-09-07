@@ -1,0 +1,60 @@
+[4.239s] Invoking command in '/home/jetson/f1tenth_ws/src/auto_drive': NX_CONNECTION=192.168.1.8 58977 192.168.1.10 4000 PYTHONPATH=/home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/auto_drive build --build-base /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build install --record /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/install.log --install-scripts $base/lib/auto_drive --single-version-externally-managed install_data
+[5.028s] /home/jetson/.local/lib/python3.8/site-packages/setuptools/dist.py:495: SetuptoolsDeprecationWarning: Invalid dash-separated options
+[5.029s] !!
+[5.029s] 
+[5.030s]         ********************************************************************************
+[5.031s]         Usage of dash-separated 'script-dir' will not be supported in future
+[5.032s]         versions. Please use the underscore name 'script_dir' instead.
+[5.032s] 
+[5.033s]         This deprecation is overdue, please update your project and remove deprecated
+[5.033s]         calls to avoid build errors in the future.
+[5.033s] 
+[5.034s]         See https://setuptools.pypa.io/en/latest/userguide/declarative_config.html for details.
+[5.034s]         ********************************************************************************
+[5.035s] 
+[5.035s] !!
+[5.035s]   opt = self.warn_dash_deprecation(opt, section)
+[5.121s] /home/jetson/.local/lib/python3.8/site-packages/setuptools/_distutils/dist.py:261: UserWarning: Unknown distribution option: 'tests_require'
+[5.122s]   warnings.warn(msg)
+[5.697s] running egg_info
+[5.787s] writing build/auto_drive/auto_drive.egg-info/PKG-INFO
+[5.790s] writing dependency_links to build/auto_drive/auto_drive.egg-info/dependency_links.txt
+[5.791s] writing entry points to build/auto_drive/auto_drive.egg-info/entry_points.txt
+[5.792s] writing requirements to build/auto_drive/auto_drive.egg-info/requires.txt
+[5.793s] writing top-level names to build/auto_drive/auto_drive.egg-info/top_level.txt
+[6.486s] reading manifest file 'build/auto_drive/auto_drive.egg-info/SOURCES.txt'
+[6.490s] adding license file 'LICENSE'
+[6.497s] writing manifest file 'build/auto_drive/auto_drive.egg-info/SOURCES.txt'
+[6.498s] running build
+[6.498s] running build_py
+[6.500s] copying auto_drive/test_invert.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.501s] copying auto_drive/PP.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.503s] copying auto_drive/kalman_filter.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.504s] copying auto_drive/__init__.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.505s] copying auto_drive/CBF.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.506s] copying auto_drive/IP_ackermann.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.507s] copying auto_drive/math.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.508s] copying auto_drive/barrier_visualizer.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.510s] copying auto_drive/cbf_visualizer.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.511s] copying auto_drive/cbf_Node_refactored.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.512s] copying auto_drive/Model_Free_Node.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.514s] copying auto_drive/test2.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.515s] copying auto_drive/test_barriers.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.516s] copying auto_drive/CBF_refactored.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.518s] copying auto_drive/test_model_free_cbf.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.520s] copying auto_drive/cbf_Node.py -> /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build/lib/auto_drive
+[6.522s] running install
+[6.548s] running install_lib
+[6.647s] running install_data
+[6.649s] copying resource/auto_drive -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/share/ament_index/resource_index/packages
+[6.651s] copying package.xml -> /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/share/auto_drive
+[6.652s] running install_egg_info
+[6.744s] removing '/home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive-0.0.0-py3.8.egg-info' (and everything under it)
+[6.746s] Copying build/auto_drive/auto_drive.egg-info to /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages/auto_drive-0.0.0-py3.8.egg-info
+[6.752s] running install_scripts
+[6.967s] Installing Model_Free_Node script to /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/auto_drive
+[6.968s] Installing cbf_Node script to /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/auto_drive
+[6.969s] Installing cbf_Node_refactored script to /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/auto_drive
+[6.970s] Installing cbf_visualizer script to /home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/auto_drive
+[6.973s] writing list of installed files to '/home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/install.log'
+[7.090s] Invoked command in '/home/jetson/f1tenth_ws/src/auto_drive' returned '0': NX_CONNECTION=192.168.1.8 58977 192.168.1.10 4000 PYTHONPATH=/home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/jetson/f1tenth_ws/src/auto_drive/install/auto_drive/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/auto_drive build --build-base /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/build install --record /home/jetson/f1tenth_ws/src/auto_drive/build/auto_drive/install.log --install-scripts $base/lib/auto_drive --single-version-externally-managed install_data
