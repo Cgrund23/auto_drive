@@ -100,9 +100,11 @@ import numpy as np
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry, Path
 from sensor_msgs.msg import LaserScan
 from ackermann_msgs.msg import AckermannDriveStamped
+from geometry_msgs.msg import PoseStamped, Point
+from visualization_msgs.msg import Marker, MarkerArray
 
 
 def rbf_kernel(X1, X2, sigma_f, ell):
@@ -857,6 +859,26 @@ class ControllerNode(Node):
         self._scan_log_w = csv.writer(self._scan_log_f)
         self._scan_log_header_written = False
 
+        # --- RViz2 live visualization -------------------------------------
+        # Published at PERCEPTION rate (once per real scan, from
+        # lidar_callback -- not per control substep) since none of this
+        # needs 114 Hz resolution to look smooth in RViz, and building
+        # Marker messages every substep would be pure overhead. Uses
+        # whatever frame /odom's own header declares (captured in
+        # odom_callback) rather than hardcoding 'odom', so this lines up
+        # with the TF tree your localization stack already publishes,
+        # whatever it calls that frame.
+        self._odom_frame_id = 'odom'   # overwritten by the first real Odometry message
+        self.viz_pub = self.create_publisher(MarkerArray, '/cbf_viz', 10)
+        self.path_pub = self.create_publisher(Path, '/cbf_path', 10)
+        self._path_msg = Path()
+        self._path_max_poses = 3000    # bound memory on a long run
+        self._last_q_hat = 0.0
+        self._last_B_q_hat = np.zeros(2)
+        self._last_feasible = True
+        self._last_min_range = 999.0
+        self._last_action = 'SAFE'
+
         self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
         self.create_subscription(LaserScan, '/scan', self.lidar_callback, 10)
         self.cmd_pub = self.create_publisher(AckermannDriveStamped, '/drive', 10)
@@ -986,6 +1008,7 @@ class ControllerNode(Node):
 
     # -------------------------------------------------------------------
     def odom_callback(self, msg):
+        self._odom_frame_id = msg.header.frame_id or self._odom_frame_id
         self.x = msg.pose.pose.position.x
         self.y = msg.pose.pose.position.y
         quat = msg.pose.pose.orientation
@@ -1050,6 +1073,109 @@ class ControllerNode(Node):
         dt_sub = scan_dt / self.n_control_substeps
         for _ in range(self.n_control_substeps):
             self._control_step(valid_ranges, raw_side_bias, dt_sub)
+
+        self._publish_viz(now)
+
+    def _publish_viz(self, stamp):
+        """
+        RViz2 live view: per-obstacle GP points, a status sphere + text at
+        the vehicle's position (color/content from the most recent control
+        step, stashed by _control_step), an e-stop-threshold ring, and the
+        driven path. Deliberately NOT the full barrier-field contour that
+        analyze_hardware_log.py draws offline -- evaluating that grid (GP
+        posterior mean over ~150x50 points per obstacle) at ~38 Hz would be
+        real, avoidable load on the Jetson for something that only needs to
+        look right after the fact anyway. Everything here is O(number of
+        already-stored GP points), which is cheap.
+        """
+        stamp_msg = stamp.to_msg()
+        frame_id = self._odom_frame_id
+        markers = MarkerArray()
+
+        colors = [(0.12, 0.47, 0.71), (1.00, 0.50, 0.05), (0.17, 0.63, 0.17),
+                  (0.84, 0.15, 0.16), (0.58, 0.40, 0.74), (0.55, 0.34, 0.29)]
+        for obs_id, gp in self.cbf.gps.items():
+            if gp.n_points == 0:
+                continue
+            m = Marker()
+            m.header.frame_id = frame_id
+            m.header.stamp = stamp_msg
+            m.ns = 'obstacle_points'
+            m.id = int(obs_id)
+            m.type = Marker.SPHERE_LIST
+            m.action = Marker.ADD
+            m.scale.x = m.scale.y = m.scale.z = 0.06
+            c = colors[int(obs_id) % len(colors)]
+            m.color.r, m.color.g, m.color.b, m.color.a = c[0], c[1], c[2], 0.9
+            for (px, py) in gp.P:
+                m.points.append(Point(x=float(px), y=float(py), z=0.0))
+            markers.markers.append(m)
+
+        q = self._last_q_hat
+        status = Marker()
+        status.header.frame_id = frame_id
+        status.header.stamp = stamp_msg
+        status.ns = 'status'
+        status.id = 0
+        status.type = Marker.SPHERE
+        status.action = Marker.ADD
+        status.pose.position.x, status.pose.position.y, status.pose.position.z = self.x, self.y, 0.1
+        status.scale.x = status.scale.y = status.scale.z = 2 * self.r_buf
+        if not self._last_feasible or self._last_action == 'ESTOP':
+            status.color.r, status.color.g, status.color.b = 0.9, 0.1, 0.1
+        elif q < 0.3:
+            status.color.r, status.color.g, status.color.b = 0.9, 0.7, 0.1
+        else:
+            status.color.r, status.color.g, status.color.b = 0.1, 0.8, 0.1
+        status.color.a = 0.85
+        markers.markers.append(status)
+
+        text = Marker()
+        text.header.frame_id = frame_id
+        text.header.stamp = stamp_msg
+        text.ns = 'status_text'
+        text.id = 1
+        text.type = Marker.TEXT_VIEW_FACING
+        text.action = Marker.ADD
+        text.pose.position.x, text.pose.position.y, text.pose.position.z = self.x, self.y, 0.5
+        text.scale.z = 0.25
+        text.color.r = text.color.g = text.color.b = text.color.a = 1.0
+        text.text = (f'{self._last_action}  q={q:.2f}  min_r={self._last_min_range:.2f}  '
+                     f'feas={self._last_feasible}  Bq=[{self._last_B_q_hat[0]:.2f},{self._last_B_q_hat[1]:.2f}]')
+        markers.markers.append(text)
+
+        ring = Marker()
+        ring.header.frame_id = frame_id
+        ring.header.stamp = stamp_msg
+        ring.ns = 'estop_ring'
+        ring.id = 2
+        ring.type = Marker.LINE_STRIP
+        ring.action = Marker.ADD
+        ring.scale.x = 0.02
+        ring.color.r = 1.0
+        ring.color.g = 0.2 if self._last_min_range < 0.30 else 0.8
+        ring.color.b = 0.2
+        ring.color.a = 0.8
+        for k in range(33):
+            ang = 2 * np.pi * k / 32
+            ring.points.append(Point(x=self.x + 0.30 * np.cos(ang), y=self.y + 0.30 * np.sin(ang), z=0.05))
+        markers.markers.append(ring)
+
+        self.viz_pub.publish(markers)
+
+        pose = PoseStamped()
+        pose.header.frame_id = frame_id
+        pose.header.stamp = stamp_msg
+        pose.pose.position.x, pose.pose.position.y = self.x, self.y
+        half_yaw = self.theta / 2.0
+        pose.pose.orientation.z = float(np.sin(half_yaw))
+        pose.pose.orientation.w = float(np.cos(half_yaw))
+        self._path_msg.header.frame_id = frame_id
+        self._path_msg.header.stamp = stamp_msg
+        self._path_msg.poses.append(pose)
+        if len(self._path_msg.poses) > self._path_max_poses:
+            self._path_msg.poses = self._path_msg.poses[-self._path_max_poses:]
+        self.path_pub.publish(self._path_msg)
 
     def _control_step(self, valid_ranges, raw_side_bias, dt_sub):
         """
@@ -1205,6 +1331,15 @@ class ControllerNode(Node):
         action = 'ESTOP' if min_range < 0.30 else \
                  ('SAFE' if feasible and abs(u_safe[0] - u_ref[0]) < 0.1 else
                   ('STEER' if abs(u_safe[1] - u_ref[1]) > 0.05 else 'BRAKE'))
+
+        # Stashed for _publish_viz() (called from lidar_callback at
+        # perception rate, not here) to read the most recent control step's
+        # outputs without re-deriving them.
+        self._last_q_hat = q_hat
+        self._last_B_q_hat = B_q_hat
+        self._last_feasible = feasible
+        self._last_min_range = min_range
+        self._last_action = action
 
         # sigma_k (Theorem 2 confidence margin, Eq. 12-14) isn't returned by
         # compute_safe_control -- recompute it here against the SAME
