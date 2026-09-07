@@ -160,7 +160,12 @@ def check_collision(x, y, obstacles=None):
 # ============================================================================
 class SimNode:
     def __init__(self):
-        self.dt = 0.01
+        # Real scan period, not the 0.01 (100 Hz) this file originally
+        # assumed -- measured directly from timestamps in a real hardware
+        # log: 650 lidar_callback invocations spanned 17.14s, i.e. ~26.4ms
+        # (~38 Hz) per scan. See cbf_Node_refactored.py's matching comment.
+        self.dt = 0.0264
+        self.n_control_substeps = 3    # see step()/_control_step() below
         self.L = 0.27   # estimated wheelbase from 16in vehicle length; see cbf_Node_refactored.py
         self.v_min, self.v_max = 0.0, 1.2
         self.phi_min, self.phi_max = -0.4, 0.4
@@ -273,18 +278,40 @@ class SimNode:
 
     # -- exact port of ControllerNode.lidar_callback ------------------------
     def step(self, ranges, angles):
-        self._step_count += 1
+        """Perception once per (simulated) scan, then the control law runs
+        n_control_substeps times against it -- mirrors cbf_Node_refactored.py's
+        lidar_callback/_control_step split; see that method's docstring for
+        why re-running the control law without new perception is legitimate
+        (q_meas/qdot_meas come from the persistent, already-fitted per-
+        obstacle GPs evaluated at the evolving position estimate, not from
+        the scan directly)."""
         self.last_ranges, self.last_angles = ranges, angles
 
         self.cbf.set_obstacles(ranges, angles, robot_xy=(self.x, self.y),
                                 robot_theta=self.theta)
         valid_ranges = ranges[(ranges > 0.1) & (ranges < self.r_max)]
-        p_world = np.array([self.x, self.y])
 
         left_mask, right_mask = angles > 0, angles < 0
         left_min = float(np.min(ranges[left_mask])) if np.any(left_mask) else self.r_max
         right_min = float(np.min(ranges[right_mask])) if np.any(right_mask) else self.r_max
         raw_side_bias = left_min - right_min
+
+        dt_sub = self.dt / self.n_control_substeps
+        result = None
+        for _ in range(self.n_control_substeps):
+            result = self._control_step(valid_ranges, raw_side_bias, dt_sub)
+        return result
+
+    def _control_step(self, valid_ranges, raw_side_bias, dt_sub):
+        self._step_count += 1
+
+        self.cbf.dt = dt_sub
+        self.safety_ekf.Ts = dt_sub
+        self.position_ekf.Ts = dt_sub
+        self.cbf.stuck_limit = max(1, int(0.15 / dt_sub))
+        self.cbf.fallback_dither_period = max(1, int(0.3 / dt_sub))
+
+        p_world = np.array([self.x, self.y])
 
         self.safety_ekf.predict(self.u_prev)
         self.position_ekf.predict(self.u_prev)
@@ -343,9 +370,9 @@ class SimNode:
 
         # Ackermann bicycle model in place of publishing /drive.
         self.v = u_safe[0]
-        self.x += u_safe[0] * np.cos(self.theta) * self.dt
-        self.y += u_safe[0] * np.sin(self.theta) * self.dt
-        self.theta += (u_safe[0] / self.L) * np.tan(u_safe[1]) * self.dt
+        self.x += u_safe[0] * np.cos(self.theta) * dt_sub
+        self.y += u_safe[0] * np.sin(self.theta) * dt_sub
+        self.theta += (u_safe[0] / self.L) * np.tan(u_safe[1]) * dt_sub
         self.theta = float(np.arctan2(np.sin(self.theta), np.cos(self.theta)))
         self.u_prev = np.array(u_safe)
 

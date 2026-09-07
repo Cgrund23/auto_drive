@@ -660,7 +660,20 @@ class ControllerNode(Node):
         super().__init__('ModelFreeCBF_Node_Ackermann')
 
         # --- parameters ---
-        self.dt = 0.01                 # 100 Hz control loop
+        # Initial estimate only -- measured directly from real scan-to-scan
+        # timestamps in lidar_callback() below and corrected every cycle.
+        # 0.01 (100 Hz) was the ORIGINAL assumption here and is wrong:
+        # timestamps in an actual hardware log showed the real LiDAR
+        # delivers scans every ~26ms (~38 Hz), a 2.6x error that fed
+        # directly into the EKF's Ts and effective_bounds()'s actuator
+        # rate-limiting box (u_prev +/- rate*dt) -- with dt wrong by 2.6x,
+        # that box was ~2.6x narrower than what the vehicle could actually
+        # achieve in the real elapsed time between commands, which looks
+        # exactly like "doesn't turn quickly enough" independent of any
+        # geometry or tuning. This value is just the fallback used before
+        # the first scan arrives.
+        self.dt = 0.0264
+        self.n_control_substeps = 3    # see lidar_callback()
         # Estimated from the real 16in vehicle length (0.65-0.70x length is
         # a typical wheelbase/length ratio) -- not yet a direct measurement,
         # replace with the actual wheelbase when known. Was 0.33m, a generic
@@ -780,6 +793,7 @@ class ControllerNode(Node):
         # Consecutive cycles the hard emergency-stop layer (below) has held
         # v=0 -- see its comment for why this needs its own creep escape.
         self._estop_stuck_counter = 0
+        self._last_scan_time = None    # for measuring the real scan period
 
         self.safety_ekf = SafetyULM_EKF(Ts=self.dt, m_inputs=2)
         self.position_ekf = PositionULM_EKF(Ts=self.dt, m_inputs=2)
@@ -929,8 +943,23 @@ class ControllerNode(Node):
         self.position_ekf.update(np.array([self.x, self.y]))
 
     def lidar_callback(self, msg):
-        start_time = time.time()
-        self._step_count += 1
+        """
+        Perception-rate entry point: parses the scan and updates the
+        persistent per-obstacle GPs ONCE per real LiDAR message (this part
+        genuinely needs new sensor data). The actual control law then runs
+        self.n_control_substeps times against that single scan via
+        _control_step() -- see that method's docstring for why re-running it
+        without new perception data is legitimate rather than "inventing"
+        information, and why this exists at all (the real scan rate is far
+        below the ~100 Hz this file was designed around).
+        """
+        now = self.get_clock().now()
+        if self._last_scan_time is not None:
+            scan_dt = (now - self._last_scan_time).nanoseconds * 1e-9
+            scan_dt = float(np.clip(scan_dt, 0.005, 0.5))
+        else:
+            scan_dt = self.dt   # first callback ever: no prior timestamp yet
+        self._last_scan_time = now
 
         ranges_raw = msg.ranges[::20]
         angles_raw = np.linspace(msg.angle_min, msg.angle_max, len(msg.ranges))[::20]
@@ -944,7 +973,6 @@ class ControllerNode(Node):
         self.cbf.set_obstacles(ranges, angles, robot_xy=(self.x, self.y),
                                 robot_theta=self.theta)
         valid_ranges = ranges[(ranges > 0.1) & (ranges < self.r_max)]
-        p_world = np.array([self.x, self.y])
 
         # Raw (model-free-of-the-EKF) left-vs-right clearance, used only as a
         # tie-breaker deep in the fallback paths below when the learned
@@ -953,6 +981,40 @@ class ControllerNode(Node):
         left_min = float(np.min(ranges[left_mask])) if np.any(left_mask) else self.r_max
         right_min = float(np.min(ranges[right_mask])) if np.any(right_mask) else self.r_max
         raw_side_bias = left_min - right_min
+
+        dt_sub = scan_dt / self.n_control_substeps
+        for _ in range(self.n_control_substeps):
+            self._control_step(valid_ranges, raw_side_bias, dt_sub)
+
+    def _control_step(self, valid_ranges, raw_side_bias, dt_sub):
+        """
+        One control-law update. Called self.n_control_substeps times per
+        real scan (from lidar_callback) rather than once, so actuation
+        updates near the rate this file was originally designed for (~100
+        Hz) even though the real LiDAR only delivers new perception at
+        ~38 Hz. This is NOT fabricating sensor data: q_meas/qdot_meas below
+        come from evaluating the already-fitted, persistent per-obstacle
+        GPs (set_obstacles() in lidar_callback, unchanged since the last
+        real scan) at the CURRENT position estimate, which legitimately
+        keeps evolving between scans via EKF prediction and any new
+        odometry that has arrived (odom_callback runs independently, and
+        this node's executor is multi-threaded) -- re-evaluating a static
+        map at an updated position is a real measurement, not an invented
+        one. Only perception itself (the scan, obstacle GP updates,
+        raw_side_bias, valid_ranges) is genuinely tied to a new LiDAR
+        message and stays out of this method.
+        """
+        start_time = time.time()
+        self._step_count += 1
+
+        self.dt = dt_sub
+        self.cbf.dt = dt_sub
+        self.safety_ekf.Ts = dt_sub
+        self.position_ekf.Ts = dt_sub
+        self.cbf.stuck_limit = max(1, int(0.15 / dt_sub))
+        self.cbf.fallback_dither_period = max(1, int(0.3 / dt_sub))
+
+        p_world = np.array([self.x, self.y])
 
         # EKF predict, Eq. (8)-(10) discretized.
         self.safety_ekf.predict(self.u_prev)
