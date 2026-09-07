@@ -170,7 +170,7 @@ class SimNode:
         self.v_min, self.v_max = 0.0, 1.2
         self.phi_min, self.phi_max = -0.4, 0.4
         self.r_max = 3.0
-        self.length_scale = 0.20
+        self.length_scale = 0.70   # see matching comment in cbf_Node_refactored.py
         self.sigma_f = 1.0
         self.r_buf = 0.1016 + 0.05    # vehicle half-width (8in/2) + noise margin
         self.lambda_0 = 2.5
