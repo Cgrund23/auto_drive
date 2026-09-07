@@ -314,17 +314,16 @@ class SimNode:
         q_hat, qdot_hat, F_q_hat, B_q_hat, P_safety = self.safety_ekf.get_estimates()
 
         u_ref = u_ref.copy()
-        u_ref[0] *= float(np.clip(q_hat if np.isfinite(q_hat) else 1.0, 0.15, 1.0))
+        u_ref[0] *= float(np.clip((q_hat if np.isfinite(q_hat) else 1.0) / 0.6, 0.15, 1.0))
 
         min_range = float(np.min(valid_ranges)) if len(valid_ranges) > 0 else 999.0
         if min_range < 0.30:
             self._estop_stuck_counter += 1
-            model_dir = 1.0 if B_q_hat[1] >= 0 else -1.0
             raw_dir = 1.0 if raw_side_bias >= 0 else -1.0
-            if self._estop_stuck_counter > self.cbf.stuck_limit and raw_side_bias != 0.0 and model_dir != raw_dir:
+            if raw_side_bias != 0.0:
                 chosen_dir = raw_dir
             else:
-                chosen_dir = model_dir
+                chosen_dir = 1.0 if B_q_hat[1] >= 0 else -1.0
             phi_dir = self.phi_max if chosen_dir > 0 else self.phi_min
             if self._estop_stuck_counter >= self.cbf.stuck_limit:
                 v_estop = min(self.cbf.fallback_creep_v, self.v_max)

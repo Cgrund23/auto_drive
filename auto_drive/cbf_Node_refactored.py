@@ -1000,8 +1000,16 @@ class ControllerNode(Node):
         # slower floor (0.15 vs 0.25) right up against an obstacle, buys
         # back some of that distance budget without touching the actual
         # safety constraint, which the CBF-QP enforces regardless.
+        # Restored a full-speed zone (q_hat >= 0.6) that an earlier change
+        # this session removed -- scaling from q_hat=1.0 instead of 0.6
+        # meant ANY steady-state proximity to a wall (even a comfortably
+        # safe one) permanently capped cruising speed, confirmed on
+        # hardware: min_range held a stable ~0.6m (q~0.78, well clear of
+        # any real risk) yet speed was pinned at 0.78x forever instead of
+        # ramping to full v_ref once settled. Below 0.6 still scales down
+        # to the 0.15 floor for genuinely close encounters.
         u_ref = u_ref.copy()
-        u_ref[0] *= float(np.clip(q_hat if np.isfinite(q_hat) else 1.0, 0.15, 1.0))
+        u_ref[0] *= float(np.clip((q_hat if np.isfinite(q_hat) else 1.0) / 0.6, 0.15, 1.0))
 
         min_range = float(np.min(valid_ranges)) if len(valid_ranges) > 0 else 999.0
         if min_range < 0.30:
@@ -1019,12 +1027,23 @@ class ControllerNode(Node):
             # instead of freezing at whatever phi happened to be applied the
             # instant this branch first triggered.
             self._estop_stuck_counter += 1
-            model_dir = 1.0 if B_q_hat[1] >= 0 else -1.0
+            # Trust raw_side_bias IMMEDIATELY here, not after stuck_limit
+            # steps like the softer CBF fallback does. That delay exists so
+            # the model gets "a fair chance" before being overridden, which
+            # is reasonable when there's still distance to spare -- but this
+            # branch by definition only engages inside min_range<0.30, the
+            # single most time-critical moment there is. Confirmed in
+            # simulation: waiting here cost exactly one stuck_limit's worth
+            # of WRONG-direction steering (phi snapped to +0.4, toward the
+            # obstacle, for 15 steps before correcting) right as min_range
+            # first crossed the threshold -- burning through the last of the
+            # distance budget on a stale model belief instead of the
+            # always-available raw measurement.
             raw_dir = 1.0 if raw_side_bias >= 0 else -1.0
-            if self._estop_stuck_counter > self.cbf.stuck_limit and raw_side_bias != 0.0 and model_dir != raw_dir:
+            if raw_side_bias != 0.0:
                 chosen_dir = raw_dir
             else:
-                chosen_dir = model_dir
+                chosen_dir = 1.0 if B_q_hat[1] >= 0 else -1.0
             phi_dir = self.phi_max if chosen_dir > 0 else self.phi_min
             if self._estop_stuck_counter >= self.cbf.stuck_limit:
                 v_estop = min(self.cbf.fallback_creep_v, self.v_max)
@@ -1048,11 +1067,21 @@ class ControllerNode(Node):
 
         if self._step_count % 50 == 0:
             total_time = time.time() - start_time
+            # Compare against u_ref (the scaled target actually being
+            # pursued this cycle), NOT self.u_ref (the raw, unscaled
+            # v_ref=1.0 the wall-follower emits) -- comparing against the
+            # unscaled value meant this label reported BRAKE for perfectly
+            # normal, feasible tracking of a courtesy-slowed target every
+            # time the vehicle held a steady, safe distance from a wall
+            # (confirmed on hardware: v matched the scaled target almost
+            # exactly, phi was small dither not a pinned fallback value --
+            # neither is what BRAKE implies). feasible is now printed
+            # directly so this class of mislabeling is visible, not hidden.
             action = 'ESTOP' if min_range < 0.30 else \
-                     ('SAFE' if feasible and abs(u_safe[0] - self.u_ref[0]) < 0.1 else
-                      ('STEER' if abs(u_safe[1] - self.u_ref[1]) > 0.05 else 'BRAKE'))
+                     ('SAFE' if feasible and abs(u_safe[0] - u_ref[0]) < 0.1 else
+                      ('STEER' if abs(u_safe[1] - u_ref[1]) > 0.05 else 'BRAKE'))
             self.get_logger().info(
-                f'[{action}] {total_time*1000:.0f}ms | q={q_hat:.2f} | min_range={min_range:.2f} | '
+                f'[{action}] {total_time*1000:.0f}ms | feas={feasible} | q={q_hat:.2f} | min_range={min_range:.2f} | '
                 f'B_q=[{B_q_hat[0]:.2f},{B_q_hat[1]:.2f}] | v={u_safe[0]:.2f} phi={u_safe[1]:.2f}')
 
     def send_command(self, v, phi):
